@@ -1,5 +1,6 @@
 # Predicting Air Quality from Weather Observarions
 
 
-## Bigger picture
-![Alt text](./architecture.svg)
+
+## Code structure
+![Alt text](./doc/architecture.svg)
