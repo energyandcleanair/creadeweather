@@ -3,8 +3,9 @@ require(purrr)
 require(sf)
 require(raster)
 require(tidyr)
+if (!require(GADMTools)) install.packages(c('GADMTools')); require(GADMTools)
 
-meas <- readRDS('data/00_init/daily data all stations.RDS')
+meas <- readRDS('data/00_init/input/daily data all stations.RDS')
 meas <- tibble(meas)
 
 # Get unique countries, date interval etc.
@@ -40,10 +41,14 @@ stations_sf <- sf::st_as_sf(stations, coords=c("Longitude","Latitude"),crs=4326)
 # Add GADM1 information
 iso2 <- unique(meas_meta$country) # Used for filtering GADM1 in QGIS
 iso3 <- countrycode::countrycode(iso2, "iso2c", "iso3c")
+iso3 <- setdiff(iso3, "GIB")
+# gadm1s <- GADMTools::gadm_sf.loadCountries(iso3, level=1, simplify = 0.05)
 gadm1s <- lapply(iso3, function(x) tryCatch({raster::getData('GADM', country=x, level=1)},error=function(cond){NULL}))
 gadm1s <- gadm1s[!sapply(gadm1s,is.null)]
 gadm1 <- do.call(raster::bind, gadm1s) 
-gadm1_sf <- sf::st_as_sf(gadm1) %>% dplyr::select(gadm1_id=GID_1, gadm1_name=NAME_1)
+gadm1_sf <- st_as_sf(gadm1) %>% dplyr::select(gadm1_id=GID_1, gadm1_name=NAME_1)
+gadm1_sf <- st_simplify(gadm1_sf,preserveTopology = T,dTolerance = 0.1)
+
 stations_sf <- st_join(stations_sf, gadm1_sf)
 gadm1_filtered_sf <- gadm1_sf %>% filter(gadm1_id %in% unique(stations_sf$gadm1_id))
 # Gee doesn't like complex shapes (takes a lot of time). We simplify GADM1s as their boundinx boxes
@@ -57,6 +62,9 @@ stations_sf %>% sf::st_write('data/00_init/output/stations.geojson')
 file.remove(list.files('data/00_init/output/','^gadm1_filtered.(geojson|shp|prj|dbf|shx)', full.names = T))
 gadm1_filtered_sf %>% sf::st_write('data/00_init/output/gadm1_filtered.shp')
 gadm1_filtered_sf %>% sf::st_write('data/00_init/output/gadm1_filtered.geojson')
+
+file.remove(list.files('data/00_init/output/','^gadm1.geojson', full.names = T))
+gadm1_sf %>% sf::st_write('data/00_init/output/gadm1.geojson')
 
 file.remove(list.files('data/00_init/output/','^gadm1_filtered_bounds.(geojson|shp|prj|dbf|shx)', full.names = T))
 gadm1_filtered_bounds_sf %>% sf::st_write('data/00_init/output/gadm1_filtered_bounds.shp')

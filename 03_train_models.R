@@ -33,7 +33,7 @@ weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,se
 # "air_temp"   "atmos_pres" "wd" "ws" "ceil_hgt" "visibility" "precip" "RH"
 formula_vars <- vars(all.vars(formula))
 
-formula <- reformulate(termlabels=weather_vars,
+formula <- reformulate(termlabels=weather_vars_lags,
                        response='value')
 
 
@@ -107,6 +107,11 @@ saveRDS(output_data %>% dplyr::select(-c(training, testing)), file.path(result_f
 
 
 plot.output_data(output_data, rolling_days=7,
-                              filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows.pdf')))
+                              filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows_7d.pdf')))
+
+plot.output_data(output_data, rolling_days=7,
+                 filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows_30d.pdf')))
+
+plot.output_map(output_data, result_folder=result_folder, timestamp_str = timestamp_str)
 
 

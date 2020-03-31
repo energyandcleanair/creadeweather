@@ -1,5 +1,6 @@
 require(ggplot2)
 if (!require(cowplot)) install.packages(c('cowplot')); require(cowplot)
+if (!require(GADMTools)) install.packages(c('GADMTools')); require(GADMTools)
 
 source('99_utils.R')
 
@@ -63,22 +64,24 @@ plot.infos <- function(output_data_row){
 
 plot.output_data_row <- function(output_data_row, rolling_days){
   
-  if(is.null(output_data_row$model_fitted[[1]]) || is.na(output_data_row$model_fitted[[1]])){
-    no_data <- "No Data"
-    p1 <- ggplot() + theme_void() + ggplot2::annotate("text", label=no_data) 
-    p2 <- ggplot() + theme_void() + ggplot2::annotate("text", label=no_data) 
-    p3 <- plot.infos(output_data_row)
-  }
-  else{
+  tryCatch({
     p1 <- plot.predicted(output_data_row$meas_weather[[1]],rolling_days) +
       theme(legend.position='none') +
       scale_x_date(limits=c(lubridate::date('2015-01-01'), lubridate::date('2020-01-01')))
     p2 <- plot.predicted(output_data_row$meas_weather[[1]],rolling_days, min_date = '2020-01-01') +
       theme(legend.position='bottom')
     p3 <- plot.infos(output_data_row)
-  }
-  # plot_grid(p1, p2, p3, ncol = 3, nrow = 1, align = "h",  axis = "b")
-  figure <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
+    figure <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
+    
+  },
+  error=function(cond){
+    no_data <- "No Data"
+    p1 <- ggplot() + theme_void() + ggplot2::annotate("text", label=no_data) 
+    p2 <- ggplot() + theme_void() + ggplot2::annotate("text", label=no_data) 
+    p3 <- plot.infos(output_data_row)
+    figure <- ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
+  })
+  
   annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(output_data_row$AirPollutant,
@@ -104,4 +107,25 @@ plot.output_data <- function(output_data, rolling_days, filepath){
   
   figure_alls <- ggarrange(plotlist=figures, ncol = 1, nrow = 3)
   ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
+}
+
+
+plot.output_map <- function(output_data, result_folder, timestamp_str){
+  gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
+  polls <- uniaue(Ai)
+  gadm1_data <- gadm1_sf %>% dplyr::right_join(
+    output_data %>%
+      dplyr::select(gadm1_id, AirPollutant, rmse, rmse_test, mae, mae_test, rsq, rsq_test) %>%
+      right_join(tidyr::crossing(output_data %>% distinct(gadm1_id, gadm1_name),
+                                 AirPollutant=unique(output_data$AirPollutant)))
+    )
+  
+  map_r2_test <- ggplot(gadm1_data) +
+    geom_sf(aes(fill=rsq_test),size=0.1) +
+    facet_grid(~AirPollutant) +
+    labs(title=expression(paste(R^{2}, "validation"))) +
+    scale_fill_continuous(na.value="white")
+  
+  ggsave(file.path(result_folder,paste0(timestamp_str,'_map_rsq_test.pdf')))
+  
 }
