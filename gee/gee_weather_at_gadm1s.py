@@ -40,7 +40,7 @@ def iterate_fn(ft, fc_res):
     return ee.FeatureCollection(fc_res).merge(res)
 
 
-# Approach1 : One station at a time
+# Approach1 : One region at a time
 bar = pyprind.ProgBar(len(gadm1_fts), title='GEE: Weather at GADM1s', stream=sys.stdout)
 res_gadm1s = []
 start_time = time.time()
@@ -57,21 +57,22 @@ print("Method1:" + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
 
 
-# Approach2 : all together
-def reduce_image(img):
-    return ee.Image(img).reduceRegions(
-                          collection=ee.FeatureCollection(gadm1_fts[:2]),
-                          reducer=ee.Reducer.mean(),  # At a single point, no need to average
-                          tileScale=4
-                      )
-
-start_time = time.time()
-res_approach2 = ee.FeatureCollection(source_ic.map(reduce_image)).flatten()
-res_approach2_info = geetools.batch.featurecollection.toDict(res_approach2)
-elapsed_time=time.time()-start_time
-print("Method2:" + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
-
-
+#
+# # Approach2 : all together
+# def reduce_image(img):
+#     return ee.Image(img).reduceRegions(
+#                           collection=ee.FeatureCollection(gadm1_fts[:2]),
+#                           reducer=ee.Reducer.mean(),  # At a single point, no need to average
+#                           tileScale=4
+#                       )
+#
+# start_time = time.time()
+# res_approach2 = ee.FeatureCollection(source_ic.map(reduce_image)).flatten()
+# res_approach2_info = geetools.batch.featurecollection.toDict(res_approach2)
+# elapsed_time=time.time()-start_time
+# print("Method2:" + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+#
+#
 
 
 # res_stations_data = [x['features'] for x in res_stations]

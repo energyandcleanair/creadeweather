@@ -4,10 +4,12 @@ require(sf)
 require(tibble)
 require(lubridate)
 require(ggplot2)
+source('99_utils.R')
 
-exp_name <- 'test_1'
+exp_name <- 'lag7'
 test_frac <- 0.1
-day_lags <- c(1:3)
+day_lags <- c(1:7)
+n_regions = NULL #50 #You might not want to run every region / poll combination
 
 meas_weather <- readRDS('data/02_prep_training/output/meas_weather_gadm1.RDS')
 
@@ -17,32 +19,31 @@ models <- list(model_gbm=function(training_data, formula){
       formula = formula,
       data = training_data,
       cv.folds = 5,
-      n.trees = 1500,
-      verbose = FALSE
+      n.trees = 800, # So farm, it seems only up to 500 trees are used
+      verbose = FALSE,
+      keep.data = FALSE
     )
     print("Done")
     return(gbm.fit)
 })
 
-colnames(meas_weather$meas[[1]])
-
-formula <- reformulate(termlabels=c('Psurf_f_inst', paste('Psurf_f_inst',day_lags,sep="_"),
-                                    'Qair_f_inst', paste('Qair_f_inst',day_lags,sep="_"),
-                                    'Rainf_tavg', paste('Rainf_tavg',day_lags,sep="_"),
-                                    'Tair_f_inst', paste('Tair_f_inst',day_lags,sep="_"),
-                                    'Wind_f_inst', paste('Wind_f_inst',day_lags,sep="_")
-                                    ),
-                       response='value')
+weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
+weather_vars <- weather_vars_available
+weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
+# "air_temp"   "atmos_pres" "wd" "ws" "ceil_hgt" "visibility" "precip" "RH"
 formula_vars <- vars(all.vars(formula))
-weather_vars <- c('Psurf_f_inst','Qair_f_inst','Rainf_tavg','Tair_f_inst','Wind_f_inst')
+
+formula <- reformulate(termlabels=weather_vars,
+                       response='value')
+
 
 # Adding lag
 meas_weather_lag <- meas_weather %>% rowwise() %>%
-  mutate(meas=list(utils.add_lag(meas, weather_vars, group_cols=c(), day_lags, 'day')))
+  mutate(meas_weather=list(utils.add_lag(meas_weather, weather_vars, group_cols=c(), day_lags, 'day')))
          
 # Keep only full observations
 meas_weather_lag <- meas_weather_lag %>%
-  mutate(meas=list(meas %>% filter_at(c(formula_vars, vars(value)), all_vars(!is.na(.)))))
+  mutate(meas_weather=list(meas_weather %>% filter_at(c(formula_vars, vars(value)), all_vars(!is.na(.)))))
 
 ### Result folder
 # Create results folder
@@ -62,18 +63,19 @@ file.rename(from = file.path(result_folder, basename(org_file)),
 #----------------
 # Split training / validation
 input_data <- meas_weather_lag %>% rowwise() %>%
-  mutate(meas = list(meas %>% mutate(id = row_number()))) %>%
-  mutate(training = list(dplyr::sample_frac(meas, 1-test_frac))) %>% 
-  mutate(testing = list(anti_join(meas, training, by='id')))
+  mutate(meas_weather = list(meas_weather %>% mutate(id = row_number()))) %>%
+  mutate(training = list(dplyr::sample_frac(meas_weather, 1-test_frac))) %>% 
+  mutate(testing = list(anti_join(meas_weather, training, by='id')))
 
 # Adding models to tibble (each model is applied to each region, poll combination)
 model_names <- if (!is.null(names(models))) names(models) else seq_along(models)
 models_df <- tibble(model_name=names(models), model=models)
 input_data <- input_data %>% tidyr::crossing(models_df)
 
-output_data <- input_data[1:50,] %>%
+n_poll = 3 #TODO Remove hardcoding
+n_trainings = ifelse(!is.null(n_regions),n_regions * n_poll *length(models),nrow(input_data)) 
+output_data <- input_data[1:n_trainings,] %>%
   mutate(model_fitted=purrr::map2(training, model, purrr::possibly(~.y(.x %>% select_at(formula_vars), formula), otherwise = NA, quiet = FALSE)))
-
 
 #----------------
 # Predict
@@ -83,8 +85,7 @@ output_data <- output_data %>% mutate(training=purrr::map2(training, model_fitte
 output_data <- output_data %>% mutate(testing=purrr::map2(testing, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
 
 # Also predict on whole dataset for plotting purposes
-output_data <- output_data %>% mutate(meas=purrr::map2(meas, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
-
+output_data <- output_data %>% mutate(meas_weather=purrr::map2(meas_weather, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
 
 #---------------
 # Post compute
@@ -102,31 +103,10 @@ output_data <- output_data %>% mutate(rsq_test=purrr::map_dbl(testing, purrr::po
 #-----------------------
 # Save and plot results
 #-----------------------
-saveRDS(output_data, file.path(result_folder, paste0(timestamp_str,'_results.RDS')))
-
-roll_plot <- function(raw, n_days){
-  result <- raw %>%
-    dplyr::mutate(date=lubridate::floor_date(date, unit = 'day')) %>%
-    dplyr::group_by(gadm1_id, AirPollutant, rsq, rsq_test, mae, mae_test, date, type) %>%
-    dplyr::summarise(value=mean(value, na.rm = T)) %>% dplyr::ungroup() %>%
-    dplyr::group_by(gadm1_id, AirPollutant, rsq, rsq_test, mae, mae_test, type) %>%
-    dplyr::arrange(date) %>%
-    dplyr::mutate(value=zoo::rollapply(value, width=n_days,
-                                       FUN=function(x) mean(x, na.rm=TRUE), align='right',fill=NA)) %>%
-    dplyr::ungroup()
-  
-  return(result)
-}
-
-plot_data <- output_data %>%
-  dplyr::select(gadm1_id, AirPollutant, meas, rsq, rsq_test, mae, mae_test) %>%
-  filter(!is.na(meas)) %>%
-  tidyr::unnest(cols=meas) %>%
-  dplyr::select(gadm1_id, AirPollutant, date, rsq, rsq_test, mae, mae_test, value, predicted) %>%
-  tidyr::gather("type", "value", -c(gadm1_id, AirPollutant, date, rsq, rsq_test, mae, mae_test)) %>%
-  roll_plot(7)
+saveRDS(output_data %>% dplyr::select(-c(training, testing)), file.path(result_folder, paste0(timestamp_str,'_results.RDS')))
 
 
-ggplot(plot_data %>% filter(date>='2020-01-01'), aes(x=date, y=value, colour=type)) +
-  facet_grid(gadm1_id ~ AirPollutant, scales='free') +
-  geom_line()
+plot.output_data(output_data, rolling_days=7,
+                              filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows.pdf')))
+
+

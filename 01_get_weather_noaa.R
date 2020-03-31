@@ -13,9 +13,7 @@ min_year=2015
 max_year=2020
 max_stations_per_gadm1=5
 
-
-
-collect_weather_3h <- function(gadm1_sf, min_year, max_year, max_stations_per_gadm1){
+create_weather_3h <- function(gadm1_sf, min_year, max_year, max_stations_per_gadm1){
   
   gadm1_noaa <- gadm1_sf %>%
     rowwise() %>%
@@ -41,43 +39,90 @@ collect_weather_3h <- function(gadm1_sf, min_year, max_year, max_stations_per_ga
                                    path = file.path(getwd(),'cache')
                                  ),
                                  otherwise = NA)))
+  # saveRDS(gadm1_weather_3h,file.path('data', '01_weather', 'tmp', 'gadm1_weather_3h.RDS')) #1GB
   return(gadm1_weather_3h)
 }
 
-saveRDS(gadm1_weather_3h,file.path('data', '01_weather', 'tmp', 'gadm1_weather_3h.RDS')) #1GB
 
-# Aggregate per day
-gadm1_weather_day <- gadm1_weather_3h %>% filter(!is.na(weather)) %>%
-  rowwise() %>% mutate(weather=list(
-    weather %>%
-      dplyr::group_by(lubridate::date(date)) %>%
-      dplyr::summarize(
-        air_temp=mean(air_temp, na.rm=T),
-        atmos_pres=mean(atmos_pres, na.rm=T),
-        wd=mean(wd, na.rm=T),
-        ws=mean(ws, na.rm=T),
-        ceil_hgt=mean(ceil_hgt, na.rm=T),
-        visibility=mean(visibility, na.rm=T),
-        precip=mean(precip, na.rm=T),
-        RH=mean(RH, na.rm=T)
-      )
-  )
-  )
+aggregate_weather_3h <- function(gadm1_weather_3h){
 
-# Aggregate per region
-gadm1_weather_day_region <- gadm1_weather_day %>%
-  rowwise() %>% mutate(weather=list(
-    weather %>%
-      dplyr::group_by(lubridate::date(date)) %>%
-      dplyr::summarize(
-        air_temp=mean(air_temp, na.rm=T),
-        atmos_pres=mean(atmos_pres, na.rm=T),
-        wd=mean(wd, na.rm=T),
-        ws=mean(ws, na.rm=T),
-        ceil_hgt=mean(ceil_hgt, na.rm=T),
-        visibility=mean(visibility, na.rm=T),
-        precip=mean(precip, na.rm=T),
-        RH=mean(RH, na.rm=T)
+  # Aggregate per day
+  gadm1_weather_day <- gadm1_weather_3h %>% filter(!is.na(weather)) %>%
+    rowwise() %>% mutate(weather=list(
+      weather %>%
+        dplyr::group_by(date=lubridate::date(date)) %>%
+        dplyr::summarize(
+          air_temp=mean(air_temp, na.rm=T),
+          atmos_pres=mean(atmos_pres, na.rm=T),
+          wd=mean(wd, na.rm=T),
+          ws=mean(ws, na.rm=T),
+          ceil_hgt=mean(ceil_hgt, na.rm=T),
+          visibility=mean(visibility, na.rm=T),
+          precip=mean(precip, na.rm=T),
+          RH=mean(RH, na.rm=T)
+        )
       )
-  )
-  )
+    )
+  
+  # Aggregate per region
+  gadm1_weather_day_region <- gadm1_weather_day %>%
+    dplyr::group_by(gadm1_id, gadm1_name) %>%
+    summarise(weather=list(
+      bind_rows(weather) %>%
+        dplyr::group_by(date) %>%
+        dplyr::summarize(
+          air_temp=mean(air_temp, na.rm=T),
+          atmos_pres=mean(atmos_pres, na.rm=T),
+          wd=mean(wd, na.rm=T),
+          ws=mean(ws, na.rm=T),
+          ceil_hgt=mean(ceil_hgt, na.rm=T),
+          visibility=mean(visibility, na.rm=T),
+          precip=mean(precip, na.rm=T),
+          RH=mean(RH, na.rm=T)
+        )
+      )
+    )
+  
+  return(gadm1_weather_day_region)
+}
+
+
+# Create from scratch: can take 5-10 hours for Europe
+create_weather <- function(gadm1_sf, min_year, max_year, max_stations_per_gadm1){
+  gadm1_weather_3h <- create_weather_3h(gadm1_sf, min_year, max_year, max_stations_per_gadm1)
+  gadm1_weather_day_region <- aggregate_weather_3h(gadm1_weather_3h)
+  return(gadm1_weather_day_region)
+}
+
+# Update previously fetched weather data wih latest measurements (i.e. last year)
+# Not tested yet
+update_weather <- function(gadm1_weather_day_region, gadm1_sf, max_stations_per_gadm1){
+  
+  last_year <- max((gadm1_weather_day_region %>%
+                      rowwise() %>%
+                      mutate(last_year=lubridate::year(max(weather$date))))$last_year)
+  gadm1_weather_3h_new <- create_weather_3h(gadm1_sf, last_year, last_year, max_stations_per_gadm1)
+  gadm1_weather_day_region_new <- aggregate_weather_3h(gadm1_weather_3h_new)
+  
+  # Replace in existing results
+  # 1. remove last year in old data
+  gadm1_weather_day_region <-  gadm1_weather_day_region %>%
+    rowwise() %>%
+    mutate(weather=list(weather %>% filter(lubridate::year(date) != last_year)))
+  # 2. add newly fetched data
+  gadm1_weather_day_region <-  bind_rows(gadm1_weather_day_region, gadm1_weather_day_region_new) %>%
+    group_by(gadm1_id, gadm1_name) %>%
+    mutate(weather=list(bind_rows(weather)))
+  
+  return(gadm1_weather_day_region)
+}
+
+result_path <- file.path('data','01_weather', 'output','gadm1_weather_noaa.RDS')
+if(file.exists(result_path)){
+  gadm1_weather_day_region <- readRDS(result_path)
+  gadm1_weather_day_region <- update_weather(gadm1_weather_day_region, gadm1_sf, max_stations_per_gadm1)
+}else{
+  gadm1_weather_day_region <- create_weather_3h(gadm1_sf, min_year, max_year, max_stations_per_gadm1)
+}
+
+saveRDS(gadm1_weather_day_region, result_path)
