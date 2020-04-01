@@ -109,6 +109,32 @@ plot.output_data <- function(output_data, rolling_days, filepath){
   ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
 }
 
+plot.map_count <- function(data, folder, title, meas_col){
+  
+  # Plot number of measurements with weather
+  gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
+  map_count_data <- st_as_sf(gadm1_sf %>% 
+                               tidyr::crossing(pollutant=unique(data$pollutant))) %>%
+    left_join(
+      data %>%
+        rowwise() %>% 
+        mutate_at(meas_col, nrow)
+      ) %>%
+    group_by(gadm1_id, pollutant) %>% 
+    mutate_at(meas_col, sum)
+    
+  map_count <- ggplot(map_count_data) +
+    geom_sf(aes_string(fill=meas_col),size=0.1) +
+    facet_grid(~pollutant) +
+    labs(title=title, fill="Count") +
+    scale_fill_continuous(na.value="white")
+  
+  if(!is.null(folder)){
+    ggsave(filename=file.path(folder,'map_count.pdf'), map_count)
+    ggsave(filename=file.path(folder,'map_count_thumb.png'), map_count, scale=0.7, width=15, height=6, dpi = 120)  
+  }
+  map_count
+}
 
 plot.output_map <- function(output_data, result_folder, timestamp_str){
   gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')

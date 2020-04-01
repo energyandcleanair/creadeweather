@@ -58,3 +58,12 @@ utils.rolling_average <- function(data, average_by, average_width, group_cols, a
     dplyr::mutate_at(avg_cols, train_roll_fn)
   return(data)
 }
+
+
+utils.replace_nan_with_na <- function(tbl){
+  list_names <- colnames(tbl)
+  list_values <- rep(NA, length(list_names))
+  replace_list <- as.list(list_values)
+  names(replace_list) <- list_names
+  tbl %>% tidyr::replace_na(replace_list)
+}

@@ -28,22 +28,24 @@ models <- list(model_gbm=function(training_data, formula){
 })
 
 weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
-weather_vars <- weather_vars_available
+weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd_factor', 'ws_max', 'ceil_hgt', 'visibility',
+                  'precip', 'RH', 'sunshine')
 weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
-# "air_temp"   "atmos_pres" "wd" "ws" "ceil_hgt" "visibility" "precip" "RH"
-formula_vars <- vars(all.vars(formula))
-
 formula <- reformulate(termlabels=weather_vars_lags,
                        response='value')
-
+formula_vars <- vars(all.vars(formula))
 
 # Adding lag
 meas_weather_lag <- meas_weather %>% rowwise() %>%
   mutate(meas_weather=list(utils.add_lag(meas_weather, weather_vars, group_cols=c(), day_lags, 'day')))
          
-# Keep only full observations
+# Keep only observations with a concentration and some weather data
+# GBM can deal with incomplete observations -> we use any_vars rather than all_vars
 meas_weather_lag <- meas_weather_lag %>%
-  mutate(meas_weather=list(meas_weather %>% filter_at(c(formula_vars, vars(value)), all_vars(!is.na(.)))))
+  mutate(meas_weather=list(meas_weather %>% filter_at(weather_vars_lags, any_vars(!is.na(.)))))
+meas_weather_lag <- meas_weather_lag %>%
+  mutate(meas_weather=list(meas_weather %>% filter(!is.na(value))))
+
 
 ### Result folder
 # Create results folder
@@ -57,6 +59,10 @@ file.copy(org_file, result_folder, overwrite = T)
 file.rename(from = file.path(result_folder, basename(org_file)),
             to = file.path(result_folder, paste0(timestamp_str, '_', tools::file_path_sans_ext(basename(org_file)),'.R')))
 
+# Map count of inputs (to compare with output and see where models failed)
+plot.map_count(meas_weather_lag, folder=result_folder,
+               title='Number of full measurements / weather observations',
+               meas_col = 'meas_weather')
 
 #----------------
 # Train models
@@ -72,7 +78,7 @@ model_names <- if (!is.null(names(models))) names(models) else seq_along(models)
 models_df <- tibble(model_name=names(models), model=models)
 input_data <- input_data %>% tidyr::crossing(models_df)
 
-n_poll = 3 #TODO Remove hardcoding
+n_poll = length(unique(meas_weather$pollutant))
 n_trainings = ifelse(!is.null(n_regions),n_regions * n_poll *length(models),nrow(input_data)) 
 output_data <- input_data[1:n_trainings,] %>%
   mutate(model_fitted=purrr::map2(training, model, purrr::possibly(~.y(.x %>% select_at(formula_vars), formula), otherwise = NA, quiet = FALSE)))
