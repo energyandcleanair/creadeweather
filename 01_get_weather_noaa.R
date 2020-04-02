@@ -1,19 +1,56 @@
 require(purrr)
 require(sf)
-require(rnoaa)
 require(dplyr)
-require(worldmet)
-require(sirad)
-if (!require(RNCEP)) install.packages('RNCEP'); library(RNCEP)
+
+if(!require(install.load)) install.packages("install.load"); require(install.load)
+install_load('rnoaa', 'worldmet', 'sirad')
+
 
 #-----------------------------------------------------------------------------
 # If no existing result: query the whole dataset again (can take 5-10 hours)
-# If existing rsults: only query last year and merge into results
+# If existing results: only query last year and merge into results
 #-----------------------------------------------------------------------------
 gadm1_sf <- sf::st_read('data/00_init/output/gadm1_filtered_bounds.geojson')
 min_year=2015
 max_year=2020
-max_stations_per_gadm1=5
+max_stations_per_gadm1=10
+
+cache_folder <- file.path('data', '01_weather', 'cache')
+if(!dir.exists(cache_folder)) dir.create(cache_folder)
+
+output_folder <- file.path('data', '01_weather', 'output')
+if(!dir.exists(output_folder)) dir.create(output_folder)
+
+get_noaa <- function(code, years, cache_folder){
+  # Get NOAA data, first trying to use cached files for complete years
+  year_incomplete <- c(2020)
+  
+  # Reading cache files
+  years_try_cache <- setdiff(years, year_incomplete)
+  files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
+  
+  readFile <- function(path){
+    if(file.exists(path)) readRDS(path) else NULL
+  }
+
+  data_cached <- files %>% map_dfr(readFile) %>% 
+    bind_rows()
+  
+  # Adding last year
+  data_last_year <- worldmet::importNOAA(
+    code = code,
+    year = year_incomplete,
+    hourly = FALSE,
+    precip = TRUE,
+    PWC = FALSE,
+    parallel = T,
+    quiet = FALSE,
+    path = cache_folder
+  )
+  
+  # Binding and returning
+  return(bind_rows(data_cached, data_last_year))
+}
 
 create_weather_3h <- function(gadm1_sf, min_year, max_year, max_stations_per_gadm1){
   
@@ -30,15 +67,10 @@ create_weather_3h <- function(gadm1_sf, min_year, max_year, max_stations_per_gad
     dplyr::select(gadm1_id, gadm1_name, noaa_station_sample) %>%
     tidyr::unnest(cols=c(noaa_station_sample)) %>%
     mutate(weather = purrr::map2(.x=usaf, .y=wban,
-                                 purrr::possibly(~worldmet::importNOAA(
+                                 purrr::possibly(~get_noaa(
                                    code = paste(.x, .y, sep="-"),
-                                   year = min_year:max_year,
-                                   hourly = FALSE,
-                                   precip = TRUE,
-                                   PWC = FALSE,
-                                   parallel = T,
-                                   quiet = FALSE,
-                                   path = file.path(getwd(),'cache')
+                                   years = min_year:max_year,
+                                   cache_folder=cache_folder
                                  ),
                                  otherwise = NA)))
   # saveRDS(gadm1_weather_3h,file.path('data', '01_weather', 'tmp', 'gadm1_weather_3h.RDS')) #1GB
@@ -161,11 +193,11 @@ update_weather <- function(gadm1_weather_day_region, gadm1_sf, max_stations_per_
 }
 
 result_path <- file.path('data','01_weather', 'output','gadm1_weather_noaa.RDS')
-if(file.exists(result_path)){
-  gadm1_weather_day_region <- readRDS(result_path)
-  gadm1_weather_day_region <- update_weather(gadm1_weather_day_region, gadm1_sf, max_stations_per_gadm1)
-}else{
+# if(file.exists(result_path)){
+#   gadm1_weather_day_region <- readRDS(result_path)
+#   gadm1_weather_day_region <- update_weather(gadm1_weather_day_region, gadm1_sf, max_stations_per_gadm1)
+# }else{
   gadm1_weather_day_region <- create_weather(gadm1_sf, min_year, max_year, max_stations_per_gadm1)
-}
+# }
 
 saveRDS(gadm1_weather_day_region, result_path)
