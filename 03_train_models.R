@@ -5,6 +5,7 @@ require(tibble)
 require(lubridate)
 require(ggplot2)
 source('99_utils.R')
+source('99_plot.R')
 
 exp_name <- 'lag7'
 test_frac <- 0.1
@@ -90,8 +91,11 @@ output_data <- output_data %>% mutate(training=purrr::map2(training, model_fitte
 
 output_data <- output_data %>% mutate(testing=purrr::map2(testing, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
 
-# Also predict on whole dataset for plotting purposes
+# Also predict on whole dataset for plotting and residual analysis purposes
 output_data <- output_data %>% mutate(meas_weather=purrr::map2(meas_weather, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
+
+output_data <- output_data %>% rowwise() %>%
+  mutate(meas_weather = list(if(!is.na(meas_weather)) meas_weather %>% mutate(residuals=predicted-value) else NA))
 
 #---------------
 # Post compute
@@ -106,6 +110,7 @@ output_data <- output_data %>% mutate(mae_test=purrr::map_dbl(testing, purrr::po
 output_data <- output_data %>% mutate(rsq=purrr::map_dbl(training, purrr::possibly(~ rsq(.x$value, .x$predicted), otherwise = NA)))
 output_data <- output_data %>% mutate(rsq_test=purrr::map_dbl(testing, purrr::possibly(~ rsq(.x$value, .x$predicted), otherwise = NA)))
 
+
 #-----------------------
 # Save and plot results
 #-----------------------
@@ -115,9 +120,58 @@ saveRDS(output_data %>% dplyr::select(-c(training, testing)), file.path(result_f
 plot.output_data(output_data, rolling_days=7,
                               filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows_7d.pdf')))
 
-plot.output_data(output_data, rolling_days=7,
+plot.output_data(output_data, rolling_days=30,
                  filepath=file.path(result_folder,paste0(timestamp_str,'_results_plotrows_30d.pdf')))
 
-plot.output_map(output_data, result_folder=result_folder, timestamp_str = timestamp_str)
+plot.output_map(output_data, result_folder=result_folder, timestamp_str = timestamp_str,
+                meas_col='rsq_test', title=expression(paste(R^{2}, " validation")))
 
+
+### Residuals analysis: how does March 2020 compare with March 2015-2019
+average_over_yearly_periods <- function(tbl, meas_col, years, doys){
+  
+  if(is.na(tbl)) return(NA)
+  # doys: day of years
+  (tbl %>% filter(lubridate::year(date) %in% years,
+                  lubridate::yday(date) %in% doys) %>%
+      group_by() %>%
+      summarise_at(c(meas_col), mean, na.rm = TRUE))[[meas_col]][[1]]
+}
+
+output_data <- output_data %>% rowwise() %>% 
+  mutate(march_res_before=average_over_yearly_periods(meas_weather, 'residuals', years=c(2015:2019), doys=c(62:93)),
+         march_res_after=average_over_yearly_periods(meas_weather, 'residuals', years=c(2020), doys=c(62:93)),
+         value_mean=if(is.na(meas_weather)) NA else mean(meas_weather[['value']], na.rm = T)) %>%
+  mutate(march_res_comparison = -(march_res_after - march_res_before)/value_mean,
+         march_res_after_neg=(march_res_after/value_mean)*-1)
+
+output_data <- output_data %>% rowwise() %>%
+  mutate(march2020_value=average_over_yearly_periods(meas_weather, 'value', years=c(2020), doys=c(62:93)),
+         march2020_predicted=average_over_yearly_periods(meas_weather, 'predicted', years=c(2020), doys=c(62:93))) %>%
+  mutate(march2020_ratio=-1+march2020_value/march2020_predicted)
+
+output_data$march2020_ratio_c <- cut(output_data$march2020_ratio, labels=c("Decrease >100% (sic)",
+                                              "Decrease 20-100%",
+                                              "Decrease 10-20%",
+                                              "Decrease 5-10%",
+                                              "Decrease 0-5%",
+                                              "Increase 0-5%",
+                                              "Increase 5-10%",
+                                              "Increase 10-100%",
+                                              "Increase 20-100%",
+                                              "Increase > 100%"
+                                              ),
+    breaks=c(-Inf,-1,-0.2,-0.1,-0.05,0,0.05,0.1,0.2,1,+Inf))
+
+output_data$march2020_ratio_c <- reorder(output_data$march2020_ratio_c, desc(output_data$march2020_ratio_c))
+
+plot.output_map(output_data, result_folder=result_folder, timestamp_str = timestamp_str,
+                meas_col='march2020_ratio_c', title="March 2020 - Value vs Predicted",
+                scale=scale_fill_brewer(palette='RdBu', na.value="grey"),
+                labs=labs(fill=""))
+
+
+plot.output_map(output_data, result_folder=result_folder, timestamp_str = timestamp_str,
+                meas_col='march_res_comparison', title="Relative March 2020 residuals vs March 2015-2019 residuals (blue: value is lower than predicted)",
+                scale=scale_fill_distiller(palette='RdBu', limits=c(-1,1), breaks=c(-1,-0.05,0,0.05,1), na.value="grey"))
 
