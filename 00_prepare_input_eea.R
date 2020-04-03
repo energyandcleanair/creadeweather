@@ -6,7 +6,7 @@ require(magrittr)
 require(ggplot2)
 require(countrycode)
 require(lwgeom)
-
+require(pbapply)
 
 eea.get_stations <- function(){
   file_metadata <- file.path(input_folder,'PanEuropean_metadata.csv')
@@ -23,21 +23,32 @@ eea.get_stations <- function(){
       longitude=Longitude,
       date_from=ObservationDateBegin,
       date_to=ObservationDateEnd) %>%
-    mutate_if(is.factor, as.character)
+    mutate_if(is.factor, as.character) %>%
+    group_by(iso2, station_id) %>%
+    summarise(
+      latitude=first(latitude),
+      longitude=first(longitude),
+      date_from=min(date_from),
+      date_to=if('' %in% date_to) 'present' else max(date_to)
+    ) 
   return(stations)
 }
+
+
 
 eea.get_stations_sf <- function(){
   sf::st_as_sf(eea.get_stations(), coords=c("longitude","latitude"), crs=4326)
 }
 
-eea.download_station_meas <- function(station_id, years_force_refresh=c(2020)){
+eea.download_station_meas <- function(station_id, pollutant_names, years_force_refresh=c(2020)){
+  
   print(station_id)
   base_url = 'https://fme.discomap.eea.europa.eu/fmedatastreaming/AirQualityDownload/AQData_Extract.fmw?CountryCode=&CityName=&Pollutant=8&Year_from=2015&Year_to=2020&Station=&Samplingpoint=&Source=All&Output=TEXT&UpdateDate=&TimeCoverage=Year'
   
   pollutants = list(NO2=8, PM10=5, CO=10)
+  
   urls = list()
-  for(p in names(pollutants)) {
+  for(p in pollutant_names) {
     base_url %>% gsub('Pollutant=8', paste0('Pollutant=', pollutants[[p]]), .) %>%
       gsub('Station=', paste0('Station=', station_id), .) %>%
       gsub('Year_from=2015', paste0('Year_from=', 2015), .) %>% 
@@ -76,22 +87,29 @@ eea.download_station_meas <- function(station_id, years_force_refresh=c(2020)){
   url_to_download <- meas$url[file_paths_to_download_i]
   
   # Download files
-  for(u in url_to_download){
-    try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
-  }
-  
+  lapply(url_to_download,
+           function(u) try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
+           )
   return(meas)
 }
 
-eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=NULL){
-  print(pollutant_names)
+eea.download_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=c(2020)){
+  pblapply(station_ids,
+          function(station_id) eea.download_station_meas(station_id,
+                                                         pollutant_names=pollutant_names,
+                                                         years_force_refresh=years_force_refresh)
+          )
+}
   
+
+eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=NULL){
+
   file_paths <- list.files(cache_folder,'*_timeseries.csv', full.names = T)
   # We open every single file ancd check it belong s to station_ids & pollutant
   
   filter_file <- function(f, station_ids, pollutant_names){
     tryCatch({
-      fl <- read_csv(f, n_max = 1, progress=F)
+      fl <- read_csv(f, n_max = 1, progress=F, col_types = cols())
       res <- (fl$AirQualityStation %in% station_ids) &&(fl$AirPollutant %in% pollutant_names)
       if(is.na(res) || is.null(res)) FALSE else res
     }, error=function(cond){FALSE}
@@ -99,7 +117,7 @@ eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_ref
   }
   
   read_file <- function(f){
-    meas <- f %>% read_csv(progress=F) %>% 
+    meas <- f %>% read_csv(progress=F, col_types = cols()) %>% 
       filter(!is.na(Concentration), Concentration>0) %>%
       select(Countrycode, AirQualityStation, AirPollutant, Concentration, UnitOfMeasurement, DatetimeBegin, DatetimeEnd) %>%
       rename(
@@ -118,5 +136,5 @@ eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_ref
     if(filter_file(f, station_ids, pollutant_names)) read_file(f) else NULL
   }
   
-  do.call("rbind", lapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
+  do.call("rbind", pblapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
 }
