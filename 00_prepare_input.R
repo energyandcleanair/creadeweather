@@ -3,71 +3,187 @@ require(sf)
 require(raster)
 require(tidyverse)
 require(magrittr)
-require(pbapply)
 require(ggplot2)
+require(countrycode)
+require(lwgeom)
 
+set.seed(2020)
 cache_folder <- file.path('data', '00_init', 'cache')
-if(!dir.exists(cache_folder)) dir.create(cache_folder)
+if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
 
 output_folder <- file.path('data', '00_init', 'output')
-if(!dir.exists(output_folder)) dir.create(output_folder)
+if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
 
+input_folder <- file.path('data', '00_init', 'input')
+if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
 
-get_eea_meas <- function(){
-  
-    download_eea_meas_fresh <- function(years_force_refresh=NULL){
-      base_url = 'https://fme.discomap.eea.europa.eu/fmedatastreaming/AirQualityDownload/AQData_Extract.fmw?CountryCode=&CityName=&Pollutant=8&Year_from=2015&Year_to=2020&Station=&Samplingpoint=&Source=All&Output=TEXT&UpdateDate=&TimeCoverage=Year'
-      
-      pollutants = list(NO2=8, PM10=5, CO=10)
-      urls = list()
-      for(p in names(pollutants)) {
-        base_url %>% gsub('Pollutant=8', paste0('Pollutant=', pollutants[[p]]), .) %>%
-          gsub('Year_from=2015', paste0('Year_from=', 2015), .) %>% 
-          gsub('Year_to=2020', paste0('Year_to=', 2020), .) %>% 
-          readLines() -> urls[[p]]
-      }
-      
-      urls %<>% unlist
-      
-      file_paths <-  file.path(cache_folder, gsub('.*/', '', urls))
-      file_paths_to_download_i <- which(!file.exists(file_paths))
-        
-      if(!is.null(years_force_refresh)){
-        file_paths_to_download_i <- unique(c(file_paths_to_download_i,
-                                    grep(paste0('_',years_force_refresh,'_timeseries.csv',collapse='|'),
-                                         file_paths, perl=T, value=F)))
-      }
-
-      url_to_download <- urls[file_paths_to_download_i]
-      # Download
-      for(u in urls) try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
-    }
-    
-    # build a data.frame of downloaded files
-    # urls %>% gsub('.*/', '', .) -> inF
-    inF <- list.files(path=cache_folder, pattern='*_timeseries.csv')
-    inF <- do.call('rbind', lapply(inF, function(x){
-        data.frame(t(strsplit(x, '_')[[1]][1:4])) %>%
-          set_names(c('ISO3', 'PollutantCode', 'STID', 'Year')) %>%
-          mutate(file=file.path(cache_folder,x)) %>% mutate_if(is.factor, as.character)
-      }))
-    
-    # Read data
-    coltypes <- inF$file[1] %>% read_csv() %>% sapply(class) %>% substr(1, 1)
-    read_timeseries <- function(file){
-      tryCatch({
-        file %>% read_csv(col_types = coltypes, progress=F) %>% 
-            filter(!is.na(Concentration), Concentration>0)},
-        errorCondition(cond){
-          NA
-        })
-    }
-    inF <- inF %>% mutate(meas=list(map_dfr(file,read_timeseries)))
-    return(inF)
+eea.get_stations <- function(){
+  file_metadata <- file.path(input_folder,'PanEuropean_metadata.csv')
+  if(!file.exists(file_metadata)){
+    download.file(url='http://discomap.eea.europa.eu/map/fme/metadata/PanEuropean_metadata.csv',
+                  destfile=file_metadata)
+  }
+  stations <- read.csv(file_metadata, header=T, sep="\t") %>%
+    distinct(Countrycode, AirQualityStation, Latitude, Longitude, ObservationDateBegin, ObservationDateEnd) %>%
+    rename(
+      iso2=Countrycode,
+      station_id=AirQualityStation,
+      latitude=Latitude,
+      longitude=Longitude,
+      date_from=ObservationDateBegin,
+      date_to=ObservationDateEnd) %>%
+    mutate_if(is.factor, as.character)
+  return(stations)
 }
 
+eea.download_station_meas <- function(station_id, years_force_refresh=c(2020)){
+  print(station_id)
+  base_url = 'https://fme.discomap.eea.europa.eu/fmedatastreaming/AirQualityDownload/AQData_Extract.fmw?CountryCode=&CityName=&Pollutant=8&Year_from=2015&Year_to=2020&Station=&Samplingpoint=&Source=All&Output=TEXT&UpdateDate=&TimeCoverage=Year'
+  
+  pollutants = list(NO2=8, PM10=5, CO=10)
+  urls = list()
+  for(p in names(pollutants)) {
+    base_url %>% gsub('Pollutant=8', paste0('Pollutant=', pollutants[[p]]), .) %>%
+      gsub('Station=', paste0('Station=', station_id), .) %>%
+      gsub('Year_from=2015', paste0('Year_from=', 2015), .) %>% 
+      gsub('Year_to=2020', paste0('Year_to=', 2020), .) %>% 
+      readLines() -> urls[[p]]
+  }
+  
+  urls %<>% unlist
+  files <- gsub('.*/', '', urls)
+  meas <- do.call('rbind', lapply(files, function(x){
+    data.frame(t(strsplit(x, '_')[[1]][1:4])) %>%
+      set_names(c('iso2', 'pollutant', 'station_id', 'year')) %>%
+      mutate(file=file.path(cache_folder,x)) %>% mutate_if(is.factor, as.character)
+  }))
+  
+  # rename pollutant
+  pollutants <- unlist(pollutants)
+  meas$pollutant <- names(pollutants)[match(meas$pollutant, pollutants)]
+  
+  # adding urls
+  meas$url <- urls
+  
+  # download
+  file_paths <-  meas$file
+  if(is.null(file_paths)){
+    print('Empty')
+    return(NULL)
+  }
+  # Find files to download
+  file_paths_to_download_i <- which(!file.exists(file_paths))
+  if(!is.null(years_force_refresh)){
+    file_paths_to_download_i <- unique(c(file_paths_to_download_i,
+                                         grep(paste0('_',years_force_refresh,'_timeseries.csv',collapse='|'),
+                                              file_paths, perl=T, value=F)))
+  }
+  url_to_download <- meas$url[file_paths_to_download_i]
+  
+  # Download files
+  for(u in url_to_download){
+    try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
+  }
+  
+  return(meas)
+}
 
-meas <- readreadRDS(file.path('data','00_init','input','daily data all stations.RDS'))
+eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=NULL){
+  print(pollutant_names)
+    
+  file_paths <- list.files(cache_folder,'*_timeseries.csv', full.names = T)
+  # We open every single file ancd check it belong s to station_ids & pollutant
+  
+  filter_file <- function(f, station_ids, pollutant_names){
+    tryCatch({
+      fl <- read_csv(f, n_max = 1, progress=F)
+      res <- (fl$AirQualityStation %in% station_ids) &&(fl$AirPollutant %in% pollutant_names)
+      if(is.na(res) || is.null(res)) FALSE else res
+    }, error=function(cond){FALSE}
+    )
+  }
+  
+  read_file <- function(f){
+    meas <- f %>% read_csv(progress=F) %>% 
+      filter(!is.na(Concentration), Concentration>0) %>%
+      select(Countrycode, AirQualityStation, AirPollutant, Concentration, UnitOfMeasurement, DatetimeBegin, DatetimeEnd) %>%
+      rename(
+        iso2=Countrycode,
+        station_id=AirQualityStation,
+        pollutant=AirPollutant,
+        value=Concentration,
+        unit=UnitOfMeasurement,
+        date_from=DatetimeBegin) %>%
+      mutate(date=lubridate::date(date_from)) %>% # Group by day
+      group_by(iso2, station_id, pollutant, date, unit) %>%
+      summarise(value=mean(value, na.rm=T))
+  }
+  
+  filter_and_read_file <- function(f, station_ids, pollutant_names){
+    if(filter_file(f, station_ids, pollutant_names)) read_file(f) else NULL
+  }
+  
+  do.call("rbind", lapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
+}
+
+get_gdam1_sf <- function(iso3){
+  gadm1s <- lapply(iso3, function(x) tryCatch({raster::getData('GADM', country=x, level=1, path=cache_folder)},error=function(cond){NULL}))
+  gadm1s <- gadm1s[!sapply(gadm1s,is.null)]
+  gadm1 <- do.call(raster::bind, gadm1s) 
+  gadm1_sf <- st_as_sf(gadm1) %>% dplyr::select(gadm0_id=GID_0, gadm1_id=GID_1, gadm1_name=NAME_1)
+  return(gadm1_sf)
+}
+
+eea_stations <- get_eea_stations()
+eea_stations_sf <- sf::st_as_sf(eea_stations, coords=c("longitude","latitude"), crs=4326)
+
+iso3 <- countrycode::countrycode(unique(eea_stations$iso2), "iso2c", "iso3c")
+iso3 <- setdiff(iso3, "GIB")
+gadm1_sf <- get_gdam1_sf(iso3)
+gadm1_sf$area <- st_area(gadm1_sf)
+
+# Pick stations
+min_station_per_gadm1 <- 1
+avg_station_per_gadm1 <- 5
+max_station_per_gadm1 <- 10
+median_area <- median(gadm1_sf$area)
+gadm1_sf$n_station <- pmin(max_station_per_gadm1,
+                           pmax(min_station_per_gadm1,
+                                as.integer(round(gadm1_sf$area/median_area*avg_station_per_gadm1))))
+
+
+# Attach GADM1 to eea_stations
+eea_stations_sf <- st_join(eea_stations_sf, gadm1_sf)
+
+eea_stations_filtered <-
+  data.frame(eea_stations_sf) %>%
+  filter(date_to=='') %>%
+  group_by(gadm1_id) %>%
+  filter(!is.na(n_station)) %>%
+  mutate(n_station=min(n(), n_station)) %>%
+  dplyr::sample_frac(1) %>%
+  slice(1:unique(n_station))
+
+length(unique(eea_stations_filtered$gadm1_id)) #493
+length(unique(eea_stations_sf$gadm1_id)) #498
+
+# We download first
+eea_stations_filtered %>%
+  mutate(meas=list(map_dfr(station_id, eea.download_station_meas, years_force_refresh=c(2020))))
+
+# And then read
+eea_meas <- eea.read_stations_meas(station_ids=unique(eea_stations_filtered$station_id),
+                                                      pollutant_names=names(pollutants)) 
+  
+# And then save...
+eea_meas_nested <- eea_meas %>% group_by(station_id, pollutant) %>% tidyr::nest()
+saveRDS(eea_meas, file.path(output_folder,'eea_meas_daily.RDS'))
+
+
+
+# Select which stations to query (can't query all of them)
+
+# meas <- readreadRDS(file.path('data','00_init','input','daily data all stations.RDS'))
 # meas <- readreadRDS(file.path('data','00_init','input','daily data all stations.RDS'))
 
 # Get unique countries, date interval etc.
