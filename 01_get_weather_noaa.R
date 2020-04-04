@@ -1,6 +1,8 @@
 require(purrr)
 require(sf)
 require(dplyr)
+require(tidyr)
+require(pbapply)
 
 if(!require(install.load)) install.packages("install.load"); require(install.load)
 install_load('rnoaa', 'worldmet', 'sirad')
@@ -63,6 +65,24 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
   
   # Binding and returning
   result <- bind_rows(data_cached, data_last_year)
+  
+  # Aggregate per day
+  result <- result %>%
+    dplyr::group_by(date=lubridate::date(date)) %>%
+    dplyr::summarize(
+      air_temp=mean(air_temp, na.rm=T),
+      air_temp_min=min(air_temp, na.rm=T),
+      air_temp_max=max(air_temp, na.rm=T),
+      atmos_pres=mean(atmos_pres, na.rm=T),
+      wd=mean(wd, na.rm=T),
+      ws=mean(ws, na.rm=T),
+      ws_max=max(ws, na.rm=T),
+      ceil_hgt=mean(ceil_hgt, na.rm=T),
+      visibility=mean(visibility, na.rm=T),
+      precip=mean(precip, na.rm=T),
+      RH=mean(RH, na.rm=T)
+    )
+    
   if(nrow(result)==0){ result <- NULL }
   return(result)
 }
@@ -70,7 +90,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
 
 noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020), cache_folder){
   
-  stations_weather <- meas_w_stations %>% ungroup() %>% unnest(cols=(noaa_station)) %>%
+  stations_weather <- meas_w_stations %>% ungroup() %>% tidyr::unnest(cols=(noaa_station)) %>%
     distinct(station_id, usaf, wban)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
