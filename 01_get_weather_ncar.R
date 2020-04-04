@@ -41,7 +41,7 @@ ncar.add_pbl <- function(meas_w_weather){
   joined <- meas_w_weather %>% rowwise() %>%
     mutate(weather_station_id=station_id, weather=list(weather %>% left_join(
       pbl_values %>% filter(station_id==weather_station_id)
-    )))
+    ))) %>% dplyr::select(-c(weather_station_id))
   
   return(joined)
 }

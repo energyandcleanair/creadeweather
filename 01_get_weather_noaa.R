@@ -5,7 +5,7 @@ require(tidyr)
 require(pbapply)
 
 if(!require(install.load)) install.packages("install.load"); require(install.load)
-install_load('rnoaa', 'worldmet', 'sirad')
+install_load('rnoaa', 'worldmet')
 
 
 noaa.add_close_stations <- function(meas, n_per_station){
@@ -100,7 +100,26 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
 
   meas_w_stations <- meas_w_stations %>%
     left_join(
-      stations_weather %>% dplyr::select(station_id, weather)
+      stations_weather %>%
+        dplyr::select(station_id, weather) %>%
+        group_by(station_id) %>%
+        summarise(weather=list(bind_rows(weather) %>%
+                 dplyr::group_by(date=lubridate::date(date)) %>%
+                 dplyr::summarize(
+                   air_temp=mean(air_temp, na.rm=T),
+                   air_temp_min=min(air_temp_min, na.rm=T),
+                   air_temp_max=max(air_temp_max, na.rm=T),
+                   atmos_pres=mean(atmos_pres, na.rm=T),
+                   wd=mean(wd, na.rm=T),
+                   ws=mean(ws, na.rm=T),
+                   ws_max=max(ws_max, na.rm=T),
+                   ceil_hgt=mean(ceil_hgt, na.rm=T),
+                   visibility=mean(visibility, na.rm=T),
+                   precip=mean(precip, na.rm=T),
+                   RH=mean(RH, na.rm=T)
+                 )
+        )
+        )
     )
     
 }
