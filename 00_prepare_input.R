@@ -11,7 +11,6 @@ source('00_prepare_input_gadm1.R')
 source('00_prepare_input_eea.R')
 source('00_prepare_input_lombardia.R')
 
-set.seed(2020)
 
 
 cache_folder <- file.path('data', '00_init', 'cache')
@@ -26,76 +25,108 @@ if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
 
 # Get stations and regions
 stations_eea_sf <- eea.get_stations_sf()
+
+continental_bbox <- sf::st_bbox(c(xmin = -13, 
+                  ymin = 25, 
+                  xmax = 50, 
+                  ymax = 70),
+                crs = st_crs(4326))
+stations_eea_sf <- st_intersection(stations_eea_sf, st_as_sfc(continental_bbox))
+stations_eea_present_sf <- stations_eea_sf %>%
+  filter(date_to=='present')
+
 stations_lombardia_sf <- lombardia.get_stations_sf()
 
-gadm1_sf <- gadm1.get_sf(eea_stations_sf$iso2)
+
+gadm1_sf <- gadm1.get_sf(stations_eea_sf$iso2)
 gadm1_sf$area <- st_area(gadm1_sf)
+gadm1_simplified_sf <- st_simplify(gadm1_sf,preserveTopology = T,dTolerance = 0.1)
 
-# Select stations to keep
-# (we can't keep all of them)
-min_station_per_gadm1 <- 1
-avg_station_per_gadm1 <- 5
-max_station_per_gadm1 <- 10
-median_area <- median(gadm1_sf$area)
-gadm1_sf$n_station <- pmin(max_station_per_gadm1,
-                           pmax(min_station_per_gadm1,
-                                as.integer(round(gadm1_sf$area/median_area*avg_station_per_gadm1))))
+grid <- gadm1_simplified_sf %>% 
+  st_make_grid(cellsize = 1, what = "centers") %>% # grid of points
+  st_intersection(gadm1_simplified_sf)   
 
-# Attach GADM1 to eea_stations
-eea_stations_sf <- st_join(eea_stations_sf, gadm1_sf)
-
-eea_stations_filtered <-
-  data.frame(eea_stations_sf) %>%
-  filter(date_to=='present') %>%
-  group_by(gadm1_id) %>%
-  filter(!is.na(n_station)) %>%
-  mutate(n_station=min(n(), n_station)) %>%
-  dplyr::sample_frac(1) %>%
-  slice(1:unique(n_station))
-
-nrow(eea_stations_filtered) # 2689 (min:1, median:5, max: 10) | 4488 (min:2, median:10, max: 20)
-nrow(eea_stations_sf) # 22339
-length(unique(eea_stations_filtered$gadm1_id)) #493
-length(unique(eea_stations_sf$gadm1_id)) #498
+nearest_idx <- grid %>% st_nearest_feature(
+  stations_eea_present_sf
+  )
+stations_eea_filtered <- stations_eea_present_sf[nearest_idx, ]
+ggplot(stations_eea_filtered) + geom_sf(data=gadm1_simplified_sf) + geom_sf()
+# 
+# 
+# # Select stations to keep
+# # (we can't keep all of them)
+# min_station_per_gadm1 <- 1
+# avg_station_per_gadm1 <- 2
+# max_station_per_gadm1 <- 8
+# median_area <- median(gadm1_sf$area)
+# gadm1_sf$n_station <- pmin(max_station_per_gadm1,
+#                            pmax(min_station_per_gadm1,
+#                                 as.integer(round(gadm1_sf$area/median_area*avg_station_per_gadm1))))
+# 
+# # Attach GADM1 to stations_eea
+# stations_eea_gadm_sf <- st_join(stations_eea_sf, gadm1_sf)
+# set.seed(2020) # Need to run everytime with filter/sample
+# stations_eea_filtered <-
+#   data.frame(stations_eea_gadm_sf) %>%
+#   filter(date_to=='present') %>%
+#   group_by(gadm1_id) %>%
+#   filter(!is.na(n_station)) %>%
+#   mutate(n_station=min(n(), n_station)) %>%
+#   filter(date_from<='2015-01-01') %>%
+#   dplyr::sample_frac(1) %>%
+#   slice(1:unique(n_station))
+# 
+# # Map filtered stations
+# ggplot() + geom_sf(data=gadm1_simplified_sf) +
+#   geom_sf(data=st_as_sf(stations_eea_filtered)) + 
+#   labs(subtitle=paste(
+#     'n_stations:', nrow(stations_eea_filtered %>% ungroup() %>% distinct(station_id)),"\n",
+#     'min_station_per_gadm1:',min_station_per_gadm1,"\n",
+#     'avg_station_per_gadm1:',avg_station_per_gadm1,"\n",
+#     'max_station_per_gadm1:',max_station_per_gadm1))
+# 
+# nrow(stations_eea_filtered) # 1096 (min:1, median:2, max: 4) # 1969 (min:1, median:5, max: 10) | 2947 (min:2, median:10, max: 20)
+# nrow(stations_eea_gadm_sf) # 6102
+# length(unique(stations_eea_filtered$gadm1_id)) #493
+# length(unique(stations_eea_gadm_sf$gadm1_id)) #498
 
 # We download first
+# we store references to accelerate later scraping / reading
+eea_refs <- tryCatch({
+  readRDS(file.path(cache_folder,'eea_refs.RDS'))},
+  error=function(err){
+    tibble(station_id=character(),pollutant=character(),year=integer(),file=character(),url=character())
+  }
+)
+
 pollutant_names <- c("NO2", "CO", "PM10")
-eea.download_stations_meas(unique(eea_stations_filtered$station_id),
+eea_refs <- eea.download_stations_meas(station_ids=unique(stations_eea_filtered$station_id),
                       pollutant_names=pollutant_names,
-                      years_force_refresh=c(2020)
+                      years_force_refresh=NULL, #c(2020)
+                      refs=eea_refs
                       )
 
+saveRDS(eea_refs, file.path(cache_folder,'eea_refs.RDS'))
 # then read
-eea_meas <- eea.read_stations_meas(station_ids=unique(eea_stations_filtered$station_id),
+eea_meas <- eea.read_stations_meas(station_ids=unique(stations_eea_filtered$station_id),
                                                       pollutant_names=names(pollutants))
   
 # then nest
 eea_meas_nested <- eea_meas %>%
-  group_by(station_id, pollutant) %>%
+  group_by(station_id, pollutant, unit) %>%
   tidyr::nest() %>%
   rename(meas=data)
 
 # join GADM1
-eea_stations_sf %>%
-  select(station_id, gadm0_id, gadm1_id, geometry) %>%
-  right_join(eea_meas_nested)
-
 eea_meas_nested <- eea_meas_nested %>%
   left_join(
-    eea_stations_sf %>% select(station_id, gadm0_id, gadm1_id, geometry)
+    stations_eea_gadm_sf %>% select(station_id, gadm0_id, gadm1_id, geometry)
   ) 
 
-# then join gadm
-eea_stations_sf
-eea_stations_filtered <-
+# Then save
+saveRDS(eea_meas_nested, file.path(output_folder,'eea_meas_daily.RDS'))
 
-
-
-
-
-saveRDS(eea_meas, file.path(output_folder,'eea_meas_daily.RDS'))
-
-
+                      
 
 
 # Add Lombardia
