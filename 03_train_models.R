@@ -12,7 +12,7 @@ test_frac <- 0.1
 day_lags <- c(1:7)
 n_regions = NULL #50 #You might not want to run every region / poll combination
 
-meas_weather <- readRDS('data/02_prep_training/output/meas_weather_gadm1.RDS')
+meas_weather <- readRDS('data/02_prep_training/output/meas_weather.RDS')
 
 models <- list(model_gbm=function(training_data, formula){
     print("Training gbm")
@@ -29,8 +29,8 @@ models <- list(model_gbm=function(training_data, formula){
 })
 
 weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
-weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd_factor', 'ws_max', 'ceil_hgt', 'visibility',
-                  'precip', 'RH', 'sunshine')
+weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'visibility', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
+
 weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
 formula <- reformulate(termlabels=weather_vars_lags,
                        response='value')
@@ -87,22 +87,32 @@ output_data <- input_data[1:n_trainings,] %>%
 #----------------
 # Predict
 #----------------
-output_data <- output_data %>% mutate(training=purrr::map2(training, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
+output_data <- output_data %>%
+  mutate(training=purrr::map2(
+    training, model_fitted,
+    purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x),
+                                    residuals=predicted-value),
+                    otherwise = NA)))
 
-output_data <- output_data %>% mutate(testing=purrr::map2(testing, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
+output_data <- output_data %>%
+  mutate(testing=purrr::map2(
+    testing, model_fitted,
+    purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x),
+                                    residuals=predicted-value),
+                    otherwise = NA)))
 
 # Also predict on whole dataset for plotting and residual analysis purposes
-output_data <- output_data %>% mutate(meas_weather=purrr::map2(meas_weather, model_fitted, purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x)), otherwise = NA)))
-
-output_data <- output_data %>% rowwise() %>%
-  mutate(meas_weather = list(if(!is.na(meas_weather)) meas_weather %>% mutate(residuals=predicted-value) else NA))
+output_data <- output_data %>%
+  mutate(meas_weather=purrr::map2(
+    meas_weather, model_fitted,
+    purrr::possibly(~ .x %>% mutate(predicted=predict(.y, .x),
+                                    residuals=predicted-value),
+                    otherwise = NA)))
 
 #---------------
 # Post compute
 #---------------
 rsq <- function(x,y) cor(x, y) ^ 2
-output_data <- output_data %>% mutate(training=purrr::map(training, purrr::possibly(~ .x %>% mutate(residuals=predicted-value), otherwise = NA)))
-output_data <- output_data %>% mutate(testing=purrr::map(testing,  purrr::possibly(~ .x %>% mutate(residuals=predicted-value), otherwise = NA)))
 output_data <- output_data %>% mutate(rmse=purrr::map_dbl(training, purrr::possibly(~ Metrics::rmse(.x$value, .x$predicted), otherwise = NA)))
 output_data <- output_data %>% mutate(rmse_test=purrr::map_dbl(testing, purrr::possibly(~ Metrics::rmse(.x$value, .x$predicted), otherwise = NA)))
 output_data <- output_data %>% mutate(mae=purrr::map_dbl(training, purrr::possibly(~ Metrics::mae(.x$value, .x$predicted), otherwise = NA)))
