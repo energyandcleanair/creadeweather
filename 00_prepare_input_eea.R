@@ -148,8 +148,8 @@ eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_ref
   
   read_file <- function(f){
     meas <- f %>% read_csv(progress=F, col_types = cols()) %>% 
-      filter(!is.na(Concentration), Concentration>0) %>%
-      select(Countrycode, AirQualityStation, AirPollutant, Concentration, UnitOfMeasurement, DatetimeBegin, DatetimeEnd) %>%
+      dplyr::filter(!is.na(Concentration), Concentration>0) %>%
+      dplyr::select(Countrycode, AirQualityStation, AirPollutant, Concentration, UnitOfMeasurement, DatetimeBegin, DatetimeEnd) %>%
       rename(
         iso2=Countrycode,
         station_id=AirQualityStation,
@@ -157,14 +157,14 @@ eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_ref
         value=Concentration,
         unit=UnitOfMeasurement,
         date_from=DatetimeBegin) %>%
-      mutate(date=lubridate::date(date_from)) %>% # Group by day
-      group_by(iso2, station_id, pollutant, date, unit) %>%
-      summarise(value=mean(value, na.rm=T))
+      dplyr::mutate(date=lubridate::date(date_from)) %>% # Group by day
+      dplyr::group_by(iso2, station_id, pollutant, date, unit) %>%
+      dplyr::summarise(value=mean(value, na.rm=T))
   }
   
   filter_and_read_file <- function(f, station_ids, pollutant_names){
     if(filter_file(f, station_ids, pollutant_names)) read_file(f) else NULL
   }
   
-  do.call("rbind", pblapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
+  bind_rows(pblapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
 }

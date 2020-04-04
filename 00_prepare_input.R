@@ -64,7 +64,7 @@ ggplot(stations_eea_filtered) + geom_sf(data=gadm1_simplified_sf) + geom_sf()
 #                                 as.integer(round(gadm1_sf$area/median_area*avg_station_per_gadm1))))
 # 
 # # Attach GADM1 to stations_eea
-# stations_eea_gadm_sf <- st_join(stations_eea_sf, gadm1_sf)
+stations_eea_gadm_sf <- st_join(stations_eea_sf, gadm1_sf)
 # set.seed(2020) # Need to run everytime with filter/sample
 # stations_eea_filtered <-
 #   data.frame(stations_eea_gadm_sf) %>%
@@ -109,7 +109,7 @@ eea_refs <- eea.download_stations_meas(station_ids=unique(stations_eea_filtered$
 saveRDS(eea_refs, file.path(cache_folder,'eea_refs.RDS'))
 # then read
 eea_meas <- eea.read_stations_meas(station_ids=unique(stations_eea_filtered$station_id),
-                                                      pollutant_names=names(pollutants))
+                                                      pollutant_names=pollutant_names)
   
 # then nest
 eea_meas_nested <- eea_meas %>%
@@ -120,7 +120,7 @@ eea_meas_nested <- eea_meas %>%
 # join GADM1
 eea_meas_nested <- eea_meas_nested %>%
   left_join(
-    stations_eea_gadm_sf %>% select(station_id, gadm0_id, gadm1_id, geometry)
+    stations_eea_gadm_sf %>% dplyr::select(station_id, gadm0_id, gadm1_id, geometry)
   ) 
 
 # Then save
