@@ -16,8 +16,8 @@ noaa.add_close_stations <- function(meas, n_per_station){
     rowwise() %>%
     mutate(noaa_station=list(
       rnoaa::isd_stations_search(
-      lat=st_coordinates(geometry)[[2]],
-      lon=st_coordinates(geometry)[[1]],
+      lat=st_coordinates(geometry)[,2],
+      lon=st_coordinates(geometry)[,1],
       radius=100) %>%
         arrange(desc(end), distance) %>%
         slice(1:n_per_station)
