@@ -7,6 +7,9 @@ require(ggplot2)
 source('99_utils.R')
 source('99_plot.R')
 
+output_folder <- file.path('data', '03_train_models', 'output')
+if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
+
 exp_name <- 'lag7'
 test_frac <- 0.1
 day_lags <- c(1:7)
@@ -51,7 +54,7 @@ meas_weather_lag <- meas_weather_lag %>%
 ### Result folder
 # Create results folder
 timestamp_str <- format(Sys.time(), "%Y%m%d_%H%M%S")
-result_folder <- file.path('data','03_train_models', 'output', paste(timestamp_str,exp_name,sep='_'))
+result_folder <- file.path(output_folder, paste(timestamp_str,exp_name,sep='_'))
 dir.create(result_folder)
 
 # Save script file
