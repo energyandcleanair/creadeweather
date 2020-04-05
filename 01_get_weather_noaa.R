@@ -70,13 +70,13 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
   result <- result %>%
     dplyr::group_by(date=lubridate::date(date)) %>%
     dplyr::summarize(
-      air_temp=mean(air_temp, na.rm=T),
       air_temp_min=min(air_temp, na.rm=T),
       air_temp_max=max(air_temp, na.rm=T),
+      air_temp=mean(air_temp, na.rm=T),
       atmos_pres=mean(atmos_pres, na.rm=T),
       wd=mean(wd, na.rm=T),
-      ws=mean(ws, na.rm=T),
       ws_max=max(ws, na.rm=T),
+      ws=mean(ws, na.rm=T),
       ceil_hgt=mean(ceil_hgt, na.rm=T),
       visibility=mean(visibility, na.rm=T),
       precip=mean(precip, na.rm=T),
@@ -106,13 +106,13 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
         summarise(weather=list(bind_rows(weather) %>%
                  dplyr::group_by(date=lubridate::date(date)) %>%
                  dplyr::summarize(
-                   air_temp=mean(air_temp, na.rm=T),
                    air_temp_min=min(air_temp_min, na.rm=T),
                    air_temp_max=max(air_temp_max, na.rm=T),
+                   air_temp=mean(air_temp, na.rm=T),
                    atmos_pres=mean(atmos_pres, na.rm=T),
                    wd=mean(wd, na.rm=T),
-                   ws=mean(ws, na.rm=T),
                    ws_max=max(ws_max, na.rm=T),
+                   ws=mean(ws, na.rm=T),
                    ceil_hgt=mean(ceil_hgt, na.rm=T),
                    visibility=mean(visibility, na.rm=T),
                    precip=mean(precip, na.rm=T),

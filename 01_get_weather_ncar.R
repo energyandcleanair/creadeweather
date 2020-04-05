@@ -23,7 +23,8 @@ ncar.add_pbl <- function(meas_w_weather){
     file_values <- as.data.frame(raster::extract(r,
                                        stations_sf,
                                        # buffer=500, # 500m radius
-                                       fun=mean,na.rm=T,
+                                       fun=mean,
+                                       na.rm=T,
                                        sp = TRUE,
                                        method='simple')) %>%
       dplyr::select(-c(coords.x1, coords.x2)) %>%
