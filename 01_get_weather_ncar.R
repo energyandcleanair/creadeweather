@@ -6,8 +6,8 @@ require(rgdal)
 
 input_folder <- file.path('data', '01_weather', 'input')
 
-ncar.add_pbl <- function(meas_w_weather){
-  stations_sf <- st_as_sf(meas_w_weather %>% ungroup() %>%
+ncar.add_pbl <- function(weather){
+  stations_sf <- st_as_sf(weather %>% ungroup() %>%
                             dplyr::select(station_id, geometry) %>%
                             dplyr::distinct(station_id, .keep_all=T))
   
@@ -17,10 +17,15 @@ ncar.add_pbl <- function(meas_w_weather){
   pat = 'cdas1\\.(\\d{8})\\.pgrbh'
   dates <- lubridate::ymd(str_match(files, pat)[, 2])
  
-  process_file <- function(stations_sf, file){
+  process_file <- function(file, stations_sf){
     pat = 'cdas1\\.(\\d{8})\\.pgrbh'
     date <- lubridate::ymd(str_match(file, pat)[, 2])
     r <- raster::brick(file)
+    # For some reason, on GCP/Ubuntu, raster is offset by 360deg
+    if(xmin(r)>180){
+      xmin(r)=xmin(r)-360
+      xmax(r)=xmax(r)-360
+    }
     file_values <- as.data.frame(raster::extract(r,
                                        stations_sf,
                                        # buffer=500, # 500m radius
@@ -40,7 +45,7 @@ ncar.add_pbl <- function(meas_w_weather){
   pbl_values <- do.call('bind_rows', pblapply(files, process_file, stations_sf=stations_sf))
   
   # Join to weather data
-  joined <- meas_w_weather %>% rowwise() %>%
+  joined <- weather %>% rowwise() %>%
     mutate(weather_station_id=station_id, weather=list(weather %>% left_join(
       pbl_values %>% filter(station_id==weather_station_id)
     ))) %>% dplyr::select(-c(weather_station_id))
