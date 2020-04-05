@@ -2,6 +2,7 @@ library(raster)
 library(sf)
 library(dplyr)
 library(stringr)
+require(rgdal)
 
 input_folder <- file.path('data', '01_weather', 'input')
 
@@ -36,7 +37,7 @@ ncar.add_pbl <- function(meas_w_weather){
 
     return(file_values)
   }
-  pbl_values <- do.call('rbind', pblapply(files, process_file, stations_sf=stations_sf))
+  pbl_values <- do.call('bind_rows', pblapply(files, process_file, stations_sf=stations_sf))
   
   # Join to weather data
   joined <- meas_w_weather %>% rowwise() %>%
