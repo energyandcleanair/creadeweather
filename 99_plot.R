@@ -3,6 +3,7 @@ if (!require(cowplot)) install.packages(c('cowplot')); require(cowplot)
 if (!require(ggpubr)) install.packages(c('ggpubr')); require(ggpubr)
 
 source('99_utils.R')
+source('99_crea_theme.R')
 
 plot.tools.gather_predicted <- function(meas_weather){
   meas_weather %>%
@@ -160,6 +161,22 @@ plot.map_count_per_gadm <- function(data, folder, title, meas_col){
 }
 
 plot.output_map <- function(output_data, result_folder, timestamp_str, meas_col, title, scale=NULL, labs=NULL){
+  gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
+  map_data <- st_as_sf(data)
+ 
+  map_ <- ggplot(map_data) + geom_sf(data=gadm1_sf) + 
+    geom_sf(aes_string(fill=meas_col),size=0.1) +
+    facet_grid(~pollutant) +
+    labs(title=title)
+  
+  map_ <- map_ + if(is.null(scale)) scale_fill_continuous(na.value="white") else scale
+  map_ <- map_ + if(is.null(labs)) labs(fill="") else labs
+  ggsave(file.path(result_folder,paste0(timestamp_str,'_map_',meas_col,'.pdf')), plot=map_)
+  map_
+  
+}
+
+plot.output_map_gadm <- function(output_data, result_folder, timestamp_str, meas_col, title, scale=NULL, labs=NULL){
   gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
   gadm1_data <- gadm1_sf %>% dplyr::right_join(
     output_data %>%
