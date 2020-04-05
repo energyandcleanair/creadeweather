@@ -23,7 +23,7 @@ meas <- readRDS(file.path('data', '00_init', 'output', 'eea_meas_daily.RDS'))
 
 
 # For development purposes
-meas <- meas %>% head(2)
+meas <- meas %>% head(5)
 
 stations <- meas %>% ungroup() %>% dplyr::select(station_id, geometry) %>% distinct(station_id, .keep_all = T)
 stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = 2)
@@ -40,7 +40,7 @@ weather <- sirad.add_sunshine(weather)
 # Join weather into measurements
 meas_w_weather <- meas %>%
   left_join(weather %>% dplyr::select(station_id, weather)) %>%
-  dplyr::rowwise() %>%
+  rowwise() %>%
   mutate(meas=list(
     meas %>% left_join(weather)
   )) %>%
