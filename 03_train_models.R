@@ -5,19 +5,27 @@ require(tibble)
 require(lubridate)
 require(ggplot2)
 require(pbapply)
+require(gbm)
 source('99_utils.R')
 source('99_plot.R')
 
 output_folder <- file.path('data', '03_train_models', 'output')
 if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
 
-exp_name <- 'lag7'
+# Check we can find this file (to be copied later on)
+org_file <- if(rstudioapi::isAvailable()) rstudioapi::getActiveDocumentContext()$path else '03_train_models.R'
+print(org_file)
+
+exp_name <- 'lag7_no2_novisibility_no2020'
 test_frac <- 0.1
 day_lags <- c(1:7)
-n_stations = 10 #50 #You might not want to run every region / poll combination
-pollutants = c('PM10')
+n_stations = NULL #50 #You might not want to run every region / poll combination
+pollutants = c('NO2')
 
 meas_weather <- readRDS('data/02_prep_training/output/meas_weather.RDS')
+
+# only keep those with values in 2020
+meas_weather <- meas_weather %>% filter(max(meas_weather$date)>='2020-01-01')
 
 if(!is.null(pollutants)){
   meas_weather <- meas_weather %>% filter(pollutant %in% pollutants)
@@ -43,7 +51,7 @@ models <- list(model_gbm=function(training_data, formula){
 })
 
 weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
-weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'visibility', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
+weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
 
 weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
 formula <- reformulate(termlabels=weather_vars_lags,
@@ -69,7 +77,6 @@ result_folder <- file.path(output_folder, paste(timestamp_str,exp_name,sep='_'))
 dir.create(result_folder)
 
 # Save script file
-org_file <- rstudioapi::getActiveDocumentContext()$path
 file.copy(org_file, result_folder, overwrite = T)
 file.rename(from = file.path(result_folder, basename(org_file)),
             to = file.path(result_folder, paste0(timestamp_str, '_', tools::file_path_sans_ext(basename(org_file)),'.R')))
@@ -85,8 +92,8 @@ plot.map_count(meas_weather_lag, folder=result_folder,
 # Split training / validation
 data <- meas_weather_lag %>% rowwise() %>%
   mutate(meas_weather = list(meas_weather %>% mutate(id = row_number()))) %>%
-  mutate(training = list(dplyr::sample_frac(meas_weather, 1-test_frac))) %>% 
-  mutate(testing = list(anti_join(meas_weather, training, by='id')))
+  mutate(training = list(dplyr::sample_frac(meas_weather %>% filter(date<="2020-01-01"), 1-test_frac))) %>% 
+  mutate(testing = list(anti_join(meas_weather %>% filter(date<="2020-01-01"), training, by='id')))
 
 # Adding models to tibble (each model is applied to each region, poll combination)
 model_names <- if (!is.null(names(models))) names(models) else seq_along(models)
