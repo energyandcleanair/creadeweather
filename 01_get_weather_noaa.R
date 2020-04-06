@@ -30,61 +30,62 @@ noaa.add_close_stations <- function(meas, n_per_station){
 
 noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cache_folder){
   # Get NOAA data, first trying to use cached files for complete years
-  
-  # Reading cache files
-  years_try_cache <- setdiff(years, years_force_refresh)
-  files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
-  
-  readFile <- function(path){
-    if(file.exists(path)) readRDS(path) else NULL
-  }
-  
-  data_cached <- files %>% map_dfr(readFile) %>% 
-    bind_rows()
-  
-  if(nrow(data_cached)==0){
-    years_force_refresh <- years
-  }
-  
-  # Adding last year
-  data_last_year <- tryCatch({
-    worldmet::importNOAA(
-      code = code,
-      year = years_force_refresh,
-      hourly = FALSE,
-      precip = TRUE,
-      PWC = FALSE,
-      parallel = T,
-      quiet = FALSE,
-      path = cache_folder
-    )},
-    error=function(cond){
-      NULL
+  tryCatch({
+    # Reading cache files
+    years_try_cache <- setdiff(years, years_force_refresh)
+    files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
+    
+    readFile <- function(path){
+      if(file.exists(path)) readRDS(path) else NULL
     }
-  )
-  
-  # Binding and returning
-  result <- bind_rows(data_cached, data_last_year)
-  
-  # Aggregate per day
-  result <- result %>%
-    dplyr::group_by(date=lubridate::date(date)) %>%
-    dplyr::summarize(
-      air_temp_min=min(air_temp, na.rm=T),
-      air_temp_max=max(air_temp, na.rm=T),
-      air_temp=mean(air_temp, na.rm=T),
-      atmos_pres=mean(atmos_pres, na.rm=T),
-      wd=mean(wd, na.rm=T),
-      ws_max=max(ws, na.rm=T),
-      ws=mean(ws, na.rm=T),
-      ceil_hgt=mean(ceil_hgt, na.rm=T),
-      visibility=mean(visibility, na.rm=T),
-      precip=mean(precip, na.rm=T),
-      RH=mean(RH, na.rm=T)
+    
+    data_cached <- files %>% map_dfr(readFile) %>% 
+      bind_rows()
+    
+    if(nrow(data_cached)==0){
+      years_force_refresh <- years
+    }
+    
+    # Adding last year
+    data_last_year <- tryCatch({
+      worldmet::importNOAA(
+        code = code,
+        year = years_force_refresh,
+        hourly = FALSE,
+        precip = TRUE,
+        PWC = FALSE,
+        parallel = T,
+        quiet = FALSE,
+        path = cache_folder
+      )},
+      error=function(cond){
+        NULL
+      }
     )
     
-  if(nrow(result)==0){ result <- NULL }
-  return(result)
+    # Binding and returning
+    result <- bind_rows(data_cached, data_last_year)
+    
+    # Aggregate per day
+    result <- result %>%
+      dplyr::group_by(date=lubridate::date(date)) %>%
+      dplyr::summarize(
+        air_temp_min=min(air_temp, na.rm=T),
+        air_temp_max=max(air_temp, na.rm=T),
+        air_temp=mean(air_temp, na.rm=T),
+        atmos_pres=mean(atmos_pres, na.rm=T),
+        wd=mean(wd, na.rm=T),
+        ws_max=max(ws, na.rm=T),
+        ws=mean(ws, na.rm=T),
+        ceil_hgt=mean(ceil_hgt, na.rm=T),
+        visibility=mean(visibility, na.rm=T),
+        precip=mean(precip, na.rm=T),
+        RH=mean(RH, na.rm=T)
+      )
+      
+    if(nrow(result)==0){ result <- NULL }
+    return(result)
+  }, error=function(err){return(NULL)})
 }
 
 
