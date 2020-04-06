@@ -13,17 +13,35 @@ meas_weather <- readRDS(file.path('data','01_weather','output','meas_w_weather.R
 # weather <- readRDS(file.path('data','01_weather','output','gadm1_weather_noaa.RDS'))
 
 
+cache_folder <- file.path('data', '02_prep_training', 'cache')
+if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
+
+output_folder <- file.path('data', '02_prep_training', 'output')
+if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
+
+input_folder <- file.path('data', '02_prep_training', 'input')
+if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
+
 # Certain stations miss certain weather variables
 coalesce_weather_tbl <- function(tbl){
-  print(tbl$ceil_hgt)
+  # Different kind of treatments
+  
+  # If all NAs
   if(all(is.na(tbl$wd))) tbl$wd <-0
   if(all(is.na(tbl$precip))) tbl$precip <-0
   if(all(is.na(tbl$ceil_hgt))) tbl$ceil_hgt <-0
   if(all(is.na(tbl$atmos_pres))) tbl$atmos_pres <-0
   if(all(is.na(tbl$wd))) tbl$wd <-0
   if(all(is.na(tbl$visibility))) tbl$visibility <-0
-  # tbl <- tbl %>% mutate(atmos_pres=zoo::na.approx(atmos_pres, date, na.rm=FALSE)) %>% ungroup()
-  # tbl$atmos_pres <- coalesce(tbl$atmos_pres, 1030) # If still NA everywhere
+  
+  # If only some of them are NAs
+  tbl <- tbl %>% mutate(sunshine=zoo::na.approx(sunshine, date, na.rm=FALSE)) %>% ungroup()
+  tbl <- tbl %>% mutate(atmos_pres=zoo::na.approx(atmos_pres, date, na.rm=FALSE)) %>% ungroup()
+  tbl <- tbl %>% mutate(air_temp_min=zoo::na.approx(air_temp_min, date, na.rm=FALSE)) %>% ungroup()
+  tbl <- tbl %>% mutate(air_temp_max=zoo::na.approx(air_temp_max, date, na.rm=FALSE)) %>% ungroup()
+  tbl <- tbl %>% mutate(air_temp=zoo::na.approx(air_temp, date, na.rm=FALSE)) %>% ungroup()
+
+  tbl$precip <- coalesce(tbl$precip, 0) # Precip is a bit special
   return(tbl)
 }
 
@@ -48,7 +66,7 @@ meas_weather <- meas_weather %>% rowwise() %>%
 meas_weather <- meas_weather %>% rowwise() %>%
   mutate(meas_weather=list(utils.replace_nan_with_na(meas_weather)))
 
-saveRDS(meas_weather, file.path('data', '02_prep_training', 'output', 'meas_weather.RDS'))
+saveRDS(meas_weather, file.path(output_folder, 'meas_weather.RDS'))
 
 # Plot number of measurements with weather
 plot.map_count(meas_weather,
