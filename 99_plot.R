@@ -49,6 +49,7 @@ plot.predicted <- function(meas_weather, rolling_days, min_date=NULL){
 plot.infos <- function(output_data_row){
   
   infos_list <- list(
+    'Station id'=output_data_row$station_id,
     'Region id'=output_data_row$gadm1_id,
     'Region name'=output_data_row$gadm1_name,
     'Pollutant'=output_data_row$pollutant,
@@ -88,6 +89,7 @@ plot.output_data_row <- function(output_data_row, rolling_days){
   annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(output_data_row$pollutant,
+                                  output_data_row$station_id,
                                   output_data_row$gadm1_id,
                                   output_data_row$gadm1_name,
                                   paste0(rolling_days,' days average'),
@@ -99,9 +101,9 @@ plot.output_data <- function(output_data, rolling_days, filepath){
   
   # Arrange / Fill so that pages are homogenous
   filled_output <- output_data %>%
-    right_join(tidyr::crossing(output_data %>% distinct(gadm1_id, gadm1_name),
+    right_join(tidyr::crossing(output_data %>% distinct(station_id),
                                pollutant=unique(output_data$pollutant))) %>%
-    arrange(gadm1_id, pollutant)
+    arrange(station_id, pollutant)
   
   figures <- list()
   for(i in seq(1,nrow(filled_output))){
