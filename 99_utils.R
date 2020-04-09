@@ -33,6 +33,7 @@ utils.rolling_average <- function(data, average_by, average_width, group_cols, a
   data <- data %>% mutate(date=lubridate::floor_date(date, average_by))
   date_grid <- data %>% dplyr::group_by_at(group_cols) %>%
     dplyr::summarize(date_min=min(date), date_max = max(date)) %>%
+    filter(!is.na(date_min)) %>%
     dplyr::mutate(date=purrr::map2(date_min, date_max, ~seq(.x, .y, by=average_by))) %>%
     dplyr::select(-c(date_min, date_max)) %>%
     tidyr::unnest(cols=c(date))
@@ -66,4 +67,18 @@ utils.replace_nan_with_na <- function(tbl){
   replace_list <- as.list(list_values)
   names(replace_list) <- list_names
   tbl %>% tidyr::replace_na(replace_list)
+}
+
+utils.average_over_yearly_periods <- function(tbl, meas_col, years, doys){
+  if(is.na(tbl)) return(NA)
+  # doys: day of years
+  (tbl %>% filter(lubridate::year(date) %in% years,
+                  lubridate::yday(date) %in% doys) %>%
+      group_by() %>%
+      summarise_at(c(meas_col), mean, na.rm = TRUE))[[meas_col]][[1]]
+}
+
+utils.add_city <- function(data){
+  city_corr <- read.csv(file.path('data','00_init','input','eea_station_city.csv'))
+  data %>% left_join(city_corr %>% select(station_id, city))
 }
