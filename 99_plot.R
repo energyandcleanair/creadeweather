@@ -198,3 +198,96 @@ plot.output_map_gadm <- function(output_data, result_folder, timestamp_str, meas
   map_
   
 }
+
+
+#------------------------------
+# Plot for rmweather results
+#------------------------------
+plot.rmweather.normalized <- function(model_fitted, rolling_days){
+  data <- model_fitted$normalised
+  data <- utils.rolling_average(data, average_by = 'day', average_width = rolling_days, group_cols = c(), avg_cols='value_predict')
+  data$year <- factor(lubridate::year(data$date))
+  data$date_in_year <- data$date
+  lubridate::year(data$date_in_year) <- 0
+  ggplot(data) + geom_line(aes(x=date_in_year, y=value_predict, color=year, size=year)) +
+    labs(y='Weather normalized concentration', x=NULL, size='Year', colour="Year") +
+    scale_size_manual(values=c(0.5,0.5,0.5,0.5,0.5,1), breaks = c(2015,2016,2017,2018,2019,2020)) +
+    # theme_crea() +
+    theme(legend.position="bottom")
+}
+
+plot.rmweather.importance <- function(model_fitted){
+  
+  data <- model_fitted$model %>% 
+    rmw_model_importance()  
+  
+  # Group all lag variables into 1
+  data$variable <- gsub("_\\d","",data$variable)
+
+  ggplot(data) + geom_boxplot(aes(y=reorder(variable, importance, FUN = median),x=importance)) +
+    labs(y='Variable (all lags combined)') + #theme_crea() +
+    theme(legend.position="bottom")
+}
+
+
+plot.rmweather.infos <- function(row){
+  infos_list <- list(
+    'Station id'=row$station_id,
+    'Country id'=row$gadm0_id,
+    'Region id'=row$gadm1_id,
+    'Pollutant'=row$pollutant,
+    'Trees'=row$model_fitted[[1]]$model$num.trees,
+    'R2'=round(row$model_fitted[[1]]$model$r.squared,2),
+    'Prediction error'=round(row$model_fitted[[1]]$model$prediction.error,2)
+  )
+  infos_tbl <- tibble('Parameter / Result'=names(infos_list), 'Value'=as.character(infos_list))
+  ggtexttable(infos_tbl, rows = NULL, 
+              theme = ttheme("lCyan"))
+}
+
+plot.rmweather.result_row <- function(row, rolling_days){
+  
+  figure <- tryCatch({
+    p1 <- plot.rmweather.normalized(row$model_fitted[[1]],rolling_days)
+    p2 <- p1 +
+      scale_x_datetime(limits=c(as.POSIXct('0-01-01'), as.POSIXct('0-05-01')))
+    p3 <- plot.rmweather.importance(row$model_fitted[[1]])
+    p4 <- plot.rmweather.infos(row)
+    ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,2,1))
+  },
+  error=function(cond){
+    no_data <- "No Data"
+    p1 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
+    p2 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
+    p3 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
+    p4 <- plot.rmweather.infos(row)
+    ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,2,1))
+  })
+  
+  annotate_figure(figure,
+                  top=" ",
+                  fig.lab = paste(row$pollutant,
+                                  row$station_id,
+                                  row$gadm1_id,
+                                  paste0(rolling_days,' days average'),
+                                  sep=" - ")
+  )
+}
+
+
+plot.rmweather.result_rows <- function(rows, rolling_days, filepath){
+  
+  # Arrange / Fill so that pages are homogenous
+  rows_filled <- rows %>%
+    right_join(tidyr::crossing(rows %>% distinct(station_id),
+                               pollutant=unique(rows$pollutant))) %>%
+    arrange(station_id, pollutant)
+  
+  figures <- list()
+  for(i in seq(1,nrow(rows_filled))){
+    figures[[i]] <- plot.rmweather.result_row(rows_filled[i,], rolling_days)
+  }
+  
+  figure_alls <- ggarrange(plotlist=figures, ncol = 1, nrow = 3)
+  ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
+}

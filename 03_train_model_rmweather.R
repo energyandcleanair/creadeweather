@@ -7,7 +7,6 @@ require(lubridate)
 require(ggplot2)
 require(pbapply)
 require(pbmcapply)
-require(gbm)
 require(parallel)
 require(future)
 
@@ -28,7 +27,7 @@ pollutants <-c('NO2')
 
 meas_weather <- readRDS('data/02_prep_training/output/meas_w_weather_allpolls_05.RDS')
 # only keep those with values in 2020
-# meas_weather <- meas_weather %>% filter(max(meas_weather$date)>'2020-01-01')
+meas_weather <- meas_weather %>% filter(max(meas_weather$date)>'2020-01-01')
 
 if(!is.null(pollutants)){
   meas_weather <- meas_weather %>% filter(pollutant %in% pollutants)
@@ -42,7 +41,6 @@ if(!is.null(n_stations)){
 weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
 weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
 weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
-variables <- c(weather_vars_lags, )
 
 
 # formula <- reformulate(termlabels=weather_vars_lags,
@@ -66,15 +64,15 @@ file.rename(from = file.path(result_folder, basename(org_file)),
             to = file.path(result_folder, paste0(timestamp_str, '_', tools::file_path_sans_ext(basename(org_file)),'.R')))
 
 # Train models
-train_row <- function(station_id, data, variables){
+train_row <- function(station_id, data){
   tryCatch({
-    data_prepared <- data %>% 
+    data_prepared <- data %>%
       mutate(date=as.POSIXct(date)) %>%
       rmw_prepare_data(na.rm = TRUE)
-    
+
     rmw_do_all(
       data_prepared,
-      variables = c("date_unix", "day_julian", "weekday",variables),
+      variables = c("date_unix","day_julian", "weekday",weather_vars_lags),
       n_trees = 300,
       n_samples = 300,
       verbose = TRUE
@@ -84,13 +82,25 @@ train_row <- function(station_id, data, variables){
     return(NA)})
 }
 
-nworkers <- 1#as.integer(future::availableCores() - 1)
+nworkers <- as.integer(future::availableCores() - 1)
 models_fitted <- pbmcmapply(train_row,
                             station_id=meas_weather_lag$station_id,
                             data=meas_weather_lag$meas_weather,
-                            variables=weather_vars_lags,
                             mc.cores=nworkers,
                             SIMPLIFY=FALSE)
 
-meas_weather$model_fitted <- unname(models_fitted)
-models_fitted <- NULL
+
+meas_weather_lag$meas_weather <- NULL # saving space
+meas_weather_lag$model_fitted <- models_fitted
+saveRDS(meas_weather_lag, file=file.path(result_folder,'results.RDS'))
+
+
+
+###### Plot results
+plot.rmweather.result_rows(meas_weather_lag, rolling_days=7,
+                 filepath=file.path(result_folder,paste0(timestamp_str,'_results_7d.pdf')))
+
+plot.rmweather.result_rows(meas_weather_lag, rolling_days=30,
+                 filepath=file.path(result_folder,paste0(timestamp_str,'_results_30d.pdf')))
+
+
