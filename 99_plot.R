@@ -17,7 +17,7 @@ plot.tools.roll_plot_gathered <- function(raw){
     dplyr::mutate(date=lubridate::floor_date(date, unit = 'day')) %>%
     dplyr::group_by(date, type) %>%
     dplyr::summarise(value=mean(value, na.rm = T)) %>% dplyr::ungroup() %>%
-    dplyr::group_by(gadm1_id, pollutant, rsq, rsq_test, mae, mae_test, type) %>%
+    dplyr::group_by(station_id, pollutant, rsq, rsq_test, mae, mae_test, mrae_test, mrae_test, type) %>%
     dplyr::arrange(date) %>%
     dplyr::mutate(value=zoo::rollapply(value, width=n_days,
                                        FUN=function(x) mean(x, na.rm=TRUE), align='right',fill=NA)) %>%
@@ -57,7 +57,15 @@ plot.infos <- function(output_data_row){
     'r2 training'=round(output_data_row$rsq,2),
     'r2 validation'=round(output_data_row$rsq_test,2),
     'mae training'=round(output_data_row$mae,2),
-    'mae validation'=round(output_data_row$mae_test,2)
+    'mae validation'=round(output_data_row$mae_test,2),
+    'mase training'=round(output_data_row$mase,2),
+    'mase validation'=round(output_data_row$mase_test,2),
+    'mrae training'=round(output_data_row$mrae,2),
+    'mrae validation'=round(output_data_row$mrae_test,2),
+    'me training'=round(output_data_row$me,2),
+    'me validation'=round(output_data_row$me_test,2),
+    'mpe training'=round(output_data_row$mpe,2),
+    'mpe validation'=round(output_data_row$mpe_test,2)
   )
   infos_tbl <- tibble('Parameter / Result'=names(infos_list), 'Value'=as.character(infos_list))
   ggtexttable(infos_tbl, rows = NULL, 
@@ -116,14 +124,16 @@ plot.output_data <- function(output_data, rolling_days, filepath){
 
 plot.map_count <- function(data, folder, title, meas_col){
   
+  gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
+  
   # Plot number of measurements with weather
   map_count_data <- sf::st_as_sf(data) %>%
     mutate_at(meas_col, nrow) %>%
     group_by(station_id, pollutant) %>% 
     mutate_at(meas_col, sum)
   
-  map_count <- ggplot(map_count_data) +
-    geom_sf(aes_string(fill=meas_col, colour=meas_col),size=0.1) +
+  map_count <- ggplot(map_count_data) + geom_sf(data=gadm1_sf, alpha=0.1) +
+    geom_sf(data=map_count_data, aes_string(fill=meas_col, colour=meas_col), size=0.5) +
     facet_grid(~pollutant) +
     labs(title=title, fill="Count") +
     scale_fill_continuous(na.value="white")
@@ -162,20 +172,39 @@ plot.map_count_per_gadm <- function(data, folder, title, meas_col){
   map_count
 }
 
-plot.output_map <- function(output_data, result_folder, timestamp_str, meas_col, title, scale=NULL, labs=NULL){
+plot.output_map <- function(data, result_folder, timestamp_str, meas_col, title, scale=NULL, labs=NULL){
   gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
-  map_data <- st_as_sf(data)
+  map_data <- st_as_sf(data, crs=4326)
  
-  map_ <- ggplot(map_data) + geom_sf(data=gadm1_sf) + 
-    geom_sf(aes_string(fill=meas_col),size=0.1) +
+  map_ <- ggplot(map_data) + geom_sf(data=gadm1_sf, colour='#DDDDDD', alpha=0.2) + 
+    geom_sf(aes_string(colour=meas_col),size=1) +
     facet_grid(~pollutant) +
-    labs(title=title)
+    labs(title=title) + theme_crea()
   
   map_ <- map_ + if(is.null(scale)) scale_fill_continuous(na.value="white") else scale
   map_ <- map_ + if(is.null(labs)) labs(fill="") else labs
-  ggsave(file.path(result_folder,paste0(timestamp_str,'_map_',meas_col,'.pdf')), plot=map_)
+  ggsave(file.path(result_folder,paste0(timestamp_str,'_map_',meas_col,'.pdf')),
+         plot=map_,
+         scale=2)
   map_
   
+}
+
+plot.output_map_criteria <- function(data, result_folder, timestamp_str, meas_col, criteria_col, title, scale=NULL, labs=NULL){
+  gadm1_sf <- sf::st_read('data/00_init/output/gadm1.geojson')
+  map_data <- st_as_sf(data)
+  
+  map_ <- ggplot(map_data) + geom_sf(data=gadm1_sf, colour='#DDDDDD', alpha=0.2) + 
+    geom_sf(aes_string(fill=meas_col, colour=criteria_col),size=1) +
+    facet_grid(~pollutant) +
+    labs(title=title) + theme_crea()
+  
+  map_ <- map_ + if(is.null(scale)) scale_fill_continuous(na.value="white") else scale
+  map_ <- map_ + if(is.null(labs)) labs(fill="") else labs
+  ggsave(file.path(result_folder,paste0(timestamp_str,'_map_',meas_col,'_criteria.pdf')),
+         plot=map_,
+         scale=3)
+  map_
 }
 
 plot.output_map_gadm <- function(output_data, result_folder, timestamp_str, meas_col, title, scale=NULL, labs=NULL){
@@ -190,7 +219,7 @@ plot.output_map_gadm <- function(output_data, result_folder, timestamp_str, meas
   map_ <- ggplot(gadm1_data) +
     geom_sf(aes_string(fill=meas_col),size=0.1) +
     facet_grid(~pollutant) +
-    labs(title=title)
+    labs(title=title) + theme_crea()
   
   map_ <- map_ + if(is.null(scale)) scale_fill_continuous(na.value="white") else scale
   map_ <- map_ + if(is.null(labs)) labs(fill="") else labs
@@ -199,6 +228,16 @@ plot.output_map_gadm <- function(output_data, result_folder, timestamp_str, meas
   
 }
 
+plot.output_result_quality <- function(output_data, result_folder, timestamp_str){
+  p1 <- ggplot(output_data %>% dplyr::select(pollutant, rsq_test, rsq) %>% tidyr::gather("key","value",-pollutant)) + 
+    geom_histogram(aes(x=value, fill=key, colour=key), alpha=0.2) + facet_grid(~pollutant) + theme_crea()
+  
+  p2 <- ggplot(output_data %>% dplyr::select(pollutant, mae_test, mae) %>% tidyr::gather("key","value",-pollutant)) + 
+    geom_histogram(aes(x=value, fill=key, colour=key), alpha=0.2) + facet_grid(~pollutant) + theme_crea()
+  
+  ggsave(file.path(result_folder,paste0(timestamp_str,'_quality.pdf')),
+         plot=  ggarrange(p1, p2, ncol = 2, nrow = 1,  common.legend = FALSE, legend = "bottom", widths=c(2,2)))
+}
 
 #------------------------------
 # Plot for rmweather results
