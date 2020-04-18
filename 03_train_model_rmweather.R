@@ -42,7 +42,6 @@ if(!is.null(n_stations)){
 weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
 weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
 weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
-variables <- c(weather_vars_lags, )
 
 
 # formula <- reformulate(termlabels=weather_vars_lags,
@@ -84,7 +83,7 @@ train_row <- function(station_id, data, variables){
     return(NA)})
 }
 
-nworkers <- 1#as.integer(future::availableCores() - 1)
+nworkers <- as.integer(future::availableCores() - 1)
 models_fitted <- pbmcmapply(train_row,
                             station_id=meas_weather_lag$station_id,
                             data=meas_weather_lag$meas_weather,
@@ -92,5 +91,5 @@ models_fitted <- pbmcmapply(train_row,
                             mc.cores=nworkers,
                             SIMPLIFY=FALSE)
 
-meas_weather$model_fitted <- unname(models_fitted)
+meas_weather_lag$model_fitted <- unname(models_fitted)
 models_fitted <- NULL
