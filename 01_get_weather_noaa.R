@@ -3,13 +3,10 @@ require(sf)
 require(dplyr)
 require(tidyr)
 require(pbapply)
-
-if(!require(install.load)) install.packages("install.load"); require(install.load)
-install_load('rnoaa', 'worldmet')
-
+require(rnoaa)
+require(worldmet)
 
 noaa.add_close_stations <- function(meas, n_per_station){
-
   meas_stations <- meas %>% ungroup() %>%
     dplyr::select(station_id, geometry) %>%
     distinct(station_id, .keep_all=T) %>%
@@ -74,15 +71,21 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
         air_temp_max=max(air_temp, na.rm=T),
         air_temp=mean(air_temp, na.rm=T),
         atmos_pres=mean(atmos_pres, na.rm=T),
+        atmos_pres_min=min(atmos_pres, na.rm=T),
+        atmos_pres_max=max(atmos_pres, na.rm=T),
         wd=mean(wd, na.rm=T),
+        ws_min=min(ws, na.rm=T),
         ws_max=max(ws, na.rm=T),
         ws=mean(ws, na.rm=T),
         ceil_hgt=mean(ceil_hgt, na.rm=T),
         visibility=mean(visibility, na.rm=T),
         precip=mean(precip, na.rm=T),
-        RH=mean(RH, na.rm=T)
+        precip_min=min(precip, na.rm=T),
+        precip_max=max(precip, na.rm=T),
+        RH=mean(RH, na.rm=T),
+        RH_min=min(RH, na.rm=T),
+        RH_max=max(RH, na.rm=T)
       )
-      
     if(nrow(result)==0){ result <- NULL }
     return(result)
   }, error=function(err){return(NULL)})
@@ -111,18 +114,24 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    air_temp_max=max(air_temp_max, na.rm=T),
                    air_temp=mean(air_temp, na.rm=T),
                    atmos_pres=mean(atmos_pres, na.rm=T),
+                   atmos_pres_min=min(atmos_pres, na.rm=T),
+                   atmos_pres_max=max(atmos_pres, na.rm=T),
                    wd=mean(wd, na.rm=T),
+                   ws_min=min(ws, na.rm=T),
                    ws_max=max(ws_max, na.rm=T),
                    ws=mean(ws, na.rm=T),
                    ceil_hgt=mean(ceil_hgt, na.rm=T),
                    visibility=mean(visibility, na.rm=T),
                    precip=mean(precip, na.rm=T),
-                   RH=mean(RH, na.rm=T)
+                   precip_min=min(precip, na.rm=T),
+                   precip_max=max(precip, na.rm=T),
+                   RH=mean(RH, na.rm=T),
+                   RH_min=min(RH, na.rm=T),
+                   RH_max=max(RH, na.rm=T)
                  )
-        )
+            )
         )
     )
-    
 }
 
 

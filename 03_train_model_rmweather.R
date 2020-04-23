@@ -15,7 +15,15 @@ require(purrrlyr)
 source('99_utils.R')
 source('99_plot.R')
 
-train_models_rmweather <- function(meas_weather, pollutants, deg, trees, samples, lag, normalise, exp_suffix=NULL){
+train_models_rmweather <- function(meas_weather,
+                                   pollutants,
+                                   deg,
+                                   trees,
+                                   samples,
+                                   lag,
+                                   normalise,
+                                   add_timestamp_var=T,
+                                   exp_suffix=NULL){
   
   output_folder <- file.path('data', '03_train_models', 'output')
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
@@ -25,7 +33,7 @@ train_models_rmweather <- function(meas_weather, pollutants, deg, trees, samples
   # meas_weather <- readRDS('data/02_prep_training/output/meas_w_weather_no2_02.RDS')
   
   exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),'_deg',sub('\\.','',deg),
-                     '_trees',trees,'_samples',samples,'_norm',substr(as.character(normalise),1,1))
+                     '_trees',trees,'_samples',samples,'_ts',substr(as.character(add_timestamp_var),1,1),'_norm',substr(as.character(normalise),1,1))
   if(!is.null(exp_suffix)){
     exp_name <- paste0(exp_name, exp_suffix)  
   }
@@ -94,9 +102,14 @@ train_models_rmweather <- function(meas_weather, pollutants, deg, trees, samples
       data_prepared_b <- data_prepared %>% filter(date<'2020-01-01')
       data_prepared_a <- data_prepared %>% filter(date>='2020-01-01')
       
+      variables <- c("day_julian", "weekday",weather_vars_lags)
+      if(add_timestamp_var){
+        variables <- c(variables,"date_unix")
+      }
+      
       model <- rmw_train_model(
         df=data_prepared_b,
-        variables = c("date_unix","day_julian", "weekday",weather_vars_lags),
+        variables = variables,
         n_trees = 1200,
         # n_samples = samples,
         verbose = F,
