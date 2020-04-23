@@ -1,6 +1,6 @@
 require(raster)
 
-gadm1.get_sf <- function(iso2){
+gadm1.get_sf <- function(iso2, cache_folder){
   iso3 <- countrycode::countrycode(unique(iso2), "iso2c", "iso3c")
   iso3 <- setdiff(iso3, "GIB")
   gadm1s <- lapply(iso3, function(x) tryCatch({raster::getData('GADM', country=x, level=1, path=cache_folder)},error=function(cond){NULL}))

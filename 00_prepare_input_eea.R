@@ -9,6 +9,23 @@ require(lwgeom)
 require(pbapply)
 require(stringr)
 
+eea.get_running_stations <- function(pollutants){
+  
+  urls_latest <- readLines('http://discomap.eea.europa.eu/map/fme/latest/files.txt') %>% trimws()
+  urls_latest_poll <- grep(paste0('_',paste0(pollutants, collapse="|"),'.csv'), urls_latest, value=T)
+  parse_url <- function(u){
+    tryCatch({
+      read.csv(url(URLencode(u))) %>%
+        dplyr::distinct(network_countrycode, station_localid, samplingpoint_x, samplingpoint_y) %>%
+        dplyr::rename(iso2=network_countrycode, station_id=station_localid, latitude=samplingpoint_y, longitude=samplingpoint_x)  %>%
+        dplyr::mutate(pollutant=str_match(u,"_([:alnum:]+).csv")[,2]) # Attaching pollutant name
+    },error=function(err) NULL)
+  }
+  
+  do.call('bind_rows', pblapply(urls_latest_poll, parse_url)) %>% distinct(iso2, station_id, pollutant, latitude, longitude)
+  
+}
+
 eea.get_stations <- function(){
   file_metadata <- file.path(input_folder,'PanEuropean_metadata.csv')
   if(!file.exists(file_metadata)){
@@ -41,13 +58,17 @@ eea.get_stations_sf <- function(){
   sf::st_as_sf(eea.get_stations(), coords=c("longitude","latitude"), crs=4326)
 }
 
-eea.download_station_meas <- function(station_id, pollutant_names, years_force_refresh=c(2020), refs){
+eea.get_running_stations_sf <- function(pollutants){
+  sf::st_as_sf(eea.get_running_stations(pollutants), coords=c("longitude","latitude"), crs=4326)
+}
+
+eea.download_station_meas <- function(station_id, pollutant_names, years_force_refresh=c(2020), refs, cache_folder){
   print(station_id)  
   tryCatch({
     station_id_=station_id
     base_url = 'https://fme.discomap.eea.europa.eu/fmedatastreaming/AirQualityDownload/AQData_Extract.fmw?CountryCode=&CityName=&Pollutant=8&Year_from=2015&Year_to=2020&Station=&Samplingpoint=&Source=All&Output=TEXT&UpdateDate=&TimeCoverage=Year'
     
-    pollutants = list(NO2=8, PM10=5, CO=10)
+    pollutants = list(NO2=8, PM10=5, CO=10, SO2=1, O3=7)
     
     urls = list()
     for(p in pollutant_names) {
@@ -109,38 +130,42 @@ eea.download_station_meas <- function(station_id, pollutant_names, years_force_r
     
     # Download files
     lapply(url_to_download,
-             function(u) try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
-             )
+           function(u) try(download.file(u, file.path(cache_folder, gsub('.*/', '', u))))
+    )
     
     return(refs)
   }, error=function(err) refs
   )
 }
-  
-eea.download_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=c(2020), refs){
-  pb <- txtProgressBar(min = 0, max = length(station_ids), style = 3)
+
+eea.download_stations_meas <- function(stations, years_force_refresh=c(2020), refs, cache_folder){
+  pb <- txtProgressBar(min = 0, max = nrow(stations), style = 3)
   i <- 0
-  for(station_id in station_ids){
-    refs<-eea.download_station_meas(station_id,
-                                    pollutant_names=pollutant_names,
+  
+  for(i in seq(nrow(stations))){
+    refs<-eea.download_station_meas(stations[i,]$station_id,
+                                    pollutant_names=stations[i,]$pollutant,
                                     years_force_refresh=years_force_refresh,
-                                    refs)
+                                    refs,
+                                    cache_folder=cache_folder)
     i <- i+1
     setTxtProgressBar(pb, i)
   }
+  
   return(refs)
 }
 
-eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_refresh=NULL){
-
+eea.read_stations_meas <- function(stations, cache_folder, years_force_refresh=NULL){
+  
   file_paths <- list.files(cache_folder,'*_timeseries.csv', full.names = T)
   
   # We open every single file ancd check it belong s to station_ids & pollutant
   
-  filter_file <- function(f, station_ids, pollutant_names){
+  filter_file <- function(f, stations){
     tryCatch({
       fl <- read_csv(f, n_max = 1, progress=F, col_types = cols())
-      res <- (fl$AirQualityStation %in% station_ids) &&(fl$AirPollutant %in% pollutant_names)
+      res <- (fl$AirQualityStation %in% stations$station_id) &&
+              (fl$AirPollutant %in% stations[stations$station_id==fl$AirQualityStation,'pollutant'])
       if(is.na(res) || is.null(res)) FALSE else res
     }, error=function(cond){FALSE}
     )
@@ -162,9 +187,9 @@ eea.read_stations_meas <- function(station_ids, pollutant_names, years_force_ref
       dplyr::summarise(value=mean(value, na.rm=T))
   }
   
-  filter_and_read_file <- function(f, station_ids, pollutant_names){
-    if(filter_file(f, station_ids, pollutant_names)) read_file(f) else NULL
+  filter_and_read_file <- function(f, stations){
+    if(filter_file(f, stations)) read_file(f) else NULL
   }
   
-  bind_rows(pblapply(file_paths, filter_and_read_file, station_ids=station_ids, pollutant_names=pollutant_names))
+  bind_rows(pblapply(file_paths, filter_and_read_file, stations=stations))
 }

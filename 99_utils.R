@@ -28,7 +28,7 @@ utils.most_frequent_value <- function(x) {
   uniqx[which.max(tabulate(match(x, uniqx)))]
 }
 
-utils.rolling_average <- function(data, average_by, average_width, group_cols, avg_cols){
+utils.rolling_average <- function(data, average_by, average_width, group_cols, avg_cols, max_nas=NULL){
   
   data <- data %>% mutate(date=lubridate::floor_date(date, average_by))
   date_grid <- data %>% dplyr::group_by_at(group_cols) %>%
@@ -42,6 +42,10 @@ utils.rolling_average <- function(data, average_by, average_width, group_cols, a
   
   # Rolling mean for training
   mean_fn <- function(x){
+    if(!is.null(max_nas) && sum(is.na(x))>max_nas){
+      return(NA)
+    }
+      
     if(is.numeric(x)){
       res <- mean(x, na.rm = T) # it sometimes returns NaN but models expect only NA
       return(if(is.na(res)) NA else res)
