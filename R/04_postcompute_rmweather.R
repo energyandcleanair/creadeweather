@@ -2,14 +2,6 @@
 # rmweather package. The main input is the folder of training results
 # Author: Hubert Thieriot
 
-require(dplyr)
-require(tidyr)
-require(purrr)
-require(ggplot2)
-require(countrycode)
-source('99_plot.R')
-source('04_postcompute_utils.R')
-
 
 # result_folder <- "data/03_train_models/output/20200423_010723_lag0_no2_pm10_deg02_trees600_samples300_normF"
 
@@ -29,7 +21,7 @@ postcompute_results <- function(result_folder){
     map(readRDS) %>% 
     bind_rows() %>%
     ungroup() 
-    
+  
   polls <- unique(result$pollutant)
   
   # Prepare data
@@ -37,18 +29,18 @@ postcompute_results <- function(result_folder){
   result_impact <- postcompute.lockdown_impact(result)
   result_impact <- postcompute.add_gpw(result_impact)
   result_impact_avg <- postcompute.population_weighted(result_impact,
-                                                group_by_cols=c('country', 'country_count', 'pollutant'),
-                                                value_col=c('diff_ratio','diff'))
+                                                       group_by_cols=c('country', 'country_count', 'pollutant'),
+                                                       value_col=c('diff_ratio','diff'))
   # Add a line for whole Europe
   result_impact_avg <- bind_rows(
     result_impact_avg,
     postcompute.population_weighted(result_impact,
-                                  group_by_cols=c('pollutant'),
-                                  value_col=c('diff_ratio','diff')) %>%
+                                    group_by_cols=c('pollutant'),
+                                    value_col=c('diff_ratio','diff')) %>%
       left_join(result_impact %>% group_by(pollutant) %>%summarise(country_count=n())) %>%
       mutate(country='Europe')
   )
-      
+  
   
   # saveRDS(result_impact, file=file.path(result_folder, 'result_impact.RDS'))
   saveRDS(result_impact %>% 
@@ -64,10 +56,10 @@ postcompute_results <- function(result_folder){
                         caption='Source: CREA based on EEA, NASA ISD, Oxford COVID Government Tracker')
   
   plot.rmweather.impact_avg(result_impact_avg,
-                        result_folder=result_folder,
-                        min_country_count=10,
-                        caption='Source: CREA based on EEA, NASA ISD, Oxford COVID Government Tracker')
-
+                            result_folder=result_folder,
+                            min_country_count=10,
+                            caption='Source: CREA based on EEA, NASA ISD, Oxford COVID Government Tracker')
+  
   
   # Map
   # result_impact
@@ -179,7 +171,7 @@ postcompute_results <- function(result_folder){
   # ###### Plot results
   plot.rmweather.result_rows(result, rolling_days=7, max_nas=3, w_trend=F,
                              filepath=file.path(result_folder,paste0('results_7d.pdf')))
-
+  
   plot.rmweather.result_rows(result, rolling_days=30, max_nas=15, w_trend=F,
                              filepath=file.path(result_folder,paste0('results_30d.pdf')))
   
@@ -208,5 +200,5 @@ postcompute_results <- function(result_folder){
   #     labs(y='Trend in NO2 concentration [µg/m3/year]')
   #   scale_color_discrete()
   #   
-
+  
 }

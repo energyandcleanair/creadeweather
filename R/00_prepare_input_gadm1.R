@@ -1,5 +1,3 @@
-require(raster)
-
 gadm1.get_sf <- function(iso2, cache_folder){
   iso3 <- countrycode::countrycode(unique(iso2), "iso2c", "iso3c")
   iso3 <- setdiff(iso3, "GIB")

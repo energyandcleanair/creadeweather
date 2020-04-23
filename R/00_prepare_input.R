@@ -1,17 +1,3 @@
-require(purrr)
-require(sf)
-require(raster)
-require(tidyverse)
-require(magrittr)
-require(ggplot2)
-require(countrycode)
-require(lwgeom)
-
-source('00_prepare_input_gadm1.R')
-source('00_prepare_input_eea.R')
-source('00_prepare_input_lombardia.R')
-
-
 #' Get stations and measurements in Europe for selected pollutants
 #' and at selected geographical granularity
 #'
@@ -31,7 +17,7 @@ prepare_input <- function(pollutants,
                           output_folder=file.path('data', '00_init', 'output'),
                           input_folder=file.path('data', '00_init', 'input'),
                           filename=NULL
-                          ){
+){
   
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
@@ -94,10 +80,10 @@ prepare_input <- function(pollutants,
     rename(meas=data)
   
   # # join GADM1
-  # eea_meas_nested <- eea_meas_nested %>%
-  #   left_join(
-  #     stations_eea_gadm_sf %>% dplyr::select(station_id, gadm0_id, gadm1_id, gadm1_name, geometry)
-  #   ) 
+  eea_meas_nested <- eea_meas_nested %>%
+    left_join(
+      stations_eea_gadm_sf %>% dplyr::select(station_id, gadm0_id, gadm1_id, gadm1_name, geometry)
+    )
   
   # Then save
   filename <- if(!is.null(filename)) filename else paste('eea_meas_daily',paste(tolower(pollutants),collapse='_'),sub('\\.','',deg),'.RDS',sep='_')

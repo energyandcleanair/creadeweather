@@ -1,13 +1,3 @@
-require(purrr)
-require(sf)
-require(raster)
-require(tidyverse)
-require(magrittr)
-require(ggplot2)
-require(countrycode)
-require(lwgeom)
-require(pbapply)
-require(stringr)
 
 eea.get_running_stations <- function(pollutants){
   

@@ -1,9 +1,9 @@
-require(dplyr)
 
 
+lombardia.input_folder <- file.path('data', '00_init', 'input')
 
 lombardia.get_stations <- function(){
-  file_metadata <- file.path(input_folder,'lombardia_stations.csv')
+  file_metadata <- file.path(lombardia.input_folder,'lombardia_stations.csv')
   if(!file.exists(file_metadata)){
     download.file(url='https://www.dati.lombardia.it/api/views/ib47-atvt/rows.csv?accessType=DOWNLOAD',
                   destfile=file_metadata)
@@ -43,13 +43,16 @@ lombardia.get_stations_sf <- function(){
   sf::st_as_sf(lombardia.get_stations(), coords=c("lng","lat"), crs=4326)
 }
 
-lombardia.get_meas <- function(pollutants_names){
+lombardia.get_meas <- function(){
   
   stations <- lombardia.get_stations()
   
-  meas_url <- 'https://www.dati.lombardia.it/api/views/nicp-bhqi/rows.csv?accessType=DOWNLOAD'
-  meas <- read.csv(url(meas_url))
-  
+  meas_url_2018 <- 'https://www.dati.lombardia.it/api/views/bgqm-yq56/rows.csv?accessType=DOWNLOAD'
+  meas_url_2019 <- 'https://www.dati.lombardia.it/api/views/kujm-kavy/rows.csv?accessType=DOWNLOAD'
+  meas_url_2020 <- 'https://www.dati.lombardia.it/api/views/nicp-bhqi/rows.csv?accessType=DOWNLOAD'
+  meas_urls <- c(meas_url_2018, meas_url_2019, meas_url_2020)
+  meas <- do.call('bind_rows', lapply(meas_urls, read.table, as.is=T, header=T, sep=","))
+
   meas_cleaned <- meas %>%
     select(IdSensore, Data, Valore) %>% 
     rename(
@@ -58,8 +61,8 @@ lombardia.get_meas <- function(pollutants_names){
       value=Valore
     ) %>%
     filter(value>0) %>%
-    mutate(date=lubridate::date(date)) %>%
-    group_by(IdSensore, date) %>%
+    mutate(date=as.POSIXct(strptime(date,"%d/%m/%Y %H:%M:%S %p"))) %>%
+    group_by(sensor_id, date) %>%
     summarise(value=mean(value, na.rm=T)) %>%
     ungroup() %>%
     left_join(stations) %>%
@@ -68,7 +71,5 @@ lombardia.get_meas <- function(pollutants_names){
     tidyr::nest() %>%
     rename(meas=data)
 
-  # Translating pollutant name
-  unique(meas_cleaned$pollutant)
-  meas_cleaned
+  return(meas_cleaned)
 }

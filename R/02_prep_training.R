@@ -1,13 +1,3 @@
-require(dplyr)
-require(purrr)
-require(sf)
-require(raster)
-require(tibble)
-require(lubridate)
-source('99_plot.R')
-source('99_utils.R')
-
-
 prep_training <- function(meas_weather, pollutants, deg){
   
   # meas_weather <- readRDS(file.path('data','01_weather','output','meas_w_weather_no2_02.RDS'))

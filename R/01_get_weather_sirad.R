@@ -1,11 +1,3 @@
-require(purrr)
-require(sf)
-require(dplyr)
-require(tidyr)
-require(pbapply)
-
-if(!require(install.load)) install.packages("install.load"); require(install.load)
-install_load('sirad')
 
 sirad.add_sunshine <- function(meas_w_weather){
   

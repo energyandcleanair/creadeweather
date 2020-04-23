@@ -1,0 +1,46 @@
+Package: crealockdown
+Type: Package
+Title: Analysis of impact of lockdown on air pollution in Europe
+Version: 0.1.2
+Author: Hubert Thieriot
+Maintainer: Hubert Thieriot <hubert.thieriot@gmail.com>
+Description: A set of functions to collect and analyse air pollution and weather measurements and determine the weather-corrected impact of lockdown on air quality
+License: TBC
+Encoding: UTF-8
+LazyData: true
+Imports:
+    creadb,
+    dplyr,
+    purrr,
+    sf,
+    raster,
+    pbapply,
+    bit64,
+    zoo,
+    ggnewscale,
+    lubridate,
+    gbm,
+    rnoaa,
+    e1071,
+    standardize,
+    Metrics,
+    stringr,
+    stats,
+    future,
+    rmarkdown,
+    countrycode,
+    magrittr,
+    ggthemes,
+    scales,
+    tibble,
+    worldmet,
+    sirad,
+    rmweather,
+    pbmcapply,
+    parallel,
+    cowplot,
+    ggpubr
+Depends:
+    ggplot2
+Suggests: 
+VignetteBuilder:

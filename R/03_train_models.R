@@ -3,10 +3,6 @@
 # Author: Hubert Thieriot
 
 
-source('03_train_models_gbm')
-source('03_train_models_rmweather')
-
-
 train_models_rmweather <- function(engine, meas_weather, pollutants, exp_suffix=NULL, ...){
   
   if(!engine %in% c('gbm', 'rmweather')){

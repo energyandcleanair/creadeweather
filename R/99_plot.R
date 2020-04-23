@@ -1,10 +1,3 @@
-require(ggplot2)
-if (!require(cowplot)) install.packages(c('cowplot')); require(cowplot)
-if (!require(ggpubr)) install.packages(c('ggpubr')); require(ggpubr)
-
-source('99_utils.R')
-source('99_crea_theme.R')
-
 plot.tools.gather_predicted <- function(meas_weather){
   meas_weather %>%
     dplyr::select(date, value, predicted) %>%

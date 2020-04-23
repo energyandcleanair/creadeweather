@@ -1,19 +1,3 @@
-require(devtools)
-require(rmweather)
-require(dplyr)
-require(purrr)
-require(sf)
-require(tibble)
-require(lubridate)
-require(ggplot2)
-require(pbapply)
-require(pbmcapply)
-require(parallel)
-require(future)
-require(purrrlyr)
-
-source('99_utils.R')
-source('99_plot.R')
 
 train_models_rmweather <- function(meas_weather,
                                    pollutants,
@@ -40,7 +24,7 @@ train_models_rmweather <- function(meas_weather,
   # exp_name <- paste('lag3',paste(pollutants, collapse='_'), no2_02deg_rmweather_trees600_samples600'
   n_trees <- trees
   samples <- samples
-
+  
   
   stations_idx = NULL #seq(201,400) #NULL #seq(201,nrow(meas_weather)) #50 #You might not want to run every region / poll combination
   
@@ -143,11 +127,11 @@ train_models_rmweather <- function(meas_weather,
   # Not optimal computation time wise but still decent for the safety / simplicity it brings
   nworkers <- as.integer(future::availableCores()-1)
   result <- pbmcmapply(train_row,
-                              station_id=meas_weather_lag$station_id,
-                              data=meas_weather_lag$meas_weather,
-                              pollutant=meas_weather_lag$pollutant,
-                              unit=meas_weather_lag$unit,
-                              mc.cores=nworkers,
+                       station_id=meas_weather_lag$station_id,
+                       data=meas_weather_lag$meas_weather,
+                       pollutant=meas_weather_lag$pollutant,
+                       unit=meas_weather_lag$unit,
+                       mc.cores=nworkers,
                        USE.NAMES=F,
                        SIMPLIFY=FALSE)
   
