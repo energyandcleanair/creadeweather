@@ -1,6 +1,5 @@
-# Predicting Air Quality from Weather Observarions
+# Measuring impact of COVID-19 related lockdowns on air quality
 
 
-
-## Code structure
-![Alt text](./doc/architecture.svg)
+## Methodology
+![Alt text](./doc/methodology.svg)
