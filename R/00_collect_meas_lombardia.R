@@ -54,7 +54,7 @@ lombardia.get_meas <- function(){
   meas <- do.call('bind_rows', lapply(meas_urls, read.table, as.is=T, header=T, sep=","))
 
   meas_cleaned <- meas %>%
-    select(IdSensore, Data, Valore) %>% 
+    dplyr::select(IdSensore, Data, Valore) %>% 
     rename(
       sensor_id=IdSensore,
       date=Data,

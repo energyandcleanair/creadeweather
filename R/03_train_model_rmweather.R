@@ -1,11 +1,29 @@
 
+#' Title
+#'
+#' @param meas_weather 
+#' @param pollutants 
+#' @param deg 
+#' @param trees 
+#' @param samples 
+#' @param lag 
+#' @param normalise 
+#' @param detect_breaks 
+#' @param add_timestamp_var 
+#' @param exp_suffix 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 train_models_rmweather <- function(meas_weather,
                                    pollutants,
                                    deg,
-                                   trees,
-                                   samples,
-                                   lag,
-                                   normalise,
+                                   trees=600,
+                                   samples=300,
+                                   lag=0,
+                                   normalise=F,
+                                   detect_breaks=F,
                                    add_timestamp_var=T,
                                    exp_suffix=NULL){
   
@@ -13,7 +31,7 @@ train_models_rmweather <- function(meas_weather,
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
   
   # Check we can find this file (to be copied later on)
-  org_file <- if(rstudioapi::isAvailable()) rstudioapi::getActiveDocumentContext()$path else '03_train_model_rmweather.R'
+  org_file <- if(rstudioapi::isAvailable()) rstudioapi::getActiveDocumentContext()$path else 'R/03_train_model_rmweather.R'
   # meas_weather <- readRDS('data/02_prep_training/output/meas_w_weather_no2_02.RDS')
   
   exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),'_deg',sub('\\.','',deg),
@@ -22,9 +40,6 @@ train_models_rmweather <- function(meas_weather,
     exp_name <- paste0(exp_name, exp_suffix)  
   }
   # exp_name <- paste('lag3',paste(pollutants, collapse='_'), no2_02deg_rmweather_trees600_samples600'
-  n_trees <- trees
-  samples <- samples
-  
   
   stations_idx = NULL #seq(201,400) #NULL #seq(201,nrow(meas_weather)) #50 #You might not want to run every region / poll combination
   
@@ -94,10 +109,8 @@ train_models_rmweather <- function(meas_weather,
       model <- rmw_train_model(
         df=data_prepared_b,
         variables = variables,
-        n_trees = 1200,
-        # n_samples = samples,
+        n_trees = trees,
         verbose = F,
-        keep_inbag = F, # Trying
         n_cores = 1
       )
       
@@ -112,12 +125,18 @@ train_models_rmweather <- function(meas_weather,
         mutate(model=list(model_light), predicted=list(data_prepared))
       
       if(normalise){
-        normalised <-rmw_normalise(model, data_prepared, n_samples = samples)
+        normalised <- rmw_normalise(model, data_prepared, n_samples=samples, n_cores=1)
         res <- res%>% mutate(normalised=list(normalised))
+        
+        if(detect_breaks){
+          breakpoints_ <- rmw_find_breakpoints(normalised)
+          res <- res %>% mutate(breakpoints=list(breakpoints_))
+        }
       } 
       
       res
     }, error=function(err){
+      print(err)
       warning(paste("Station id failed:",station_id,':',err))
       return(NA)})
   }
@@ -126,6 +145,7 @@ train_models_rmweather <- function(meas_weather,
   # We apply multicore training to chunks to avoid memory issues
   # Not optimal computation time wise but still decent for the safety / simplicity it brings
   nworkers <- as.integer(future::availableCores()-1)
+  
   result <- pbmcmapply(train_row,
                        station_id=meas_weather_lag$station_id,
                        data=meas_weather_lag$meas_weather,

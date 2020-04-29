@@ -7,18 +7,18 @@ ncar.add_pbl <- function(weather){
   
   
   folder <- file.path(input_folder, 'pbl')
-  files <- list.files(folder, "*.grb2", full.names = T)
-  pat = 'cdas1\\.(\\d{8})\\.pgrbh'
-  dates <- lubridate::ymd(str_match(files, pat)[, 2])
+  files <- list.files(folder, "*.grb2$", full.names = T)
+  pat = 'cdas1\\.(\\d{8})\\.'
+  dates <- lubridate::ymd(stringr::str_match(files, pat)[, 2])
  
   process_file <- function(file, stations_sf){
-    pat = 'cdas1\\.(\\d{8})\\.pgrbh'
-    date <- lubridate::ymd(str_match(file, pat)[, 2])
+    pat = 'cdas1\\.(\\d{8})\\.'
+    date <- lubridate::ymd(stringr::str_match(file, pat)[, 2])
     r <- raster::brick(file)
     # For some reason, on GCP/Ubuntu, raster is offset by 360deg
-    if(xmin(r)>180){
-      xmin(r)=xmin(r)-360
-      xmax(r)=xmax(r)-360
+    if(raster::xmin(r)>180){
+      raster::xmin(r)=raster::xmin(r)-360
+      raster::xmax(r)=raster::xmax(r)-360
     }
     file_values <- as.data.frame(raster::extract(r,
                                        stations_sf,

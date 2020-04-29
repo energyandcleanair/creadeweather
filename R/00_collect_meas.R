@@ -10,9 +10,10 @@
 #' @export
 #'
 #' @examples prepare_input(c(creadb::NO2, creadb::PM10), years
-prepare_input <- function(pollutants,
+collect_meas <- function(pollutants,
                           years_force_refresh=NULL,
                           deg=0.2,
+                          country=NULL,
                           cache_folder=file.path('data', '00_init', 'cache'),
                           output_folder=file.path('data', '00_init', 'output'),
                           input_folder=file.path('data', '00_init', 'input'),
@@ -25,15 +26,16 @@ prepare_input <- function(pollutants,
   
   # Get stations and regions
   stations_eea_sf <- eea.get_running_stations_sf(pollutants)
+  countries <- if(is.null(country)) stations_eea_sf$iso2 else country
   continental_bbox <- sf::st_bbox(c(xmin = -13, 
                                     ymin = 25, 
                                     xmax = 50, 
                                     ymax = 70),
-                                  crs = st_crs(4326))
+                                  crs = sf::st_crs(4326))
   stations_eea_sf <- st_intersection(stations_eea_sf, st_as_sfc(continental_bbox))
   stations_eea_present_sf <- stations_eea_sf 
   
-  gadm1_sf <- gadm1.get_sf(stations_eea_sf$iso2, cache_folder=cache_folder)
+  gadm1_sf <- gadm1.get_sf(countries, cache_folder=cache_folder)
   gadm1_sf$area <- st_area(gadm1_sf)
   gadm1_simplified_sf <- st_simplify(gadm1_sf,preserveTopology = T,dTolerance = 0.1)
   

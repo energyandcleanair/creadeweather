@@ -1,10 +1,14 @@
-prep_training <- function(meas_weather, pollutants, deg){
-  
-  # meas_weather <- readRDS(file.path('data','01_weather','output','meas_w_weather_no2_02.RDS'))
-  # saveRDS(meas_weather, file.path('data','01_weather','output','meas_w_weather_025.RDS'))
-  # meas <- readRDS(file.path('data','00_init','output','meas_at_gadm.RDS'))
-  # weather <- readRDS(file.path('data','01_weather','output','gadm1_weather_noaa.RDS'))
-  
+#' Title
+#'
+#' @param meas_weather
+#' @param pollutants 
+#' @param deg 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+prep_data <- function(meas_weather, pollutants, deg){
   
   cache_folder <- file.path('data', '02_prep_training', 'cache')
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
@@ -14,6 +18,20 @@ prep_training <- function(meas_weather, pollutants, deg){
   
   input_folder <- file.path('data', '02_prep_training', 'input')
   if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
+  
+  
+  # Filter outliers etc.
+  clean_meas_tbl <- function(tbl){
+    n_mad <- 30
+    mad <- stats::mad(tbl$value, na.rm=T)
+    n_before <- nrow(tbl)
+    tbl <- tbl %>% dplyr::filter(value-median(value, na.rm=T) < n_mad * mad)
+    n_after <- nrow(tbl)
+    if(n_before!=n_after){
+      print(paste(n_before-n_after,"/", n_before,"outliers removed. Threshold:", n_mad*mad+median(tbl$value)))
+    }
+    return(tbl)
+  }
   
   
   # Certain stations miss certain weather variables
@@ -54,7 +72,8 @@ prep_training <- function(meas_weather, pollutants, deg){
     return(tbl)
   }
   # 
-  meas_weather <- meas_weather %>% rowwise() %>%
+  meas_weather <- meas_weather %>% dplyr::rowwise() %>%
+   mutate(meas_weather=list(clean_meas_tbl(meas_weather))) %>%
    mutate(meas_weather=list(coalesce_weather_tbl(meas_weather))) %>%
    mutate(meas_weather=list(enrich_weather_tbl(meas_weather)))
   # 
@@ -79,12 +98,5 @@ prep_training <- function(meas_weather, pollutants, deg){
   #                meas_col='meas_weather')
   
   return(meas_weather)
-  
-  # Quality checks
-  # ggplot(meas_weather$meas_weather[[1]] %>% tidyr::gather("key", "value", -c(date, wd_factor)), aes(x=date, y=value)) + 
-  #   geom_point(size=0.1) + 
-  #   facet_wrap(~key, scales='free_y')
-  
-    
 }
 

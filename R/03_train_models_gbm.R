@@ -1,5 +1,5 @@
 
-train_models_rmweather <- function(meas_weather, pollutants, exp_suffix=NULL){
+train_models_gbm <- function(meas_weather, pollutants, exp_suffix=NULL){
     
   output_folder <- file.path('data', '03_train_models', 'output')
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)

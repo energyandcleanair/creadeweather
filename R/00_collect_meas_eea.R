@@ -9,7 +9,7 @@ eea.get_running_stations <- function(pollutants){
         dplyr::distinct(network_countrycode, station_localid, samplingpoint_x, samplingpoint_y) %>%
         dplyr::rename(iso2=network_countrycode, station_id=station_localid, latitude=samplingpoint_y, longitude=samplingpoint_x)  %>%
         dplyr::mutate(pollutant=str_match(u,"_([:alnum:]+).csv")[,2]) # Attaching pollutant name
-    },error=function(err) NULL)
+    },error=function(err){print(err);NULL})
   }
   
   do.call('bind_rows', pblapply(urls_latest_poll, parse_url)) %>% distinct(iso2, station_id, pollutant, latitude, longitude)
@@ -153,11 +153,11 @@ eea.read_stations_meas <- function(stations, cache_folder, years_force_refresh=N
   
   filter_file <- function(f, stations){
     tryCatch({
-      fl <- read_csv(f, n_max = 1, progress=F, col_types = cols())
+      fl <- readr::read_csv(f, n_max = 1, progress=F, col_types = cols())
       res <- (fl$AirQualityStation %in% stations$station_id) &&
               (fl$AirPollutant %in% stations[stations$station_id==fl$AirQualityStation,'pollutant'])
       if(is.na(res) || is.null(res)) FALSE else res
-    }, error=function(cond){FALSE}
+    }, error=function(cond){print(cond);FALSE}
     )
   }
   

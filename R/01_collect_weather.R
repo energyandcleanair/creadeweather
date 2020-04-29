@@ -1,4 +1,15 @@
-get_weather <- function(meas, pollutants, deg){
+#' Title
+#'
+#' @param meas 
+#' @param pollutants 
+#' @param deg 
+#' @param years_force_refresh 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+collect_weather <- function(meas, pollutants, deg, years_force_refresh=NULL){
     
   if(!require(install.load)) install.packages("install.load"); require(install.load)
   install_load('rnoaa', 'worldmet', 'sirad')
@@ -22,7 +33,7 @@ get_weather <- function(meas, pollutants, deg){
   stations <- meas %>% ungroup() %>% dplyr::select(station_id, geometry) %>% distinct(station_id, .keep_all = T)
   stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = 2)
   weather <- noaa.add_weather(stations_w_noaa, years=c(2015:2020),
-                                     years_force_refresh = NULL, #2020, #c(2020),
+                                     years_force_refresh = years_force_refresh, #2020, #c(2020),
                                      cache_folder = cache_folder)
   
   # Add Planet Boundary Layer from ncar
@@ -39,7 +50,7 @@ get_weather <- function(meas, pollutants, deg){
     left_join(weather %>% dplyr::select(station_id, weather)) %>%
     rowwise() %>%
     mutate(meas=list(
-      meas %>% left_join(weather) %>% select(-c(iso2, station_id))
+      meas %>% left_join(weather) %>% dplyr::select(-c(iso2, station_id))
     )) %>%
     rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))

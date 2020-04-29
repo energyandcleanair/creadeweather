@@ -12,6 +12,7 @@ Imports:
     creadb,
     dplyr,
     purrr,
+    readr,
     sf,
     raster,
     pbapply,
@@ -44,3 +45,4 @@ Depends:
     ggplot2
 Suggests: 
 VignetteBuilder:
+RoxygenNote: 7.1.0

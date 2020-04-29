@@ -76,7 +76,7 @@ plot.output_data_row <- function(output_data_row, rolling_days){
       theme(legend.position='bottom') +
       ylim(c(0, NA))
     p3 <- plot.infos(output_data_row)
-    ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
+    ggpubr::ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
     
   },
   error=function(cond){
@@ -84,10 +84,10 @@ plot.output_data_row <- function(output_data_row, rolling_days){
     p1 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
     p2 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
     p3 <- plot.infos(output_data_row)
-    ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
+    ggpubr::ggarrange(p1, p2, p3, ncol = 3, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,1))
   })
   
-  annotate_figure(figure,
+  ggpubr::annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(output_data_row$pollutant,
                                   output_data_row$station_id,
@@ -111,7 +111,7 @@ plot.output_data <- function(output_data, rolling_days, filepath){
       figures[[i]] <- plot.output_data_row(filled_output[i,], rolling_days)
   }
   
-  figure_alls <- ggarrange(plotlist=figures, ncol = 1, nrow = 3)
+  figure_alls <- ggpubr::ggarrange(plotlist=figures, ncol = 1, nrow = 3)
   ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
 }
 
@@ -121,9 +121,9 @@ plot.map_count <- function(data, folder, title, meas_col){
   
   # Plot number of measurements with weather
   map_count_data <- sf::st_as_sf(data) %>%
-    mutate_at(meas_col, nrow) %>%
-    group_by(station_id, pollutant) %>% 
-    mutate_at(meas_col, sum)
+    dplyr::mutate_at(meas_col, nrow) %>%
+    dplyr::group_by(station_id, pollutant) %>% 
+    dplyr::mutate_at(meas_col, sum)
   
   map_count <- ggplot(map_count_data) + geom_sf(data=gadm1_sf, alpha=0.1) +
     geom_sf(data=map_count_data, aes_string(fill=meas_col, colour=meas_col), size=0.5) +
@@ -146,11 +146,11 @@ plot.map_count_per_gadm <- function(data, folder, title, meas_col){
                                tidyr::crossing(pollutant=unique(data$pollutant))) %>%
     left_join(
       data %>%
-        rowwise() %>% 
-        mutate_at(meas_col, nrow)
+        dplyr::rowwise() %>% 
+        dplyr::mutate_at(meas_col, nrow)
       ) %>%
-    group_by(gadm1_id, pollutant) %>% 
-    mutate_at(meas_col, sum)
+    dplyr::group_by(gadm1_id, pollutant) %>% 
+    dplyr::mutate_at(meas_col, sum)
     
   map_count <- ggplot(map_count_data) +
     geom_sf(aes_string(fill=meas_col),size=0.1) +
@@ -229,19 +229,49 @@ plot.output_result_quality <- function(output_data, result_folder, timestamp_str
     geom_histogram(aes(x=value, fill=key, colour=key), alpha=0.2) + facet_grid(~pollutant) + theme_crea()
   
   ggsave(file.path(result_folder,paste0(timestamp_str,'_quality.pdf')),
-         plot=  ggarrange(p1, p2, ncol = 2, nrow = 1,  common.legend = FALSE, legend = "bottom", widths=c(2,2)))
+         plot=  ggpubr::ggarrange(p1, p2, ncol = 2, nrow = 1,  common.legend = FALSE, legend = "bottom", widths=c(2,2)))
 }
 
 #------------------------------
 # Plot for rmweather results
 #------------------------------
-plot.rmweather.normalized <- function(row, rolling_days, max_nas=NULL){
+plot.rmweather.observed_predicted <- function(row, rolling_days, max_nas=NULL){
+  
+  lubridate::year(row$movement) <- 0
+  lubridate::year(row$school_workplace) <- 0
+  
+  # model_fitted <- row$model_fitted[[1]]
+  data <- row$predicted[[1]]
+  data <- utils.rolling_average(data, average_by = 'day', average_width = rolling_days,
+                                group_cols = c(), avg_cols=c('value', 'predicted'), max_nas=max_nas)
+  data$year <- factor(lubridate::year(data$date))
+  data$date_in_year <- data$date
+  lubridate::year(data$date_in_year) <- 0
+  
+  ggplot(data) + 
+    geom_line(aes(x=date_in_year, y=value, color=year, size=year, linetype="Observed")) +
+    geom_line(aes(x=date_in_year, y=predicted, color=year, size=year, linetype="Predicted")) +
+    labs(y='Observed vs predicted concentration', x=NULL, size='Year', colour="Year") +
+    scale_size_manual(values=c(1.1,0.6,0.6,0.6,0.6,0.6), breaks = seq(2020,2015)) +
+    # scale_color_manual(values=c('#8c510a','#bf812d','#dfc27d','#01665e','#35978f','#80cdc1'), breaks = seq(2020,2015)) +
+    scale_color_discrete(breaks = seq(2020,2015)) +
+    theme_crea() +
+    theme(legend.position="bottom") +
+    geom_vline(data=row, aes(xintercept=as.POSIXct(movement), linetype='Lockdown (movement)'), colour=pal_crea['Turquoise']) +
+    geom_vline(data=row, aes(xintercept=as.POSIXct(school_workplace), linetype='Lockdown (school, work)'), colour=pal_crea['Turquoise'])+
+    scale_linetype_manual(name = "", values=c('dashed','dotted','solid','dashed')) +
+    guides(fill = guide_legend(nrow = 2, title.position = "left"),
+           size= guide_legend(nrow = 2, title.position = "left"),
+           linetype = guide_legend(nrow = 2, title.position = "left"))
+}
+
+plot.rmweather.normalised <- function(row, rolling_days, max_nas=NULL){
   
   lubridate::year(row$movement) <- 0
   lubridate::year(row$school_workplace) <- 0
 
-  model_fitted <- row$model_fitted[[1]]
-  data <- model_fitted$normalised
+  # model_fitted <- row$model_fitted[[1]]
+  data <- row$normalised[[1]]
   data <- utils.rolling_average(data, average_by = 'day', average_width = rolling_days,
                                 group_cols = c(), avg_cols='value_predict', max_nas=max_nas)
   data$year <- factor(lubridate::year(data$date))
@@ -260,21 +290,18 @@ plot.rmweather.normalized <- function(row, rolling_days, max_nas=NULL){
     guides(fill = guide_legend(nrow = 2, title.position = "left"),
            size= guide_legend(nrow = 2, title.position = "left"),
            linetype = guide_legend(nrow = 2, title.position = "left"))
-    
-    
 }
 
 
-plot.rmweather.normalized_w_trend <- function(row, rolling_days, max_nas=NULL){
+plot.rmweather.normalised_w_trend <- function(row, rolling_days, max_nas=NULL){
   rolling_days_ <- rolling_days
-  model_fitted <- row$model_fitted[[1]]
-  data <- model_fitted$normalised
+  data <- row$normalised[[1]]
   data <- utils.rolling_average(data, average_by = 'day', average_width = rolling_days,
                                 group_cols = c(), avg_cols='value_predict', max_nas=max_nas)
 
   date_end <- max(data$date)
   trend <- row$trend[[1]] %>% filter(rolling_days==rolling_days_) %>% tidyr::replace_na(list(date_end=max(data$date))) %>%
-    mutate(title=paste(period,p.stars))
+    dplyr::mutate(title=paste(period,p.stars))
   
   min_date <- coalesce(min(trend$date_start), as.POSIXct('2019-01-01'))
   ggplot(data %>% filter(date>=min_date)) + geom_line(aes(x=date, y=value_predict)) +
@@ -310,10 +337,10 @@ plot.rmweather.normalized_w_trend <- function(row, rolling_days, max_nas=NULL){
                  size=0.3)
 }
 
-plot.rmweather.importance <- function(model_fitted){
+plot.rmweather.importance <- function(model){
   
-  data_list <- model_fitted$model$variable.importance
-  data <- tibble(variable=names(data_list), importance=data_list)
+  data_list <- model$variable.importance
+  data <- tibble::tibble(variable=names(data_list), importance=data_list)
   # Group all lag variables into 1
   data$variable <- gsub("_\\d","",data$variable)
 
@@ -323,40 +350,52 @@ plot.rmweather.importance <- function(model_fitted){
 }
 
 
+
 plot.rmweather.infos <- function(row){
+  
   infos_list <- list(
     'Station id'=row$station_id,
-    'Country id'=row$gadm0_id,
-    'Region id'=row$gadm1_id,
+    'Country'=row$country,
+    'City'=row$city,
     'Region'=row$gadm1_name,
     'Pollutant'=row$pollutant,
-    'Trees'=row$model_fitted[[1]]$model$num.trees,
-    'R2'=round(row$model_fitted[[1]]$model$r.squared,2),
-    'Prediction error'=round(row$model_fitted[[1]]$model$prediction.error,2)
+    'Trees'=row$model[[1]]$num.trees,
+    'R2'= utils.iferr(round(row$model[[1]]$r.squared,2), 'NA'),
+    'Prediction error'= utils.iferr(round(row$model[[1]]$prediction.error,2),'NA'),
+    'Breakpoints' = utils.iferr(paste(row$breakpoints[[1]]$date[!is.na(row$breakpoints[[1]]$date)],collapse='\n'), 'NA')
   )
+  
   infos_tbl <- tibble('Parameter / Result'=names(infos_list), 'Value'=as.character(infos_list))
-  ggtexttable(infos_tbl, rows = NULL, 
-              theme = ttheme("lCyan"))
+  ggpubr::ggtexttable(infos_tbl, rows = NULL, 
+              theme = ggpubr::ttheme("lCyan"))
 }
 
-plot.rmweather.result_row <- function(row, rolling_days, max_nas=NULL, w_trend=F){
+plot.rmweather.result_row <- function(row, rolling_days, max_nas=NULL, normalised=F, w_trend=F){
+  
+  if(normalised & !'normalised' %in% colnames(row)){
+    warning('No normalised data found. Using non-normalised ones')
+    normalised=F
+  }
   
   figure <- tryCatch({
-    p1 <- plot.rmweather.normalized(row,rolling_days, max_nas=max_nas)
-    if(w_trend){
-      p2 <- plot.rmweather.normalized_w_trend(row,rolling_days, max_nas=max_nas)
-      # p2 <- tryCatch({},
-      #                error=function(cond){
-      #                  warning(paste("Failed to build trend:", cond))
-      #                  ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data)})
+    if(normalised){
+      p1 <- plot.rmweather.normalised(row,rolling_days, max_nas=max_nas)
+      if(w_trend){
+        p2 <- plot.rmweather.normalised_w_trend(row,rolling_days, max_nas=max_nas)
+      }else{
+        p2 <- p1 +
+          scale_x_datetime(limits=c(as.POSIXct('0-01-01'), as.POSIXct('0-05-01')))
+      }
     }else{
+      p1 <- plot.rmweather.observed_predicted(row,rolling_days, max_nas=max_nas)
       p2 <- p1 +
         scale_x_datetime(limits=c(as.POSIXct('0-01-01'), as.POSIXct('0-05-01')))
     }
+
     
-    p3 <- plot.rmweather.importance(row$model_fitted[[1]])
+    p3 <- plot.rmweather.importance(row$model[[1]])
     p4 <- plot.rmweather.infos(row)
-    ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = F, legend = "bottom", widths=c(2,2,2,1))
+    ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = F, legend = "bottom", widths=c(2,2,2,1))
   },
   error=function(cond){
     no_data <- "No Data"
@@ -364,10 +403,10 @@ plot.rmweather.result_row <- function(row, rolling_days, max_nas=NULL, w_trend=F
     p2 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
     p3 <- ggplot() + theme_void() + ggplot2::annotate("text", x=0, y=0, label=no_data) 
     p4 <- plot.rmweather.infos(row)
-    ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,2,1))
+    ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1,  common.legend = TRUE, legend = "bottom", widths=c(2,2,2,1))
   })
   
-  annotate_figure(figure,
+  ggpubr::annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(row$pollutant,
                                   row$station_id,
@@ -378,7 +417,7 @@ plot.rmweather.result_row <- function(row, rolling_days, max_nas=NULL, w_trend=F
 }
 
 
-plot.rmweather.result_rows <- function(rows, rolling_days, filepath, max_nas=NULL, w_trend=F){
+plot.rmweather.result_rows <- function(rows, rolling_days, filepath, max_nas=NULL, normalised=T, w_trend=F){
   
   # Arrange / Fill so that pages are homogenous
   rows_filled <- rows %>%
@@ -388,11 +427,11 @@ plot.rmweather.result_rows <- function(rows, rolling_days, filepath, max_nas=NUL
   
   figures <- list()
   for(i in seq(1,nrow(rows_filled))){
-    figures[[i]] <- plot.rmweather.result_row(rows_filled[i,], rolling_days, max_nas=max_nas, w_trend=w_trend)
+    figures[[i]] <- plot.rmweather.result_row(rows_filled[i,], rolling_days, max_nas=max_nas, normalised=normalised, w_trend=w_trend)
   }
   
-  figure_alls <- ggarrange(plotlist=figures, ncol = 1, nrow = 3)
-  ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
+  figure_alls <- ggpubr::ggarrange(plotlist=figures, ncol = 1, nrow = 3)
+  ggpubr::ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
 }
 
 plot.rmweather.before_after <- function(result, years_before, poll, nstations){
@@ -411,17 +450,17 @@ plot.rmweather.before_after <- function(result, years_before, poll, nstations){
       summarise_at(value_col, mean, na.rm=T))
   }
   
-  result <- result %>% rowwise() %>%
-    mutate(after=average_after(model_fitted$observations, movement),
+  result <- result %>% dplyr::rowwise() %>%
+    dplyr::mutate(after=average_after(model_fitted$observations, movement),
            before=average_before(model_fitted$observations, movement, years_before),
            after_normalised=average_after(model_fitted$normalised, movement, value_col='value_predict'),
            before_normalised=average_before(model_fitted$normalised, movement, years_before, value_col='value_predict'))
   
-  result <- result %>% mutate(var_pct=(after-before)/before,
+  result <- result %>% dplyr::mutate(var_pct=(after-before)/before,
                               var_pct_normalised=(after_normalised-before_normalised)/before_normalised,
                               )
   
-  plot_data <- result %>% select(country, pollutant, var_pct, var_pct_normalised) %>%
+  plot_data <- result %>% dplyr::select(country, pollutant, var_pct, var_pct_normalised) %>%
     tidyr::gather('type', 'average', -c(country, pollutant))
   
   # ggplot(plot_data) +
@@ -514,3 +553,22 @@ plot.rmweather.impact_avg <- function(result_impact_avg, min_country_count=NULL,
   }
   return(plt)
 }
+
+plot.rmweather.qc_plot <- function(result, result_folder=NULL){
+  
+  result_qc <- result %>% dplyr::rowwise() %>%
+    dplyr::mutate(rsq=model$r.squared, err=model$prediction.error) %>%
+    dplyr::select(-c(model, predicted))
+  
+  p1 <- ggplot(result_qc) + geom_boxplot(aes(x=err, y=country)) + facet_wrap(~pollutant) + labs(x='mse', y=NULL)
+  p2 <- ggplot(result_qc) + geom_boxplot(aes(x=rsq, y=country)) + facet_wrap(~pollutant) + labs(x='r2', y=NULL )
+  
+  plt <- ggpubr::ggarrange(p1, p2, ncol = 1, nrow = 2,  common.legend = F, legend = "bottom", widths=c(2,2))
+
+  if(!is.null(result_folder)){
+    ggsave(filename=file.path(result_folder, 'QC.png'),
+           plot=plt, height=20, width=15, scale=1)  
+  }
+  return(plt)
+}
+

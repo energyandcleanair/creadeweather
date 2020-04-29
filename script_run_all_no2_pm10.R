@@ -1,5 +1,5 @@
 # Ensure we have latest code, even if we didn't rebuild package
-lapply(list.files('R','*.R',full.names = T),source)
+lapply(list.files('R','*.R',full.names = T), source)
 
 
 pollutants <- c('NO2','PM10')
