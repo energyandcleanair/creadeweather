@@ -39,7 +39,7 @@ ncar.add_pbl <- function(weather){
   pbl_values <- do.call('bind_rows', pblapply(files, process_file, stations_sf=stations_sf))
   
   # Join to weather data
-  joined <- weather %>% rowwise() %>%
+  joined <- weather %>% rowwise() %>% dplyr::filter(!is.null(weather)) %>%
     mutate(weather_station_id=station_id, weather=list(weather %>% left_join(
       pbl_values %>% filter(station_id==weather_station_id)
     ))) %>% dplyr::select(-c(weather_station_id))

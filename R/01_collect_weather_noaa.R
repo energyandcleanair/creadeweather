@@ -16,7 +16,7 @@ noaa.add_close_stations <- function(meas, n_per_station){
     ))
 
   meas %>% 
-    left_join(meas_stations  %>% dplyr::select(-c(geometry)))
+    dplyr::left_join(meas_stations  %>% dplyr::select(-c(geometry)))
 }
 
 
@@ -91,13 +91,26 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
   stations_weather$weather <- pblapply(stations_weather$code, noaa.get_noaa_at_code,
            years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)
 
+  to_date <- function(d){
+    tryCatch({
+      lubridate::date(d)
+    },error=function(err){
+      print(d)
+      NA
+    })
+  }
   meas_w_stations <- meas_w_stations %>%
     left_join(
       stations_weather %>%
         dplyr::select(station_id, weather) %>%
+        dplyr::rowwise() %>%
+        dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
+        ungroup() %>%
         group_by(station_id) %>%
         summarise(weather=list(bind_rows(weather) %>%
-                 dplyr::group_by(date=lubridate::date(date)) %>%
+                 dplyr::mutate(date=to_date(date)) %>%
+                 dplyr::filter(!is.na(date)) %>%
+                 dplyr::group_by(date) %>%
                  dplyr::summarize(
                    air_temp_min=min(air_temp_min, na.rm=T),
                    air_temp_max=max(air_temp_max, na.rm=T),
@@ -111,7 +124,7 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    precip=mean(precip, na.rm=T),
                    RH=mean(RH, na.rm=T)
                  )
-        )
+            )
         )
     )
     

@@ -1,20 +1,17 @@
-#' Title
+#' Collect weather (and atmospheric) data from various sources including NOAA & UNCAR.
 #'
-#' @param meas 
+#' @param meas tibble of measurements with date and geometry
 #' @param pollutants 
 #' @param deg 
+#' @param n_per_station how many NOAA stations do we fetch per AQ measurement station (default 2)
 #' @param years_force_refresh 
 #'
 #' @return
 #' @export
 #'
 #' @examples
-collect_weather <- function(meas, pollutants, deg, years_force_refresh=NULL){
+collect_weather <- function(meas, pollutants, deg, n_per_station=2, years_force_refresh=NULL){
     
-  if(!require(install.load)) install.packages("install.load"); require(install.load)
-  install_load('rnoaa', 'worldmet', 'sirad')
-  
-  
   cache_folder <- file.path('data', '01_weather', 'cache')
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
   
@@ -24,22 +21,16 @@ collect_weather <- function(meas, pollutants, deg, years_force_refresh=NULL){
   input_folder <- file.path('data', '01_weather', 'input')
   if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
   
-  # meas <- readRDS(file.path('data', '00_init', 'output', 'eea_meas_daily_no2_02.RDS'))
-  
-  
-  # For development purposes
-  # meas <- meas %>% head(5)
   print("Getting NOAA")
   stations <- meas %>% ungroup() %>% dplyr::select(station_id, geometry) %>% distinct(station_id, .keep_all = T)
-  stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = 2)
+  stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
   weather <- noaa.add_weather(stations_w_noaa, years=c(2015:2020),
-                                     years_force_refresh = years_force_refresh, #2020, #c(2020),
+                                     years_force_refresh = years_force_refresh,
                                      cache_folder = cache_folder)
   
-  # Add Planet Boundary Layer from ncar
-  print("Getting Plamet Boundary Layer")
+  # Add Planet Boundary Layer from NCAR
+  print("Getting Planet Boundary Layer")
   weather <- ncar.add_pbl(weather)
-  
   
   # Add sunshine
   print("Getting Sunshine")
@@ -49,6 +40,7 @@ collect_weather <- function(meas, pollutants, deg, years_force_refresh=NULL){
   meas_w_weather <- meas %>%
     left_join(weather %>% dplyr::select(station_id, weather)) %>%
     rowwise() %>%
+    dplyr::filter(!is.null(weather)) %>%
     mutate(meas=list(
       meas %>% left_join(weather) %>% dplyr::select(-c(iso2, station_id))
     )) %>%

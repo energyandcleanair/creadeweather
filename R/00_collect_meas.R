@@ -1,15 +1,21 @@
 #' Get stations and measurements in Europe for selected pollutants
-#' and at selected geographical granularity
+#' and at selected geographical granularity from 2015 til now.
 #'
-#' @param pollutants 
+#' @param pollutants a vector of pollutants e.g. creadb::NO2, creadb::PM10
 #' @param years_force_refresh A vector of years for which we want to force downloading data
 #' even when file is in cache folder. Useful if you want to get latest data of current year. If NULL,
 #' no file is downloaded when it exists in cache folder.
-#' @param deg latitude/longitude degree of the grid used to find stations#'
+#' @param deg latitude/longitude degree of the grid used to find station
+#' @param country additional country filter (iso2)
+#' @param cache_folder where to store cache files for measurements [optional]
+#' @param output_folder where to store measurements RDS files [optional]
+#' @param input_folder where to get additional input data from (not used at the moment) [optional]
+#' @param filename output filename [optional]
+#'
 #' @return tibble of measurements
 #' @export
 #'
-#' @examples prepare_input(c(creadb::NO2, creadb::PM10), years
+#' @examples collect_meas(pollutants=c(creadb::NO2, creadb::PM10), deg=0.2)
 collect_meas <- function(pollutants,
                           years_force_refresh=NULL,
                           deg=0.2,
@@ -50,9 +56,8 @@ collect_meas <- function(pollutants,
   }
   
   stations_eea_filtered <- do.call("rbind",lapply(pollutants, nearest_stations_for_poll))
-  ggplot(stations_eea_filtered) + geom_sf(data=gadm1_simplified_sf) + geom_sf(aes(color=pollutant))
-  
-  # # Attach GADM1 to stations_eea
+
+  # Attach GADM1 to stations_eea
   stations_eea_gadm_sf <- st_join(stations_eea_sf, gadm1_sf)
   
   # We download first
@@ -60,11 +65,13 @@ collect_meas <- function(pollutants,
   eea_refs <- tryCatch({
     readRDS(file.path(cache_folder,'eea_refs.RDS'))},
     error=function(err){
-      tibble(station_id=character(),pollutant=character(),year=integer(),file=character(),url=character())
+      tibble(station_id=character(),pollutant=character(),
+             year=integer(),file=character(),url=character())
     }
   )
   
-  eea_refs <- eea.download_stations_meas(stations=stations_eea_filtered %>% distinct(station_id, pollutant),
+  eea_refs <- eea.download_stations_meas(stations=stations_eea_filtered %>%
+                                           distinct(station_id, pollutant),
                                          years_force_refresh= years_force_refresh,
                                          refs=eea_refs,
                                          cache_folder=cache_folder
@@ -72,22 +79,24 @@ collect_meas <- function(pollutants,
   
   saveRDS(eea_refs, file.path(cache_folder,'eea_refs.RDS'))
   
-  # then read
-  eea_meas <- eea.read_stations_meas(stations=stations_eea_filtered %>% distinct(station_id, pollutant), cache_folder=cache_folder)
+  # read
+  eea_meas <- eea.read_stations_meas(stations=stations_eea_filtered %>%
+                                       distinct(station_id, pollutant),
+                                     cache_folder=cache_folder)
   
-  # then nest
+  # nest
   eea_meas_nested <- eea_meas %>%
     group_by(station_id, pollutant, unit) %>%
     tidyr::nest() %>%
     rename(meas=data)
   
-  # # join GADM1
+  # join GADM1 information
   eea_meas_nested <- eea_meas_nested %>%
     left_join(
       stations_eea_gadm_sf %>% dplyr::select(station_id, gadm0_id, gadm1_id, gadm1_name, geometry)
     )
   
-  # Then save
+  # save
   filename <- if(!is.null(filename)) filename else paste('eea_meas_daily',paste(tolower(pollutants),collapse='_'),sub('\\.','',deg),'.RDS',sep='_')
   saveRDS(eea_meas_nested, file.path(output_folder,filename))
   return(eea_meas_nested)

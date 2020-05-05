@@ -1,4 +1,9 @@
 
+#' Get EEA stations that are still running for each pollutant specified
+#' @param pollutants vector of pollutants
+#'
+#' @return tibble with station ids, locations and pollutants
+#'
 eea.get_running_stations <- function(pollutants){
   
   urls_latest <- readLines('http://discomap.eea.europa.eu/map/fme/latest/files.txt') %>% trimws()
@@ -16,6 +21,10 @@ eea.get_running_stations <- function(pollutants){
   
 }
 
+#' Get metadata for all EEA stations
+#' 
+#' @return tibble
+#' 
 eea.get_stations <- function(){
   file_metadata <- file.path(input_folder,'PanEuropean_metadata.csv')
   if(!file.exists(file_metadata)){
@@ -44,31 +53,56 @@ eea.get_stations <- function(){
 
 
 
+#' Get sf of all EEA stations
+#'
+#' @return Simple Features of EEA stations
+#' 
 eea.get_stations_sf <- function(){
   sf::st_as_sf(eea.get_stations(), coords=c("longitude","latitude"), crs=4326)
 }
 
+
+#' Get EEA stations that are still running for each pollutant specified
+#'
+#' @param pollutants 
+#'
+#' @return Simple Features of running EEA stations
+#' @export
+#'
+#' @examples
 eea.get_running_stations_sf <- function(pollutants){
   sf::st_as_sf(eea.get_running_stations(pollutants), coords=c("longitude","latitude"), crs=4326)
 }
 
-eea.download_station_meas <- function(station_id, pollutant_names, years_force_refresh=c(2020), refs, cache_folder){
+
+
+#' Download measurements data of a single station from EEA server. Files are saved in cache_folder.
+#'
+#' @param station_id 
+#' @param pollutants 
+#' @param years_force_refresh 
+#' @param refs 
+#' @param cache_folder 
+#'
+#' @return updated reference tibble
+#'
+eea.download_station_meas <- function(station_id, pollutants, years_force_refresh=c(2020), refs, cache_folder){
   print(station_id)  
   tryCatch({
     station_id_=station_id
     base_url = 'https://fme.discomap.eea.europa.eu/fmedatastreaming/AirQualityDownload/AQData_Extract.fmw?CountryCode=&CityName=&Pollutant=8&Year_from=2015&Year_to=2020&Station=&Samplingpoint=&Source=All&Output=TEXT&UpdateDate=&TimeCoverage=Year'
     
-    pollutants = list(NO2=8, PM10=5, CO=10, SO2=1, O3=7)
+    pollutant_codes = list(NO2=8, PM10=5, CO=10, SO2=1, O3=7)
     
     urls = list()
-    for(p in pollutant_names) {
+    for(p in pollutants) {
       
       # Check if exist already
       existing_refs <- refs %>% filter(station_id==station_id_, pollutant==p, year %in% c(2015:2020))
       files <- existing_refs$file
       
       if(length(files)==0){
-        base_url %>% gsub('Pollutant=8', paste0('Pollutant=', pollutants[[p]]), .) %>%
+        base_url %>% gsub('Pollutant=8', paste0('Pollutant=', pollutant_codes[[p]]), .) %>%
           gsub('Station=', paste0('Station=', station_id), .) %>%
           gsub('Year_from=2015', paste0('Year_from=', 2015), .) %>% 
           gsub('Year_to=2020', paste0('Year_to=', 2020), .) %>% 
@@ -97,8 +131,8 @@ eea.download_station_meas <- function(station_id, pollutant_names, years_force_r
     }))
     
     # rename pollutant
-    pollutants <- unlist(pollutants)
-    meas$pollutant <- names(pollutants)[match(meas$pollutant, pollutants)]
+    pollutant_codes_v <- unlist(pollutant_codes)
+    meas$pollutant <- names(pollutant_codes_v)[match(meas$pollutant, pollutant_codes_v)]
     
     # adding urls
     meas$url <- urls
@@ -128,15 +162,25 @@ eea.download_station_meas <- function(station_id, pollutant_names, years_force_r
   )
 }
 
+
+#' Download measurements data of a single station from EEA server. Files are saved in cache_folder.
+#'
+#' @param stations 
+#' @param years_force_refresh 
+#' @param refs 
+#' @param cache_folder 
+#'
+#' @return updated reference tibble
+#' 
 eea.download_stations_meas <- function(stations, years_force_refresh=c(2020), refs, cache_folder){
   pb <- txtProgressBar(min = 0, max = nrow(stations), style = 3)
   i <- 0
   
   for(i in seq(nrow(stations))){
     refs<-eea.download_station_meas(stations[i,]$station_id,
-                                    pollutant_names=stations[i,]$pollutant,
+                                    pollutants=stations[i,]$pollutant,
                                     years_force_refresh=years_force_refresh,
-                                    refs,
+                                    refs=refs,
                                     cache_folder=cache_folder)
     i <- i+1
     setTxtProgressBar(pb, i)
@@ -145,12 +189,20 @@ eea.download_stations_meas <- function(stations, years_force_refresh=c(2020), re
   return(refs)
 }
 
+
+#' Read previously-downloaded files.
+#'
+#' @param stations 
+#' @param cache_folder 
+#' @param years_force_refresh 
+#'
+#' @return tibble
+#' 
 eea.read_stations_meas <- function(stations, cache_folder, years_force_refresh=NULL){
   
   file_paths <- list.files(cache_folder,'*_timeseries.csv', full.names = T)
   
-  # We open every single file ancd check it belong s to station_ids & pollutant
-  
+  # We open every single file ancd check it belongs to station_ids & pollutant
   filter_file <- function(f, stations){
     tryCatch({
       fl <- readr::read_csv(f, n_max = 1, progress=F, col_types = cols())
