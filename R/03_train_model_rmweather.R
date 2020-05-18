@@ -1,4 +1,3 @@
-
 #' Title
 #'
 #' @param meas_weather 
@@ -18,45 +17,46 @@
 #' @examples
 train_models_rmweather <- function(meas_weather,
                                    pollutants,
-                                   deg,
                                    trees=600,
                                    samples=300,
                                    lag=0,
                                    normalise=F,
                                    detect_breaks=F,
                                    add_timestamp_var=T,
+                                   exp_name=NULL,
                                    exp_suffix=NULL){
   
+  # Experiment name for storage
+  if(is.null(exp_name)){
+    exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),
+                       '_trees',trees,
+                       '_samples',samples,
+                       '_ts',substr(as.character(add_timestamp_var),1,1),
+                       '_norm',substr(as.character(normalise),1,1))
+    if(!is.null(exp_suffix)){
+      exp_name <- paste0(exp_name, exp_suffix)  
+    }
+  }
+  
+  # Files and folder
   output_folder <- file.path('data', '03_train_models', 'output')
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
+  org_file <- ifelse(rstudioapi::isAvailable(),
+                     rstudioapi::getActiveDocumentContext()$path,
+                     'R/03_train_model_rmweather.R')
+    
   
-  # Check we can find this file (to be copied later on)
-  org_file <- if(rstudioapi::isAvailable()) rstudioapi::getActiveDocumentContext()$path else 'R/03_train_model_rmweather.R'
-  # meas_weather <- readRDS('data/02_prep_training/output/meas_w_weather_no2_02.RDS')
-  
-  exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),'_deg',sub('\\.','',deg),
-                     '_trees',trees,'_samples',samples,'_ts',substr(as.character(add_timestamp_var),1,1),'_norm',substr(as.character(normalise),1,1))
-  if(!is.null(exp_suffix)){
-    exp_name <- paste0(exp_name, exp_suffix)  
-  }
-  # exp_name <- paste('lag3',paste(pollutants, collapse='_'), no2_02deg_rmweather_trees600_samples600'
-  
-  stations_idx = NULL #seq(201,400) #NULL #seq(201,nrow(meas_weather)) #50 #You might not want to run every region / poll combination
-  
-  # only keep those with values in 2020 and some wind data
+  # Filter input data
+  # Only keep those with values in 2020 and some wind data
   meas_weather <- meas_weather %>% rowwise() %>% filter(max(meas_weather$date)>'2020-01-01')
   meas_weather <- meas_weather %>% filter(!all(is.na(meas_weather$ws)) & length(unique(meas_weather$ws))>1)
   
-  
+  # Filter pollutants
   if(!is.null(pollutants)){
     meas_weather <- meas_weather %>% filter(pollutant %in% pollutants)
   }
   
-  if(!is.null(stations_idx)){
-    stations <- unique(meas_weather$station_id)[stations_idx]
-    meas_weather <- meas_weather %>% filter(station_id %in% stations)
-  }
-  
+  # Select variables
   weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
   weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
   
