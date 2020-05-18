@@ -40,9 +40,11 @@ Imports:
     pbmcapply,
     parallel,
     cowplot,
-    ggpubr
+    ggpubr,
+    deweather
 Depends:
     ggplot2
+Remotes: davidcarslaw/deweather
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.0
