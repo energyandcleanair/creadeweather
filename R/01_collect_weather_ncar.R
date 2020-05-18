@@ -1,6 +1,6 @@
 input_folder <- file.path('data', '01_weather', 'input')
 
-ncar.add_pbl <- function(weather){
+ncar.add_pbl <- function(weather, years){
   stations_sf <- st_as_sf(weather %>% ungroup() %>%
                             dplyr::select(station_id, geometry) %>%
                             dplyr::distinct(station_id, .keep_all=T))
@@ -36,7 +36,13 @@ ncar.add_pbl <- function(weather){
 
     return(file_values)
   }
-  pbl_values <- do.call('bind_rows', pblapply(files, process_file, stations_sf=stations_sf))
+  if(is.null(years)){
+    files_years <- files  
+  }else{
+    files_years <- files[lubridate::year(dates) %in% years]
+  }
+  
+  pbl_values <- do.call('bind_rows', pblapply(files_years, process_file, stations_sf=stations_sf))
   
   # Join to weather data
   joined <- weather %>% rowwise() %>% dplyr::filter(!is.null(weather)) %>%

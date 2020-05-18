@@ -14,7 +14,8 @@
 #'
 #' @return
 #' @export
-postcompute_results_rmweather <- function(result_folder){
+postcompute_results_rmweather <- function(result_folder,
+                                          global_region=NULL){
   
   # Read data
   result <- list.files(path=result_folder, pattern = "result.RDS", full.names = T) %>%
@@ -34,21 +35,24 @@ postcompute_results_rmweather <- function(result_folder){
   result_impact_avg <- postcompute.population_weighted(result_impact,
                                                        group_by_cols=c('country', 'country_count', 'pollutant'),
                                                        value_col=c('diff_ratio','diff'))
-  # Add a line for whole Europe
-  result_impact_avg <- dplyr::bind_rows(
-    result_impact_avg,
-    postcompute.population_weighted(result_impact,
-                                    group_by_cols=c('pollutant'),
-                                    value_col=c('diff_ratio','diff')) %>%
-      dplyr::left_join(result_impact %>% dplyr::group_by(pollutant) %>% dplyr::summarise(country_count=n())) %>%
-      dplyr::mutate(country='Europe')
-  )
+  # Add a line for whole area
+  if(!is.null(global_region)){
+    result_impact_avg <- dplyr::bind_rows(
+      result_impact_avg,
+      postcompute.population_weighted(result_impact,
+                                      group_by_cols=c('pollutant'),
+                                      value_col=c('diff_ratio','diff')) %>%
+        dplyr::left_join(result_impact %>% dplyr::group_by(pollutant) %>% dplyr::summarise(country_count=n())) %>%
+        dplyr::mutate(country=global_region)
+    )
+  }
+  
   
   
   # saveRDS(result_impact, file=file.path(result_folder, 'result_impact.RDS'))
   saveRDS(result_impact %>% 
-            dplyr::select(station_id, pollutant, unit, city,country, geometry,
-                          movement,avg_observed, avg_predicted,diff, diff_ratio, gpw),
+            dplyr::select(station_id, pollutant, unit, country, geometry,
+                          movement, avg_observed, avg_predicted,diff, diff_ratio, gpw),
           file=file.path(result_folder, 'result_impact_lite.RDS'))
   
   

@@ -1,6 +1,6 @@
-postcompute.quality_filter <- function(result, rsq.threshold=NULL, mse.thresholds=list("NO2"=NULL, "PM10"=NULL)){
+postcompute.quality_filter <- function(result, rsq.threshold=NULL, mse.thresholds=list("NO2"=NULL, "PM10"=NULL, "CO"=NULL, "O3"=NULL,"PM2.5"=NULL,"SO2"=NULL)){
   result %>% dplyr::rowwise() %>% dplyr::filter(is.null(rsq.threshold) || (model$r.squared>=rsq.threshold)) %>%
-    dplyr::filter(is.null(mse.thresholds) || (model$prediction.error<=mse.thresholds[pollutant]))
+    dplyr::filter(is.null(mse.thresholds[[pollutant]]) || (model$prediction.error<=mse.thresholds[[pollutant]]))
 }
 
 postcompute.before_after <- function(result_, years_before){
@@ -47,13 +47,25 @@ postcompute.add_metadata <- function(result_){
   lockdown$school_workplace <- pmin(lockdown$school, lockdown$workplace, na.rm=T)
   lockdown$iso2 <- countrycode::countrycode(lockdown$iso3, origin='iso3c', destination='iso2c')
   lockdown$country <- as.character(lockdown$country)
-  locs <- creadb::locations(id=unique(result_$station_id))
   
-  result_ <- result_ %>% dplyr::ungroup() %>% dplyr::left_join(locs, by=c('station_id'='id'), all.x=T)  %>%
+  join_dblocs <- ! all(c("country","geometry") %in% colnames(result_))
+  if(join_dblocs){
+    locs <- creadb::locations(id=unique(result_$station_id))
+    result_ <- result_ %>% dplyr::ungroup() %>% dplyr::left_join(locs, by=c('station_id'='id'), all.x=T)
+  }
+  
+  result_ <- result_ %>% dplyr::ungroup() %>%
     dplyr::left_join(lockdown, by=c('country'='iso2')) %>%
     tidyr::replace_na(list('movement'='2020-03-16')) %>%
-    dplyr::rename(iso2=country, country=country.y) %>%
-    dplyr::filter(!is.na(country)) 
+    dplyr::rename(iso2=country)
+  
+  if(join_dblocs){
+    result_ <- result_ %>% dplyr::rename(country=country.y)
+  }else{
+    result_ <- result_ %>%
+      dplyr::mutate(country=countrycode::countrycode(iso2, origin='iso2c', destination='country.name'),
+                    country.y=NULL)
+  }
   
   result_ <- result_ %>% dplyr::left_join(result_ %>% dplyr::filter(!is.na(country)) %>%
                                             dplyr::group_by(country, pollutant) %>%
@@ -66,7 +78,6 @@ postcompute.add_gpw <- function(result_){
   result_$gpw <- raster::extract(gpw_, sf::st_as_sf(result_))
   return(result_)
 }
-
 
 
 postcompute.lockdown_impact <- function(result_){

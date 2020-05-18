@@ -3,6 +3,7 @@
 export("%>%")
 export(collect_meas)
 export(collect_weather)
+export(eea.get_running_stations_sf)
 export(post_compute)
 export(postcompute_results_rmweather)
 export(prep_data)

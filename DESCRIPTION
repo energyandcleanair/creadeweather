@@ -42,7 +42,8 @@ Imports:
     cowplot,
     ggpubr
 Depends:
-    ggplot2
+    ggplot2,
+    ranger
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.0

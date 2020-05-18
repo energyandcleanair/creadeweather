@@ -1,4 +1,3 @@
-
 #' Title
 #'
 #' @param meas_weather 
@@ -22,10 +21,14 @@ train_models_rmweather <- function(meas_weather,
                                    trees=600,
                                    samples=300,
                                    lag=0,
+                                   weather_vars=NULL,
                                    normalise=F,
                                    detect_breaks=F,
+                                   training_date_cut,
                                    add_timestamp_var=T,
-                                   exp_suffix=NULL){
+                                   exp_suffix=NULL,
+                                   return_result=T # If False, return folder instead
+                                   ){
   
   output_folder <- file.path('data', '03_train_models', 'output')
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
@@ -58,7 +61,9 @@ train_models_rmweather <- function(meas_weather,
   }
   
   weather_vars_available <- setdiff(colnames(meas_weather$meas_weather[[1]]), c('date','value'))
-  weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH', 'pbl_min', 'pbl_max', 'sunshine')
+  if(is.null(weather_vars)){
+    weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max', 'pbl_max', 'sunshine')  
+  }
   
   if(lag>0){
     day_lags <- c(1:lag)  
@@ -69,14 +74,6 @@ train_models_rmweather <- function(meas_weather,
     weather_vars_lags <- weather_vars
     meas_weather_lag <- meas_weather %>% rowwise()
   }
-  
-  
-  # formula <- reformulate(termlabels=weather_vars_lags,
-  #                        response='value')
-  # formula_vars <- vars(all.vars(formula))
-  
-  # Adding lag
-  
   
   
   ### Result folder
@@ -98,12 +95,15 @@ train_models_rmweather <- function(meas_weather,
         mutate(date=as.POSIXct(date)) %>%
         rmw_prepare_data(na.rm = TRUE)
       
-      data_prepared_b <- data_prepared %>% filter(date<'2020-01-01')
-      data_prepared_a <- data_prepared %>% filter(date>='2020-01-01')
+      data_prepared_b <- data_prepared %>% filter(date<training_date_cut)
+      data_prepared_a <- data_prepared %>% filter(date>=training_date_cut)
       
-      variables <- c("day_julian", "weekday",weather_vars_lags)
+      variables <- c("weekday",weather_vars_lags)
+      
       if(add_timestamp_var){
         variables <- c(variables,"date_unix")
+      }else{
+        variables <- c(variables,"day_julian")
       }
       
       model <- rmw_train_model(
@@ -114,15 +114,28 @@ train_models_rmweather <- function(meas_weather,
         n_cores = 1
       )
       
-      data_prepared$predicted <-rmw_predict(model, data_prepared)
+      data_prepared$predicted <- rmw_predict(model, data_prepared)
+      data_test <- data_prepared %>% filter(set=="testing")
+      model$rmse_test <- rmse(data_test$value, data_test$predicted)
+      model$mae_test <- mae(data_test$value, data_test$predicted)
+      model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
+      
+      data_training <- data_prepared %>% filter(set=="training")
+      model$rmse_training <- rmse(data_training$value, data_training$predicted)
+      model$mae_training <- mae(data_training$value, data_training$predicted)
+      model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
       
       # save space
       model_light <- model
       model_light$forest<- NULL
       model_light$observations <- NULL
+      model_light$inbag.counts <- NULL
+      model_light$predictions <- NULL
       
       res <- tibble(station_id=station_id, pollutant=pollutant, unit=unit) %>%
-        mutate(model=list(model_light), predicted=list(data_prepared))
+        mutate(model=list(model_light),
+               predicted=list(data_prepared %>% dplyr::select(date, set, value, predicted))
+               )
       
       if(normalise){
         normalised <- rmw_normalise(model, data_prepared, n_samples=samples, n_cores=1)
@@ -133,6 +146,12 @@ train_models_rmweather <- function(meas_weather,
           res <- res %>% mutate(breakpoints=list(breakpoints_))
         }
       } 
+      
+      if(add_timestamp_var){
+        # Save trend impact (equivalent to weather corrected?)
+        res$trend <- list(rmw_partial_dependencies(model, data_prepared_b, "date_unix") %>%
+          mutate(value=lubridate::date(as.POSIXct.numeric(value, origin="1970-01-01"))))
+      }
       
       res
     }, error=function(err){
@@ -155,10 +174,13 @@ train_models_rmweather <- function(meas_weather,
                        USE.NAMES=F,
                        SIMPLIFY=FALSE)
   
-  result <- do.call('bind_rows',result[!is.na(result)])
+  result <- do.call('bind_rows', result[!is.na(result)])
   
-  # result <- meas_weather_lag
-  # result$model_fitted <- models_fitted
+  # Re-add geometry
+  result <- result %>% dplyr::left_join(meas_weather %>% dplyr::distinct(station_id, .keep_all=T)
+                                        %>% dplyr::select(station_id, country))
+  
+  
   saveRDS(result, file=file.path(result_folder,paste0('result.RDS')))
   
   # 
@@ -178,8 +200,13 @@ train_models_rmweather <- function(meas_weather,
   #   saveRDS(result, file=file.path(result_folder,paste0('result_',i,'_',n_chunk,'.RDS')))
   #   i <- i+1
   # }
-  # 
-  return(result_folder)
+  
+  #
+  if(return_result){
+    return(result)
+  }else{
+    return(result_folder)  
+  }
 }
 
 
