@@ -11,6 +11,7 @@ noaa.add_close_stations <- function(meas, n_per_station){
       lat=st_coordinates(geometry)[,2],
       lon=st_coordinates(geometry)[,1],
       radius=100) %>%
+        dplyr::filter(end>=20200101) %>%
         arrange(desc(end), distance) %>%
         slice(1:n_per_station)
     ))
@@ -25,8 +26,9 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
   tryCatch({
     # Reading cache files
     years_try_cache <- setdiff(years, years_force_refresh)
-    files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
-    
+    files <- list.files(path=cache_folder, pattern =paste0(code,'_',years_try_cache,'.rds',collapse="|"), full.names = T)
+    # files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
+    years_cached <- str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
     readFile <- function(path){
       if(file.exists(path)) readRDS(path) else NULL
     }
@@ -34,29 +36,33 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
     data_cached <- files %>% map_dfr(readFile) %>% 
       bind_rows()
     
-    if(nrow(data_cached)==0){
-      years_force_refresh <- years
-    }
+    years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
     
     # Adding last year
-    data_last_year <- tryCatch({
-      worldmet::importNOAA(
-        code = code,
-        year = years_force_refresh,
-        hourly = FALSE,
-        precip = TRUE,
-        PWC = FALSE,
-        parallel = T,
-        quiet = FALSE,
-        path = cache_folder
-      )},
-      error=function(cond){
-        NULL
-      }
-    )
+    if(length(years_to_download)>0){
+      data_downloaded <- tryCatch({
+        worldmet::importNOAA(
+          code = code,
+          year = years_to_download,
+          hourly = FALSE,
+          precip = TRUE,
+          PWC = FALSE,
+          parallel = F,
+          quiet = T,
+          path = cache_folder
+        )},
+        error=function(cond){
+        }
+      )
+    }else{
+      data_downloaded <- NULL
+    }
+    
     
     # Binding and returning
-    result <- bind_rows(data_cached, data_last_year)
+    result <- bind_rows(data_cached, data_downloaded)
+    if(nrow(result)==0){return(NULL)}
+    
     
     # Aggregate per day
     result <- result %>%
@@ -72,10 +78,11 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
         ceil_hgt=mean(ceil_hgt, na.rm=T),
         visibility=mean(visibility, na.rm=T),
         precip=mean(precip, na.rm=T),
-        RH=mean(RH, na.rm=T)
+        RH=mean(RH, na.rm=T),
+        RH_min=min(RH, na.rm=T),
+        RH_max=max(RH, na.rm=T)
       )
       
-    if(nrow(result)==0){ result <- NULL }
     return(result)
   }, error=function(err){return(NULL)})
 }
@@ -98,6 +105,10 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
       print(d)
       NA
     })
+  }
+  
+  if(nrow(stations_weather %>% rowwise() %>% filter(!is.null(weather)))==0){
+    stop("Failed to find weather data")
   }
   meas_w_stations <- meas_w_stations %>%
     left_join(
@@ -122,7 +133,9 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    ceil_hgt=mean(ceil_hgt, na.rm=T),
                    visibility=mean(visibility, na.rm=T),
                    precip=mean(precip, na.rm=T),
-                   RH=mean(RH, na.rm=T)
+                   RH=mean(RH, na.rm=T),
+                   RH_min=min(RH, na.rm=T),
+                   RH_max=max(RH, na.rm=T)
                  )
             )
         )

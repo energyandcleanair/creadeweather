@@ -1,3 +1,24 @@
+#' Function to get weekday number from a date where \code{1} is Monday and 
+#' \code{7} is Sunday. 
+#' 
+#' @author Stuart K. Grange
+#' 
+#' @param x Date vector.
+#' 
+#' @param as.factor Should the return be a factor? 
+#' 
+#' @return Numeric vector.
+#' 
+utils.wday_monday <- function(x, as.factor = FALSE) {
+  
+  x <- lubridate::wday(x)
+  x <- x - 1
+  x <- ifelse(x == 0, 7, x)
+  if (as.factor) x <- factor(x, levels = 1:7, ordered = TRUE)
+  return(x)
+  
+}
+
 utils.iferr <- function(code, value_if_err, silent=T){
     tryCatch(code, error = function(c) {
       if(!silent) print(c)

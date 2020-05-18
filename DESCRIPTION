@@ -41,7 +41,9 @@ Imports:
     parallel,
     cowplot,
     ggpubr,
-    deweather
+    deweather,
+    ranger,
+    caTools
 Depends:
     ggplot2
 Remotes: davidcarslaw/deweather
