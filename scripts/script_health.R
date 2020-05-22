@@ -1,15 +1,16 @@
 require(jsonlite)
 require(dplyr)
 require(countrycode)
+require(sf)
 devtools::install_github("https://github.com/energyandcleanair/rcrea", force=T)
 require(rcrea)
 
 ##################
 # 0. Parameters
 ##################
-iso3s <- c("ITA","FRA","BEL", "GER", "GBR") # Null if want all of them
-cache_folder <- "data/00_init/cache" # For GADM files
-source <- "eea" # For air pollution
+iso3s <- c("ITA", "FRA", "BEL", "GER", "GBR") # Null if want all of them (not tested yet)
+cache_folder <- "data/00_init/cache" # To store GADM shapefiles
+source <- "eea" # In Europe, eea is recommended. India: cpcb Elsewhere: openaq
 polls <- c(rcrea::NO2, rcrea::PM25)
 
 
@@ -64,10 +65,8 @@ meas <- bind_rows(
   rcrea::measurements(location_id=covid_locations %>% filter(gadm_level==2) %>% dplyr::pull(gadm_id),
                       aggregate_level="gadm2", date_from="2020-01-01",source=source, poll=polls)
 ) %>%
-  mutate(date=lubridate::date(date))
-
-# %>% 
-  # tidyr::spread(poll, value)
+  mutate(date=lubridate::date(date)) %>%
+  tidyr::spread(poll, value)
 
 # 1.4 Merging covid and aq data
 covid_meas_data <- covid_data %>% merge(covid_locations %>% dplyr::select(name, gadm_id),
@@ -76,5 +75,3 @@ covid_meas_data <- covid_data %>% merge(covid_locations %>% dplyr::select(name, 
 
 covid_meas_data <- covid_meas_data %>% full_join(meas, by=c("gadm_id"="region_id","date"="date"))
 
-# 1.5 Plotting for quick check
-ggplot(covid_meas_data %>% tidyr) + geom_line()
