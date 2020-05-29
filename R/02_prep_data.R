@@ -1,14 +1,12 @@
 #' Title
 #'
 #' @param meas_weather
-#' @param pollutants 
-#' @param deg 
 #'
 #' @return
 #' @export
 #'
 #' @examples
-prep_data <- function(meas_weather, pollutants, deg, filename=NULL){
+prep_data <- function(meas_weather, filename=NULL){
   
   cache_folder <- file.path('data', '02_prep_training', 'cache')
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
@@ -78,9 +76,9 @@ prep_data <- function(meas_weather, pollutants, deg, filename=NULL){
   }
   # 
   meas_weather <- meas_weather %>% dplyr::rowwise() %>%
-   mutate(meas_weather=list(clean_meas_tbl(meas_weather))) %>%
-   mutate(meas_weather=list(coalesce_weather_tbl(meas_weather))) %>%
-   mutate(meas_weather=list(enrich_weather_tbl(meas_weather)))
+    mutate(meas_weather=list(clean_meas_tbl(meas_weather))) %>%
+    mutate(meas_weather=list(coalesce_weather_tbl(meas_weather))) %>%
+    mutate(meas_weather=list(enrich_weather_tbl(meas_weather)))
   # 
   # # Merge with measurements
   # meas_weather <- meas %>%
@@ -93,8 +91,10 @@ prep_data <- function(meas_weather, pollutants, deg, filename=NULL){
   meas_weather <- meas_weather %>% rowwise() %>%
     mutate(meas_weather=list(utils.replace_nan_with_na(meas_weather)))
   
-  filename <- if(!is.null(filename)) filename else paste('meas_w_weather',paste(tolower(pollutants),collapse='_'),sub('\\.','',deg),'.RDS', sep='_')
-  saveRDS(meas_weather, file.path(output_folder, filename))
+  if(!is.null(filename)){
+    saveRDS(meas_weather, file.path(output_folder, filename))  
+  }
+  
   
   # Plot number of measurements with weather
   # plot.map_count(meas_weather,

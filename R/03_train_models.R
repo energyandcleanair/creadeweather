@@ -22,10 +22,10 @@ train_models <- function(meas_weather,
                          samples=300,
                          lag=0,
                          weather_vars=NULL,
+                         time_vars=NULL,
                          normalise=F,
                          detect_breaks=F,
                          training_date_cut,
-                         add_timestamp_var=T,
                          exp_name=NULL,
                          exp_suffix=NULL,
                          return_result=T, # If False, return folder if exists
@@ -42,7 +42,6 @@ train_models <- function(meas_weather,
     exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),
                        '_trees',trees,
                        '_samples',samples,
-                       '_ts',substr(as.character(add_timestamp_var),1,1),
                        '_norm',substr(as.character(normalise),1,1))
     if(!is.null(exp_suffix)){
       exp_name <- paste0(exp_name, exp_suffix)  
@@ -50,11 +49,13 @@ train_models <- function(meas_weather,
   }
   
   # Files and folder
-  output_folder <- file.path('data', '03_train_models', 'output')
-  if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
-  org_file <- ifelse(rstudioapi::isAvailable(),
-                     rstudioapi::getActiveDocumentContext()$path,
-                     'R/03_train_model_rmweather.R')
+  if(save_result){
+    output_folder <- file.path('data', '03_train_models', 'output')
+    if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
+    org_file <- ifelse(rstudioapi::isAvailable(),
+                       rstudioapi::getActiveDocumentContext()$path,
+                       'R/03_train_model_rmweather.R')
+  }
   
   
   # Filter input data
@@ -84,6 +85,28 @@ train_models <- function(meas_weather,
     meas_weather_lag <- meas_weather %>% rowwise()
   }
   
+  # Add certain time vars if required (rmweather doesn't handle month, none handles season etc)
+  if("month" %in% time_vars){
+    meas_weather_lag <- meas_weather_lag %>%
+      mutate(meas_weather=list(meas_weather %>% mutate(month=lubridate::month(date))))
+  }
+  
+  if("season" %in% time_vars){
+    meas_weather_lag <- meas_weather_lag %>%
+      mutate(meas_weather=list(meas_weather %>% mutate(
+            season = forcats::fct_collapse(
+              .f = factor(lubridate::month(date)),
+              Spring = c("3","4","5"),
+              Summer = c("6","7","8"),
+              Autumn = c("9","10","11"),
+              Winter = c("12","1","2")
+            )
+          )
+        )
+      )
+  }
+  
+  
   # Train models
   train_model <- switch(engine,
          "gbm"=train_model_gbm,
@@ -102,26 +125,28 @@ train_models <- function(meas_weather,
     })
   }
   
-  # We apply multicore training to chunks to avoid memory issues
-  # Not optimal computation time wise but still decent for the safety / simplicity it brings
-  nworkers <- 1 #as.integer(future::availableCores()-1)
   meas_weather_lag$index <- index(meas_weather_lag)
     
-  result <- pbmcmapply(train_model_safe,
+  result <- pbmapply(train_model_safe,
                        index=meas_weather_lag$index,
                        data=meas_weather_lag$meas_weather,
                        normalise=normalise,
                        training_date_cut=training_date_cut,
                        weather_vars=list(weather_vars_lags),
-                       add_timestamp_var=add_timestamp_var,
+                       time_vars=list(time_vars),
                        trees=trees,
                        detect_breaks=detect_breaks,
                        samples=samples,
-                       mc.cores=nworkers,
+                       mc.cores=1,
                        USE.NAMES=F,
                        SIMPLIFY=FALSE)
   
-  result <- do.call('bind_rows', result[!is.na(result)])
+  if(!is.null(result$value)){
+    # When warning raised, sometimes actual results are in value column
+    result <- do.call('bind_rows', result$value[!is.na(result$value)])
+  }else{
+    result <- do.call('bind_rows', result[!is.na(result)])
+  }
   
   if(nrow(result)==0) return(NA)
   

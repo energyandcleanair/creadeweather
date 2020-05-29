@@ -44,7 +44,8 @@ Imports:
     forcats,
     deweather,
     ranger,
-    caTools
+    caTools,
+    dotenv
 Depends:
     ggplot2
 Remotes: davidcarslaw/deweather

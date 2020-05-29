@@ -12,20 +12,33 @@
 train_model_deweather <- function(data,
                                   training_date_cut,
                                   weather_vars,
-                                  add_timestamp_var,
+                                  time_vars,
                                   trees,
                                   normalise,
                                   detect_breaks,
                                   samples,
                                   ...){
+    
+    n_cores <- as.integer(future::availableCores()-1)
   
-    time_vars <- c("weekday")
-    if(add_timestamp_var){
-      time_vars <- c(time_vars,"trend")
+    # Correspondance between our time variables and deweather ones
+    # our=deweather
+    time_vars_corr <- list(
+      "trend"="trend",
+      "wday"="weekday",
+      "month"="month",
+      "week"="week",
+      "yday"="jday",
+      "hour"="hour"
+    )
+    
+    if(any(!time_vars %in% c(names(time_vars_corr), colnames(data)))){
+      stop(paste("Deweather can only create the following timevars:", paste(names(time_vars_corr), collapse=",")))
     }else{
-      time_vars <- c(time_vars,"jday")
+      time_vars <- unlist(time_vars_corr[time_vars], use.names=F)
     }
-  
+    
+
     data_prepared <- data %>%
       mutate(date=as.POSIXct(date)) %>%
       deweather::prepData(add=time_vars)
@@ -34,18 +47,19 @@ train_model_deweather <- function(data,
                                  "training",
                                  "testing")
     data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
-    
-    data_prepared$weekday_num = as.numeric(data_prepared$weekday) #Otherwise model$pd doesn't work (weekday factors fail)
-    
     vars <- c(time_vars, weather_vars)
-    vars<-sub("weekday","weekday_num", vars)
     
+    if("weekday" %in% time_vars){
+      data_prepared$weekday_num = as.numeric(data_prepared$weekday) #Otherwise model$pd doesn't work (weekday factors fail)
+      vars<-sub("weekday","weekday_num", vars)
+    }
+
     model <- deweather::buildMod(dat = data.frame(data_prepared %>% dplyr::filter(set=="training")),
              vars = vars,
              pollutant = "value",
              n.trees = trees,
              sam.size = nrow(data_prepared),
-             n.core = 1)
+             n.core = n_cores)
     
     data_prepared$predicted <- predict(model$model, data_prepared, n.trees=model$model$n.trees)
     data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
@@ -69,21 +83,30 @@ train_model_deweather <- function(data,
       )
     
     if(normalise){
-      normalised <- deweather::metSim(model, data_prepared, metVars=weather_vars, n.core=1, B=samples)
+      normalised <- deweather::metSim(model, data_prepared, metVars=weather_vars, n.core=n_cores, B=samples) %>%
+        rename(value_predict=pred)
       res <- res %>% mutate(normalised=list(normalised))
-      
       if(detect_breaks){
         #TODO
       }
     } 
     
 
-    if(add_timestamp_var){
+    if("trend" %in% time_vars){
       # Save trend impact (equivalent to weather corrected?)
-      res$trend <- list(model$pd %>% dplyr::filter(var=="trend") %>%
-        dplyr::mutate(date=lubridate::date_decimal(x)) %>%
-        dplyr::ungroup() %>%
-        dplyr::select(date, mean, lower, upper))
+      # Different form of output depending on timevars. Trying both
+      tryCatch({
+        res$trend <- list(model$pd %>% dplyr::filter(var=="trend") %>%
+                            dplyr::mutate(date=lubridate::decimal_date(x)) %>%
+                            dplyr::ungroup() %>%
+                            dplyr::select(date, mean, lower, upper))  
+      }, error=function(err){
+        res$trend <- list(model$pd %>% dplyr::filter(var=="trend") %>%
+                            dplyr::mutate(date=lubridate::date_decimal(as.numeric(x))) %>%
+                            dplyr::ungroup() %>%
+                            dplyr::select(date, mean, lower, upper))  
+      })
+      
     }
 
     res

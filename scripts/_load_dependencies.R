@@ -33,5 +33,8 @@ require(cowplot)
 require(ggpubr)
 require(ranger)
 require(Metrics)
+require(caTools)
+require(deweather)
+require(dotenv)
 
 lapply(list.files('R','*.R',full.names = T), source)

@@ -1,8 +1,6 @@
 #' Collect weather (and atmospheric) data from various sources including NOAA & UNCAR.
 #'
 #' @param meas tibble of measurements with date and geometry
-#' @param pollutants 
-#' @param deg Only used for filename... #TODO clean
 #' @param n_per_station how many NOAA stations do we fetch per AQ measurement station (default 2)
 #' @param years_force_refresh 
 #'
@@ -11,14 +9,16 @@
 #'
 #' @examples
 collect_weather <- function(meas,
-                            pollutants,
                             n_per_station=2,
                             years=seq(2015,2020),
                             years_force_refresh=NULL,
                             add_pbl=T,
                             add_sunshine=T,
-                            filename){
+                            filename=NULL){
     
+  if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
+    stop("Measurements should be nested in meas column")
+  }
   cache_folder <- file.path('data', '01_weather', 'cache')
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
   
@@ -33,7 +33,9 @@ collect_weather <- function(meas,
   stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
   weather <- noaa.add_weather(stations_w_noaa, years=years,
                                      years_force_refresh = years_force_refresh,
-                                     cache_folder = cache_folder)
+                                     cache_folder = cache_folder) %>%
+    ungroup() %>%
+    dplyr::filter(!is.null(weather))
   
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
@@ -60,12 +62,16 @@ collect_weather <- function(meas,
     dplyr::filter(!is.null(weather)) %>%
     dplyr::filter(!is.null(meas)) %>%
     mutate(meas=list(
-      meas %>% left_join(weather)
+      meas %>%
+        mutate(date=lubridate::date(date)) %>%
+        left_join(weather)
     )) %>%
     rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))
  
-  saveRDS(meas_w_weather, file.path(output_folder, filename))
+  if(!is.null(filename)){
+    saveRDS(meas_w_weather, file.path(output_folder, filename))
+  }
   return(meas_w_weather)
 }
 

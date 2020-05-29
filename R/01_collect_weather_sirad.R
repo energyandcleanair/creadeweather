@@ -21,6 +21,7 @@ sirad.add_sunshine <- function(meas_w_weather){
   w_sunshine <- meas_w_weather %>%
     left_join(sunshine_nested) %>%
     dplyr::rowwise() %>%
+    dplyr::filter(!is.null(weather)) %>%
     mutate(weather= list(
              weather %>% mutate(doy=lubridate::yday(date)) %>%
              left_join(sunshine) %>% dplyr::select(-c(doy))

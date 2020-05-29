@@ -12,32 +12,44 @@
 train_model_rmweather <- function(data,
                                   training_date_cut,
                                   weather_vars,
-                                  add_timestamp_var,
+                                  time_vars,
                                   trees,
                                   normalise,
                                   detect_breaks,
                                   samples,
                                   ...){
 
+    n_cores <- as.integer(future::availableCores()-1)
+  
+    # Correspondance between our time variables and rmweather ones
+    # our=deweather
+    time_vars_corr <- list(
+      "trend"="date_unix",
+      "wday"="weekday",
+      "yday"="day_julian",
+      "hour"="hour"
+    )
+    if(any(!time_vars %in% c(names(time_vars_corr), colnames(data)))){
+      stop(paste("Rmweather can only create the following timevars:", paste(names(time_vars_corr), collapse=",")))
+    }else{
+      time_vars <- unlist(time_vars_corr[time_vars], use.names=F)
+    }
+    
+    
     data_prepared <- data %>%
       mutate(date=as.POSIXct(date)) %>%
       rmw_prepare_data(na.rm = TRUE)
     
     data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
-    variables <- c("weekday",weather_vars)
     
-    if(add_timestamp_var){
-      variables <- c(weather_vars,"date_unix")
-    }else{
-      variables <- c(weather_vars,"day_julian")
-    }
+    variables <- c(time_vars, weather_vars)
     
     model <- rmw_train_model(
       df=data_prepared,
       variables = variables,
       n_trees = trees,
       verbose = F,
-      n_cores = 1
+      n_cores = n_cores
     )
     
     data_prepared$predicted <- rmw_predict(model, data_prepared)
@@ -63,7 +75,10 @@ train_model_rmweather <- function(data,
       )
     
     if(normalise){
-      normalised <- rmw_normalise(model, data_prepared, n_samples=samples, n_cores=1)
+      normalised <- rmw_normalise(model=model,
+                                  df=data_prepared,
+                                  variables=weather_vars,
+                                  n_samples=samples, n_cores=1)
       res <- res%>% mutate(normalised=list(normalised))
       
       if(detect_breaks){
@@ -72,13 +87,12 @@ train_model_rmweather <- function(data,
       }
     } 
     
-    if(add_timestamp_var){
+    if("date_unix" %in% time_vars){
       # Save trend impact (equivalent to weather corrected?)
       res$trend <- list(rmw_partial_dependencies(model, data_prepared, "date_unix") %>%
                           dplyr::mutate(date=as.POSIXct.numeric(value, origin="1970-01-01")) %>%
                           dplyr::rename(mean=partial_dependency) %>%
-                          dplyr::select(-c(variable)))
-        
+                          dplyr::select(-c(variable, value)))
     }
     
     res
