@@ -1,4 +1,4 @@
-#' Training a model using standard gmb and comparing observed vs predicted as anomaly
+#' Training a model using svr
 #'
 #'
 #' @param station_id 
@@ -12,22 +12,15 @@
 #' @export
 #'
 #' @examples
-train_model_gbm <- function(data,
+train_model_svr <- function(data,
                                   training_date_cut,
                                   weather_vars,
                                   time_vars,
-                                  trees,
                                   normalise,
-                                  detect_breaks,
                                   samples,
-                                  interaction.depth=1,
                                   link=NULL,
                                   link_trend=NULL,
                                   ...){
-  
-  if(is.null(training_date_cut)){
-    training_date_cut <- "2099-01-01"
-  }
   
   n_cores <- as.integer(future::availableCores()-1)
   
@@ -68,21 +61,14 @@ train_model_gbm <- function(data,
   data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
   
   # Creating model
-  model_gbm  <- function(training_data, formula){
-    print("Training gbm")
-    gbm.fit <- gbm::gbm(
+  model_svm  <- function(training_data, formula){
+    print("Training SVR")
+    model_ <- e1071::svm(
       formula = formula,
-      data = training_data,
-      distribution='gaussian',
-      cv.folds = 3,
-      interaction.depth=interaction.depth,
-      n.cores = n_cores,
-      n.trees = trees, #So far, it seems only up to 300 trees are used
-      verbose = FALSE,
-      keep.data = F
+      data = as.matrix(training_data)
     )
     print("Done")
-    return(gbm.fit)
+    return(model_)
   }
 
   formula_vars <- c(time_vars, weather_vars)
@@ -104,12 +90,14 @@ train_model_gbm <- function(data,
   #----------------
   # Fit model
   #----------------
-  model <- model_gbm(data_prepared %>% dplyr::filter(set=="training"), formula) 
+  model <- model_svm(data_prepared %>% dplyr::filter(set=="training") %>%
+                       dplyr::select(c("value", formula_vars)), formula) 
   
   #----------------
   # Predict
   #----------------
-  data_prepared$predicted <- predict(model, data_prepared)
+  data_prepared$predicted <- predict(model, as.matrix(data_prepared %>% dplyr::select(formula_vars)))
+  
   
   if(!is.null(link) && (link=='log')){
     data_prepared$value <- exp(data_prepared$value)
@@ -176,10 +164,7 @@ train_model_gbm <- function(data,
       trend_jday <- plot.gbm(model, "jday",continuous.resolution = 366, return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
-        mutate(jday=round(jday)) %>% 
-        dplyr::group_by(jday) %>%
-        dplyr::summarize(y=mean(y, na.rm=T)) %>%
-        dplyr::select(yday_joiner=jday, jday=y) 
+        mutate(jday=round(jday)) %>% dplyr::select(yday_joiner=jday, jday=y)
       
       dates <- dates %>% left_join(trend_jday)
     }
@@ -217,7 +202,7 @@ train_model_gbm <- function(data,
     # trend <- tibble(dates) %>% dplyr::select_at(c(time_vars,"date"))
     trend <- tibble(
       date=dates$date,
-      value= dates %>% dplyr::select(time_vars) %>% rowMeans(na.rm=TRUE))
+      value= dates %>% dplyr::select(time_vars) %>% rowSums(na.rm=TRUE))
 
     # trend$value <- trend$value
     res$trend <- list(tibble(trend))

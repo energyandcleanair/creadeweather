@@ -26,7 +26,6 @@ require(scales)
 require(tibble)
 require(worldmet)
 require(sirad)
-require(rmweather)
 require(pbmcapply)
 require(parallel)
 require(cowplot)
@@ -36,5 +35,13 @@ require(Metrics)
 require(caTools)
 require(deweather)
 require(dotenv)
+require(e1071)
+
+devtools::install_github("https://github.com/energyandcleanair/rcrea", force=T)
+require(rcrea)
+
+devtools::install_github('https://github.com/hubert-thieriot/rmweather', force=T)
+require(rmweather)
+
 
 lapply(list.files('R','*.R',full.names = T), source)

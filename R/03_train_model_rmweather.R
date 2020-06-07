@@ -88,11 +88,12 @@ train_model_rmweather <- function(data,
     } 
     
     if("date_unix" %in% time_vars){
+      
       # Save trend impact (equivalent to weather corrected?)
-      res$trend <- list(rmw_partial_dependencies(model, data_prepared, "date_unix") %>%
+      res$trend <- list(rmw_partial_dependencies(model, df=data_prepared, variable="date_unix", verbose=T, n_cores=n_cores) %>%
                           dplyr::mutate(date=as.POSIXct.numeric(value, origin="1970-01-01")) %>%
-                          dplyr::rename(mean=partial_dependency) %>%
-                          dplyr::select(-c(variable, value)))
+                          dplyr::select(-c(variable, value)) %>%
+                          dplyr::rename(value=partial_dependency))
     }
     
     res

@@ -29,12 +29,13 @@ train_models <- function(meas_weather,
                          exp_name=NULL,
                          exp_suffix=NULL,
                          return_result=T, # If False, return folder if exists
-                         save_result=T
+                         save_result=T,
+                         ...
 ){
   
   # Check input
-  if(!engine %in% c('gbm', 'rmweather', 'deweather')){
-    stop("'engine' should be either 'gbm', 'rmweather' or 'deweather'")
+  if(!engine %in% c('gbm', 'svr', 'rmweather', 'deweather')){
+    stop("'engine' should be either 'gbm', 'svr', 'rmweather' or 'deweather'")
   }
   
   # Experiment name for storage
@@ -74,10 +75,14 @@ train_models <- function(meas_weather,
     weather_vars <- c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max', 'pbl_max', 'sunshine')  
   }
   
+  # Only keep rows with weather vars
+  meas_weather <- meas_weather %>% rowwise() %>%
+    mutate(meas_weather=list(meas_weather %>% filter_at(vars(weather_vars), any_vars(!is.na(.)))))
+  
   # Add lag if need be
   if(!is.null(lag) & lag>0){
     day_lags <- c(1:lag)  
-    weather_vars_lags <- unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_")))
+    weather_vars_lags <- c(weather_vars, unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_"))))
     meas_weather_lag <- meas_weather %>% rowwise() %>%
       mutate(meas_weather=list(utils.add_lag(meas_weather, weather_vars, group_cols=c(), day_lags, 'day')))
   }else{
@@ -109,6 +114,7 @@ train_models <- function(meas_weather,
   
   # Train models
   train_model <- switch(engine,
+         "svr"=train_model_svr,               
          "gbm"=train_model_gbm,
          "rmweather"=train_model_rmweather,
          "deweather"=train_model_deweather
@@ -137,9 +143,10 @@ train_models <- function(meas_weather,
                        trees=trees,
                        detect_breaks=detect_breaks,
                        samples=samples,
-                       mc.cores=1,
+                       # mc.cores=1,
                        USE.NAMES=F,
-                       SIMPLIFY=FALSE)
+                       SIMPLIFY=FALSE,
+                       ...)
   
   if(!is.null(result$value)){
     # When warning raised, sometimes actual results are in value column
