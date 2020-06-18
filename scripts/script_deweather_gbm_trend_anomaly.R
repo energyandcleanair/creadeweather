@@ -1,9 +1,14 @@
 source('scripts/_load_dependencies.R')
 
-polls <- c(rcrea::NO2) #, rcrea::PM25, rcrea::PM10, rcrea::SO2, rcrea::O3, rcrea::CO)
+polls <- c(rcrea::PM25, rcrea::NO2) #, rcrea::PM10) #, rcrea::PM25, rcrea::PM10, rcrea::SO2, rcrea::O3, rcrea::CO)
 source_ <- c("eea")
-country <- NULL #c("ID","VN","PH")
-city <- "Paris"
+country <- NULL #"VN"  #c("ID") #,"VN","PH")
+city <- c("Paris","Lyon", "London","Portsmouth","London","Manchester",
+ "Copenhagen","Madrid","Barcelona","Rome", "Milan","Turin",
+ "Berlin","Munich","Frankfurt","Düsseldorf","Brussels","Minsk",
+ "Helsinki","Athens","Budapest","Bucarest","Vienna","Bern",
+ "Lisbon","Ljubljana","Bratislava","Oslo", "Prague","Riga",
+"Warsaw","Tirana","Southampton", "Reading", "Oxford")
 training_start <- "2017-01-01"
 training_end_anomaly <- "2020-01-01"
 training_end_trend <- "2099-01-01"
@@ -47,8 +52,10 @@ data <- prep_data(meas_weather=meas_weather)
 #----------------------
 normalise <- F
 detect_breaks <- F
-trees <- 600
+trees <- 10000
 samples <- 100
+interaction.depth <- c(2)
+learning.rate <- c(0.01)
 lag <- 1
 engine <- "gbm"
 link <- "log"
@@ -56,11 +63,24 @@ weather_vars <- c(
   list(c('air_temp_min', 'air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max'))
 )
 
+# time_vars_output <- tibble(
+#   time_vars=c(list(c())),
+#   output=c('anomaly'),
+#   training_end=c(training_end_anomaly)
+# )
+# 
 time_vars_output <- tibble(
-  time_vars=c(list(c()),list(c('trend','yday'))),
+  time_vars=c(list(c()),list(c('trend'))),
   output=c('anomaly','trend'),
   training_end=c(training_end_anomaly, training_end_trend)
 )
+
+# 
+# time_vars_output <- tibble(
+#   time_vars=c(list(c('trend'))), #,list(c('trend','yday'))),
+#   output=c('trend'),
+#   training_end=c(training_end_trend)
+# )
 
 # time_vars <- c(
 #   # list(c())
@@ -73,12 +93,14 @@ time_vars_output <- tibble(
 # output <- c("trend","anomaly")
 
 configs <-  tibble() %>%
-  tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link) %>%
+  tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
   rowwise() %>%
   mutate(process_deweather=
            gsub("'","\"",paste0("{",
                                 "'engine':'",engine,"',",
                                 "'trees':'",trees,"',",
+                                "'learning.rate':'",learning.rate,"',",
+                                "'interaction.depth':'",interaction.depth,"',",
                                 "'lag':'",lag,"',",
                                 "'training_start':'",training_start,"',",
                                 "'training_end':'",training_end,"',",
@@ -99,6 +121,8 @@ results_nested <- configs %>% rowwise() %>%
       time_vars=time_vars,
       trees=trees,
       samples=samples,
+      interaction.depth=interaction.depth,
+      learning.rate=learning.rate,
       lag=lag,
       link=link,
       normalise=normalise,
@@ -124,7 +148,7 @@ results_anomaly <- results_anomaly  %>% rowwise()  %>%
          process_deweather = gsub("}",",\"output\":\"anomaly\"}",process_deweather)) %>%
   dplyr::rename(region_id=station_id) %>%
   dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source)
-  
+#   
 results_trend <- results_trend  %>% rowwise()  %>%
   dplyr::mutate(normalised=list(trend)) %>%
   dplyr::rename(region_id=station_id) %>%
@@ -157,7 +181,7 @@ agg_gadm2 <- function(results, locs){
     tidyr::nest() %>%
     rename(region_id=gid_2, normalised=data)
 }
-
+# 
 results_trend_gadm1 <- agg_gadm1(results_trend, locs)
 results_trend_gadm2 <- agg_gadm2(results_trend, locs)
 
@@ -168,8 +192,8 @@ results_anomaly_gadm2 <- agg_gadm1(results_anomaly, locs)
 #--------------------
 # 6. Upload results
 #--------------------
-processes <- results_anomaly %>% distinct(process_id, process_deweather)
-
+processes <- results_trend %>% distinct(process_id, process_deweather)
+# 
 results_trend_uploaded <- results_trend %>% rowwise() %>%
   mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("trend_gbm_lag",lag)))
 
@@ -180,10 +204,10 @@ results_trend_gadm2_uploaded <- results_trend_gadm2 %>% rowwise() %>%
   mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("trend_gbm_lag",lag,"_gadm2")))
 
 results_anomaly_uploaded <- results_anomaly %>% rowwise() %>%
-  mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag)))
+ mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag)))
 
 results_anomaly_gadm1_uploaded <- results_anomaly_gadm1 %>% rowwise() %>%
-  mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag,"_gadm1")))
+ mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag,"_gadm1")))
 
 results_anomaly_gadm2_uploaded <- results_anomaly_gadm2 %>% rowwise() %>%
-  mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag,"_gadm2")))
+ mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0("anomaly_gbm_lag",lag,"_gadm2")))

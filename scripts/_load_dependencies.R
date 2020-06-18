@@ -37,6 +37,8 @@ require(deweather)
 require(dotenv)
 require(e1071)
 
+dotenv::load_dot_env(".env")
+
 devtools::install_github("https://github.com/energyandcleanair/rcrea", force=T)
 require(rcrea)
 

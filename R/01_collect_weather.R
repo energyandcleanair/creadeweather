@@ -21,7 +21,7 @@ collect_weather <- function(meas,
   }
   cache_folder <- file.path('data', '01_weather', 'cache')
   if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
-  
+
   output_folder <- file.path('data', '01_weather', 'output')
   if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
   
