@@ -1,4 +1,5 @@
-#' Title
+#' Training models with several potential engines: deweather, rmweather or gbm directly
+#' (SVR not yet implemented)
 #'
 #' @param meas_weather 
 #' @param pollutants 
@@ -33,6 +34,11 @@ train_models <- function(meas_weather,
                          ...
 ){
   
+  if(nrow(meas_weather)==0){
+    warning("No measurements available. Returning NA")
+    return(NA)
+  }
+  
   # Check input
   if(!engine %in% c('gbm', 'svr', 'rmweather', 'deweather')){
     stop("'engine' should be either 'gbm', 'svr', 'rmweather' or 'deweather'")
@@ -62,6 +68,10 @@ train_models <- function(meas_weather,
   # Filter input data
   # Only keep those with values in 2020 and some wind data
   meas_weather <- meas_weather %>% rowwise() %>% filter(max(meas_weather$date)>'2020-01-01')
+  if(nrow(meas_weather)==0){
+    warning("No measurements available in 2020. Returning NA")
+    return(NA)
+  }
   meas_weather <- meas_weather %>% filter(!all(is.na(meas_weather$ws)) & length(unique(meas_weather$ws))>1)
   
   # Filter pollutants
@@ -77,7 +87,8 @@ train_models <- function(meas_weather,
   
   # Only keep rows with weather vars
   meas_weather <- meas_weather %>% rowwise() %>%
-    mutate(meas_weather=list(meas_weather %>% filter_at(vars(weather_vars), any_vars(!is.na(.)))))
+    mutate(meas_weather=list(meas_weather %>%
+                               dplyr::filter_at(vars(weather_vars), any_vars(!is.na(.)))))
   
   # Add lag if need be
   if(!is.null(lag) & lag>0){
@@ -120,8 +131,9 @@ train_models <- function(meas_weather,
          "deweather"=train_model_deweather
   )
 
-  train_model_safe <- function(index, ...){
+  train_model_safe <- function(index, station_id, ...){
     tryCatch({
+      print(paste("Training model on station", station_id))
       res <- train_model(...)
       res$index <- index
       return(res)
@@ -131,22 +143,24 @@ train_models <- function(meas_weather,
     })
   }
   
-  meas_weather_lag$index <- index(meas_weather_lag)
-    
-  result <- pbmapply(train_model_safe,
-                       index=meas_weather_lag$index,
-                       data=meas_weather_lag$meas_weather,
-                       normalise=normalise,
-                       training_date_cut=training_date_cut,
-                       weather_vars=list(weather_vars_lags),
-                       time_vars=list(time_vars),
-                       trees=trees,
-                       detect_breaks=detect_breaks,
-                       samples=samples,
-                       # mc.cores=1,
-                       USE.NAMES=F,
-                       SIMPLIFY=FALSE,
-                       ...)
+  meas_weather_lag$index <- zoo::index(meas_weather_lag)
+  n_cores <- 1 #as.integer(future::availableCores()-1)
+  
+  result <- pbapply::pbmapply(train_model_safe,
+                     index=meas_weather_lag$index,
+                     station_id=meas_weather_lag$station_id,
+                     data=meas_weather_lag$meas_weather,
+                     normalise=normalise,
+                     training_date_cut=training_date_cut,
+                     weather_vars=list(weather_vars_lags),
+                     time_vars=list(time_vars),
+                     trees=trees,
+                     detect_breaks=detect_breaks,
+                     samples=samples,
+                     # mc.cores=n_cores,
+                     USE.NAMES=F,
+                     SIMPLIFY=FALSE,
+                     ...)
   
   if(!is.null(result$value)){
     # When warning raised, sometimes actual results are in value column

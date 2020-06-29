@@ -54,13 +54,13 @@ train_model_rmweather <- function(data,
     
     data_prepared$predicted <- rmw_predict(model, data_prepared)
     data_test <- data_prepared %>% filter(set=="testing")
-    model$rmse_test <- rmse(data_test$value, data_test$predicted)
-    model$mae_test <- mae(data_test$value, data_test$predicted)
+    model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
+    model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
     model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
     
     data_training <- data_prepared %>% filter(set=="training")
-    model$rmse_training <- rmse(data_training$value, data_training$predicted)
-    model$mae_training <- mae(data_training$value, data_training$predicted)
+    model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
+    model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
     model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
     
     # save space

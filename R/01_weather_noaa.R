@@ -8,12 +8,12 @@ noaa.add_close_stations <- function(meas, n_per_station){
     rowwise() %>%
     mutate(noaa_station=list(
       rnoaa::isd_stations_search(
-      lat=st_coordinates(geometry)[,2],
-      lon=st_coordinates(geometry)[,1],
+      lat=sf::st_coordinates(geometry)[,2],
+      lon=sf::st_coordinates(geometry)[,1],
       radius=100) %>%
         dplyr::filter(end>=20200101) %>%
-        arrange(desc(end), distance) %>%
-        slice(1:n_per_station)
+        dplyr::arrange(desc(end), distance) %>%
+        dplyr::slice(1:n_per_station)
     ))
 
   meas %>% 
@@ -28,17 +28,18 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
     years_try_cache <- setdiff(years, years_force_refresh)
     files <- list.files(path=cache_folder, pattern =paste0(code,'_',years_try_cache,'.rds',collapse="|"), full.names = T)
     # files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
-    years_cached <- str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
+    years_cached <- stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
     readFile <- function(path){
       if(file.exists(path)) readRDS(path) else NULL
     }
     
-    data_cached <- files %>% map_dfr(readFile) %>% 
+    data_cached <- files %>%
+      purrr::map_dfr(readFile) %>% 
       bind_rows()
     
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
     
-    # Adding last year
+    # Downloading fresh data
     if(length(years_to_download)>0){
       data_downloaded <- tryCatch({
         worldmet::importNOAA(
@@ -84,18 +85,22 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
       )
       
     return(result)
-  }, error=function(err){return(NULL)})
+  }, error=function(err){
+    warning(err)
+    return(NULL)})
 }
 
 
 noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020), cache_folder){
   
-  stations_weather <- meas_w_stations %>% ungroup() %>% tidyr::unnest(cols=(noaa_station)) %>%
-    distinct(station_id, usaf, wban)
+  stations_weather <- meas_w_stations %>%
+    dplyr::ungroup() %>%
+    tidyr::unnest(cols=(noaa_station)) %>%
+    dplyr::distinct(station_id, usaf, wban)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   
-  stations_weather$weather <- pblapply(stations_weather$code, noaa.get_noaa_at_code,
+  stations_weather$weather <- pbapply::pblapply(stations_weather$code, noaa.get_noaa_at_code,
            years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)
 
   to_date <- function(d){

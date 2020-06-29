@@ -111,3 +111,145 @@ utils.add_city <- function(data){
   city_corr <- read.csv(file.path('data','00_init','input','eea_station_city.csv'))
   data %>% left_join(city_corr %>% select(station_id, city))
 }
+
+
+
+#' Find stations in selected cities
+#' Finding stations in selected cities using name fuzzy matching.
+#' Also looking at GADM2 names (some large cities make a whole GADM2)
+#'
+#' @param locs 
+#' @param cities 
+#' @param manual 
+#' @param ... 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+utils.attach_city_by_name <- function(locs, cities, manual=NULL, ...){
+  
+  if(!"iso2" %in% names(cities)){
+    cities <- cities %>%
+      mutate(iso2=countrycode::countrycode(country.etc, origin = 'country.name', destination = 'iso2c'))
+  }
+  
+  c <- cities %>%
+    filter(iso2 %in% unique(locs$country)) %>%
+    mutate(city_clean=tolower(stringi::stri_trans_general(str=name, id = "Latin-ASCII")))
+  
+  locs <- locs %>%
+    mutate(city_clean=tolower(stringi::stri_trans_general(str=city, id = "Latin-ASCII")),
+           gadm2_clean=tolower(stringi::stri_trans_general(str=name_2, id = "Latin-ASCII")))
+  
+  cl <- c %>%
+    fuzzyjoin::stringdist_left_join(locs, by=c("city_clean"="city_clean",
+                                               "iso2"="country"), ignore_case=T, max_dist = 1)
+  
+  # We also try with GADM2 in case GADM2 is the city level (name_2==city)
+  cl_gadm2 <- cl %>% 
+    # filter(is.na(id) | name.x %in% c("Amsterdam","Stockholm","Dublin")) %>%
+    fuzzyjoin::stringdist_left_join(locs %>% filter(!is.na(gadm2_clean)),
+                                    by=c("city_clean.x"="gadm2_clean",
+                                         "iso2"="country"), ignore_case=T, max_dist = 1)
+  
+  cl <- rbind(
+    cl %>% dplyr::select(id, name=name.x, city, country, geometry, pop, capital),
+    cl_gadm2 %>% dplyr::select(id=id.y, name=name_2.y, city=city.y, country=country.y, geometry=geometry.y, pop, capital)
+  ) %>%
+    distinct(id, .keep_all = T)
+  
+  return(cl)
+}
+
+
+utils.attach_city_by_location <- function(locs, cities, radius_km=20){
+  
+  if(!'geometry' %in% colnames(locs)){
+    stop("Need geometry info")
+  }
+  
+  cities <- cities %>%
+    mutate(iso2=countrycode::countrycode(country.etc, origin = 'country.name', destination = 'iso2c')) %>%
+    filter(iso2 %in% unique(locs$country))
+  
+  cities_sf <-
+    st_transform(
+      st_buffer(
+        st_transform(
+          st_as_sf(cities, coords = c("long", "lat"), crs = 4326) %>% mutate(center=geometry),
+          3857),
+        radius_km*1000),
+      4326)
+  
+  # Take closest city
+  locs_cities <- st_as_sf(locs, crs=4326) %>%
+    sf::st_join(cities_sf, join=st_intersects) %>%
+    mutate(distance=st_distance(geometry, center, by_element = T)) %>%
+    group_by(id)  %>%
+    arrange(distance) %>% 
+    slice(1) %>%
+    filter(!is.na(pop))
+  
+  return(locs_cities)
+}
+
+
+utils.attach_city <- function(locs, cities, method="location", ...){
+  if(method=="location") return(utils.attach_city_by_location(locs=locs, cities=cities, ...))
+  if(method=="name") return(utils.attach_city_by_name(locs=locs, cities=cities, ...))
+}
+
+
+# Paths -------------------------------------------------------------------
+
+
+#' Mounted folder of CREA bucket
+#'
+#' @return Local path to mounted bucket
+#'
+#' @examples
+utils.get_bucket_mnt <- function(){
+  
+  try(dotenv::load_dot_env())
+  bucket <- Sys.getenv("CREA_BUCKET_MNT")
+  if(bucket==""){
+    warning("CREA_BUCKET_MNT environment variable undefined")
+  }
+  return(bucket)
+}
+
+#' Cache folder in mounted CREA bucket
+#'
+#' @param subfolder Subfolder (to create if not existing)
+#' @return Local path to cache folder
+#'
+#' @examples
+utils.get_cache_folder <- function(subfolder=NULL){
+  folder <- file.path(utils.get_bucket_mnt(), "cache")
+  
+  if(!is.null(subfolder)){
+    folder <- file.path(folder, subfolder)
+  }
+  
+  if(!dir.exists(folder)) dir.create(folder, recursive = T)
+  return(folder)
+}
+
+#' Output folder in mounted CREA bucket
+#'
+#' @param subfolder Subfolder (to create if not existing)
+#' @return Local path to output folder
+#'
+#' @examples
+utils.get_output_folder <- function(subfolder=NULL){
+  folder <- file.path(utils.get_bucket_mnt(), "output")
+  
+  if(!is.null(subfolder)){
+    folder <- file.path(folder, subfolder)
+  }
+  
+  if(!dir.exists(folder)) dir.create(folder, recursive = T)
+  return(folder)
+}
+

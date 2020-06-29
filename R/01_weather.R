@@ -2,7 +2,11 @@
 #'
 #' @param meas tibble of measurements with date and geometry
 #' @param n_per_station how many NOAA stations do we fetch per AQ measurement station (default 2)
-#' @param years_force_refresh 
+#' @param years which years are we getting measurements from
+#' @param years_force_refresh ignoring cache files for these years
+#' @param add_pbl Adding planet boundary layer (not ready)
+#' @param add_sunshine Adding sunshine information
+#' @param filename If not null, results are saved under filename in the output folder
 #'
 #' @return
 #' @export
@@ -19,23 +23,23 @@ collect_weather <- function(meas,
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
     stop("Measurements should be nested in meas column")
   }
-  cache_folder <- file.path('data', '01_weather', 'cache')
-  if(!dir.exists(cache_folder)) dir.create(cache_folder, recursive = T)
 
-  output_folder <- file.path('data', '01_weather', 'output')
-  if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
-  
-  input_folder <- file.path('data', '01_weather', 'input')
-  if(!dir.exists(input_folder)) dir.create(input_folder, recursive = T)
-  
-  print("Getting NOAA")
-  stations <- meas %>% ungroup() %>% dplyr::select(station_id, geometry) %>% distinct(station_id, .keep_all = T)
+  cache_folder <- utils.get_cache_folder("weather")
+
+  # Find unique AQ stations
+  stations <- meas %>% ungroup() %>%
+    dplyr::select(station_id, geometry) %>%
+    distinct(station_id, .keep_all = T)
+
+  # Find weather stations nearby
   stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
+
+  # Get weather at these stations
   weather <- noaa.add_weather(stations_w_noaa, years=years,
                                      years_force_refresh = years_force_refresh,
                                      cache_folder = cache_folder) %>%
     ungroup() %>%
-    dplyr::filter(!is.null(weather))
+    filter(!is.null(weather))
   
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
@@ -49,7 +53,7 @@ collect_weather <- function(meas,
     weather <- sirad.add_sunshine(weather)  
   }
   
-  # Join weather into measurements
+  # Join weather with measurements
   if("geometry" %in% colnames(meas)){
     meas <- tibble(meas) %>% dplyr::select(-c(geometry))
   }else{
@@ -59,8 +63,8 @@ collect_weather <- function(meas,
   meas_w_weather <- tibble(meas) %>%
     left_join(weather %>% dplyr::select(station_id, weather)) %>%
     rowwise() %>%
-    dplyr::filter(!is.null(weather)) %>%
-    dplyr::filter(!is.null(meas)) %>%
+    filter(!is.null(weather)) %>%
+    filter(!is.null(meas)) %>%
     mutate(meas=list(
       meas %>%
         mutate(date=lubridate::date(date)) %>%
@@ -70,6 +74,7 @@ collect_weather <- function(meas,
     dplyr::select(-c(weather))
  
   if(!is.null(filename)){
+    ouput_folder <- utils.get_output_folder()
     saveRDS(meas_w_weather, file.path(output_folder, filename))
   }
   return(meas_w_weather)

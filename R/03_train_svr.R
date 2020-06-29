@@ -111,8 +111,8 @@ train_model_svr <- function(data,
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
   data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
-  model$rmse_test <- rmse(data_test$value, data_test$predicted)
-  model$mae_test <- mae(data_test$value, data_test$predicted)
+  model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
+  model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
   model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
 
   data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value))

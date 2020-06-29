@@ -13,24 +13,24 @@
 #'
 #' @examples
 train_model_gbm <- function(data,
-                                  training_date_cut,
-                                  weather_vars,
-                                  time_vars,
-                                  trees,
-                                  normalise,
-                                  detect_breaks,
-                                  samples,
-                                  interaction.depth=1,
-                                  learning.rate=0.1,
-                                  link=NULL,
-                                  link_trend=NULL,
-                                  ...){
+                            training_date_cut,
+                            weather_vars,
+                            time_vars,
+                            trees,
+                            normalise,
+                            detect_breaks,
+                            samples,
+                            interaction.depth=1,
+                            learning.rate=0.1,
+                            link=NULL,
+                            link_trend=NULL,
+                            ...){
   
   if(is.null(training_date_cut)){
     training_date_cut <- "2099-01-01"
   }
   
-  n_cores <- as.integer(future::availableCores()-1)
+  n_cores <-as.integer(future::availableCores()-1)
   
   link <- if(is.null(link) || is.na(link)) NULL else link
   link_trend <- if(is.null(link_trend) || is.na(link_trend)) NULL else link_trend
@@ -98,6 +98,7 @@ train_model_gbm <- function(data,
   # Add "link" transformation if required
   if(!is.null(link) && link=='log'){
     data_prepared$value <- log(data_prepared$value)
+    
   }
   if(!is.null(link_trend) && link=='log' && ('trend' %in% time_vars)){
     data_prepared$trend <- log(data_prepared$trend)
@@ -106,7 +107,7 @@ train_model_gbm <- function(data,
   #----------------
   # Fit model
   #----------------
-  model <- model_gbm(data_prepared %>% dplyr::filter(set=="training"), formula) 
+  model <- model_gbm(data_prepared %>% dplyr::filter(set=="training" & !is.na(value) & !is.infinite(value)), formula) 
   
   #----------------
   # Predict
@@ -124,14 +125,14 @@ train_model_gbm <- function(data,
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
-  data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
-  model$rmse_test <- rmse(data_test$value, data_test$predicted)
-  model$mae_test <- mae(data_test$value, data_test$predicted)
+  data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value) & !is.infinite(value))
+  model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
+  model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
   model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
 
-  data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value))
-  model$rmse_training <- rmse(data_training$value, data_training$predicted)
-  model$mae_training <- mae(data_training$value, data_training$predicted)
+  data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
+  model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
+  model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
   model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
 
   # save space
@@ -162,7 +163,7 @@ train_model_gbm <- function(data,
       
     
     if("trend" %in% time_vars){
-      trend_trend <- plot.gbm(model, "trend", continuous.resolution = nrow(dates)*2, return.grid = T) %>%
+      trend_trend <- gbm::plot.gbm(model, "trend", continuous.resolution = nrow(dates)*2, return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
         mutate(trend=ifelse(!is.null(link_trend) && (link=='log'),exp(trend),trend)) %>%
@@ -175,7 +176,7 @@ train_model_gbm <- function(data,
     }
     
     if("jday" %in% time_vars){
-      trend_jday <- plot.gbm(model, "jday",continuous.resolution = 366, return.grid = T) %>%
+      trend_jday <- gbm::plot.gbm(model, "jday",continuous.resolution = 366, return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
         mutate(jday=round(jday)) %>% 
@@ -187,7 +188,7 @@ train_model_gbm <- function(data,
     }
     
     if("month" %in% time_vars){
-      trend_month <- plot.gbm(model, "month", return.grid = T) %>%
+      trend_month <- gbm::plot.gbm(model, "month", return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
         dplyr::select(month_joiner=month, month=y)
@@ -198,7 +199,7 @@ train_model_gbm <- function(data,
     }
     
     if("weekday" %in% time_vars){
-      trend_weekday <- plot.gbm(model, "weekday", return.grid = T) %>%
+      trend_weekday <- gbm::plot.gbm(model, "weekday", return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
         dplyr::select(wday_joiner=weekday, weekday=y)
@@ -209,7 +210,7 @@ train_model_gbm <- function(data,
     }
     
     if("season" %in% time_vars){
-      trend_season <- plot.gbm(model, "season", return.grid = T) %>%
+      trend_season <- gbm::plot.gbm(model, "season", return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
         dplyr::select(season_joiner=season, season=y)

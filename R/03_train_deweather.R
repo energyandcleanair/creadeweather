@@ -63,13 +63,13 @@ train_model_deweather <- function(data,
     
     data_prepared$predicted <- predict(model$model, data_prepared, n.trees=model$model$n.trees)
     data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
-    model$rmse_test <- rmse(data_test$value, data_test$predicted)
-    model$mae_test <- mae(data_test$value, data_test$predicted)
+    model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
+    model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
     model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
     
     data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value))
-    model$rmse_training <- rmse(data_training$value, data_training$predicted)
-    model$mae_training <- mae(data_training$value, data_training$predicted)
+    model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
+    model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
     model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
     
     # save space

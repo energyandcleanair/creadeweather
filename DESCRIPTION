@@ -1,15 +1,15 @@
-Package: crealockdown
+Package: creadeweather
 Type: Package
-Title: Analysis of impact of lockdown on air pollution in Europe
+Title: cDeweathering of air pollution
 Version: 0.1.2
 Author: Hubert Thieriot
 Maintainer: Hubert Thieriot <hubert.thieriot@gmail.com>
-Description: A set of functions to collect and analyse air pollution and weather measurements and determine the weather-corrected impact of lockdown on air quality
+Description: A set of functions to collect and analyse air pollution and weather measurements and determine the weather-corrected values of pollutant concentrations
 License: TBC
 Encoding: UTF-8
 LazyData: true
 Imports:
-    creadb,
+    rcrea,
     dplyr,
     purrr,
     readr,
@@ -45,7 +45,9 @@ Imports:
     deweather,
     ranger,
     caTools,
-    dotenv
+    dotenv,
+    fuzzyjoin,
+    stringi
 Depends:
     ggplot2
 Remotes: davidcarslaw/deweather
