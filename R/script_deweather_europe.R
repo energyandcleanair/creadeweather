@@ -1,3 +1,9 @@
+#' Deweathering data in European main cities
+#'
+#' @return
+#' @export
+#'
+#' @examples
 scripts.deweather_europe <- function(){
   
   #-------------------------
@@ -18,26 +24,35 @@ scripts.deweather_europe <- function(){
   #------------------------------------
   
   # Get CREA db stations
-  locs <- rcrea::locations(source="eea")
+  # locs <- rcrea::locations(source="eea")
+  # 
+  # # Attach city to stations
+  # locs_cities <- utils.attach_city(locs, method="name", cities=cities)
+  # 
+  # locs_cities <- locs_cities[!is.na(locs_cities$name),]
+  # locs_cities[locs_cities$name=="Budapesti",]$name<- "Budapest"
+  # locs_cities[locs_cities$name=="Milano",]$name<- "Milan"
+  # locs_cities[locs_cities$name=="Vilniaus",]$name<- "Vilnius"
+  # locs_cities[locs_cities$name=="Roma",]$name<- "Rome"
+  # locs_cities[locs_cities$name=="Lisboa",]$name<- "Lisbon"
   
-  # Attach city to stations
-  locs_cities <- utils.attach_city(locs, method="name", cities=cities)
+  # print(locs_cities %>% group_by(name) %>%
+  #         summarise(count=dplyr::n()))
   
-  locs_cities <- locs_cities[!is.na(locs_cities$name),]
-  locs_cities[locs_cities$name=="Budapesti",]$name<- "Budapest"
-  locs_cities[locs_cities$name=="Milano",]$name<- "Milan"
-  locs_cities[locs_cities$name=="Vilniaus",]$name<- "Vilnius"
-  locs_cities[locs_cities$name=="Roma",]$name<- "Rome"
-  locs_cities[locs_cities$name=="Lisboa",]$name<- "Lisbon"
-  
-  print(locs_cities %>% group_by(name) %>%
-          summarize(count=n()))
+  # results <- deweather(
+  #   polls=c(rcrea::NO2),
+  #   source=c("eea"),
+  #   station_id=locs_cities$id,
+  #   aggregate_level="station",
+  #   output="anomaly",
+  #   upload_results=T
+  # )
   
   results <- deweather(
-    polls=c(rcrea::NO2),
+    poll=c(rcrea::NO2),
     source=c("eea"),
-    station_id=locs_cities$id,
-    aggregate_level="station",
+    station_id=cities$name,
+    aggregate_level="city",
     output="anomaly",
     upload_results=T
   )

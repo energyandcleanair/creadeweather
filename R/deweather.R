@@ -1,6 +1,6 @@
 #' Deweathering function
 #'
-#' @param polls 
+#' @param poll 
 #' @param source 
 #' @param country 
 #' @param station_id 
@@ -15,7 +15,7 @@
 #' @export
 #'
 deweather <- function(
- polls=NULL,
+ poll=NULL,
  source=NULL,
  country=NULL,
  station_id=NULL,
@@ -38,7 +38,7 @@ deweather <- function(
   # 1. Get measurements
   #----------------------
   print("1. Getting measurements")
-  meas <- rcrea::measurements(poll=polls,
+  meas <- rcrea::measurements(poll=poll,
                               country=country,
                               location_id=station_id,
                               city=city,
