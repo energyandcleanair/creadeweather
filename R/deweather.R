@@ -101,7 +101,7 @@ deweather <- function(
     output=c('anomaly','trend'),
     training_end=c(training_end_anomaly, training_end_trend)
     ) %>%
-    filter(output %in% !!str_extract(output, "[^_]*"))
+    filter(output %in% !!stringr::str_extract(output, "[^_]*"))
   # 'anomaly' computed if output includes 'anomaly' or 'anomaly_offsetted'
   
   configs <-  tibble() %>%
