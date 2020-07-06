@@ -5,7 +5,7 @@
 #' @param country 
 #' @param station_id 
 #' @param city 
-#' @param output either "anomaly", "trend" or both
+#' @param output any combination of "anomaly", "trend" and "anomaly_offsetted"
 #' @param aggregate_level "station" or "city"
 #' @param upload_results T/F Whether to upload results or not
 #' @param add_gadm1 T/F Whether to aggregate to GADM1 levels after computation
@@ -95,13 +95,14 @@ deweather <- function(
   link <- "log"
   
   weather_vars <- c(list(c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')))
-  
+
   time_vars_output <- tibble(
     time_vars=c(list(c('yday')),list(c('trend'))),
     output=c('anomaly','trend'),
     training_end=c(training_end_anomaly, training_end_trend)
     ) %>%
-    filter(output %in% !!output)
+    filter(output %in% !!str_extract(output, "[^_]*"))
+  # 'anomaly' computed if output includes 'anomaly' or 'anomaly_offsetted'
   
   configs <-  tibble() %>%
     tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
@@ -155,6 +156,7 @@ deweather <- function(
   # 5. Post-compute / aggregate results
   #--------------------------------------
   results_anomaly <- NULL
+  results_anomaly_offsetted <- NULL
   results_trend <- NULL
   
   if("anomaly" %in% output){
@@ -165,6 +167,26 @@ deweather <- function(
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
                     ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source)  
+  }
+  
+  if("anomaly_offsetted" %in% output){
+    results_anomaly_offsetted <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_offsetted <- results_anomaly_offsetted  %>% rowwise()  %>%
+      dplyr::mutate(
+        # offset is basically the mean of values during training period (i.e. 2017-2019)
+        offset=predicted %>%
+          filter(set=='training') %>%
+          pull(value) %>%
+          mean(na.rm=T),
+        normalised=list(predicted %>%
+          filter(set=='testing') %>%
+          mutate(value=value-predicted+offset)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly\"",
+                                               "\"output\":\"anomaly_offsetted\"")
+      ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source)  
   }
@@ -180,7 +202,8 @@ deweather <- function(
   
   results <- dplyr::bind_rows(
     results_trend,
-    results_anomaly
+    results_anomaly,
+    results_anomaly_offsetted
   )  
  
   

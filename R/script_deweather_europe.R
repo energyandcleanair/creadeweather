@@ -53,7 +53,7 @@ scripts.deweather_europe <- function(){
     source=c("eea"),
     station_id=cities$name,
     aggregate_level="city",
-    output="anomaly",
+    output="anomaly_offsetted",
     upload_results=T
   )
 }

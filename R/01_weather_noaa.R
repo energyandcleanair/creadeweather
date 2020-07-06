@@ -53,7 +53,14 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
           path = cache_folder
         )},
         error=function(cond){
-          NULL
+          warning(paste("Failed to get new data for years", years_to_download,". Using cache instead"))
+          files <- list.files(path=cache_folder, pattern =paste0(code,'_',years_to_download,'.rds',collapse="|"), full.names = T)
+          # files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
+          tryCatch({
+            files %>% purrr::map_dfr(readFile) %>% bind_rows()
+          }, error=function(c){
+            NULL
+          })
         }
       )
     }else{

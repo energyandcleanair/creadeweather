@@ -224,7 +224,7 @@ utils.get_bucket_mnt <- function(){
 #' @param subfolder Subfolder (to create if not existing)
 #' @return Local path to cache folder
 #'
-#' @examples
+#' @export
 utils.get_cache_folder <- function(subfolder=NULL){
   folder <- file.path(utils.get_bucket_mnt(), "cache")
   
@@ -241,7 +241,7 @@ utils.get_cache_folder <- function(subfolder=NULL){
 #' @param subfolder Subfolder (to create if not existing)
 #' @return Local path to output folder
 #'
-#' @examples
+#' @export
 utils.get_output_folder <- function(subfolder=NULL){
   folder <- file.path(utils.get_bucket_mnt(), "output")
   
