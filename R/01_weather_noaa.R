@@ -53,6 +53,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
           path = cache_folder
         )},
         error=function(cond){
+          NULL
         }
       )
     }else{
