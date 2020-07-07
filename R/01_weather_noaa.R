@@ -39,26 +39,32 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
     
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
     
-    # Downloading fresh data
-    if(length(years_to_download)>0){
-      data_downloaded <- tryCatch({
+    download_data <- function(year, code, cache_folder){
+      tryCatch({
         worldmet::importNOAA(
           code = code,
-          year = years_to_download,
+          year = year,
           quiet = T,
           path = cache_folder
-        )},
+          )},
         error=function(cond){
           warning(paste("Failed to get new data for years", years_to_download,". Using cache instead"))
-          files <- list.files(path=cache_folder, pattern =paste0(code,'_',years_to_download,'.rds',collapse="|"), full.names = T)
-          # files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
+          files <- list.files(path=cache_folder, pattern =paste0(code,'_',year,'.rds',collapse="|"), full.names = T)
           tryCatch({
             files %>% purrr::map_dfr(readFile) %>% bind_rows()
           }, error=function(c){
             NULL
           })
-        }
-      )
+        })
+    }
+    
+    # Downloading fresh data
+    if(length(years_to_download)>0){
+      data_downloaded <- do.call("bind_rows",
+                                 lapply(years_to_download,
+                                        download_data,
+                                        code=code,
+                                        cache_folder=cache_folder))
     }else{
       data_downloaded <- NULL
     }
