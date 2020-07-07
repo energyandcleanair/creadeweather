@@ -182,7 +182,8 @@ deweather <- function(
           mean(na.rm=T),
         normalised=list(predicted %>%
           filter(set=='testing') %>%
-          mutate(value=value-predicted+offset)),
+          mutate(value=value-predicted+offset) %>%
+          select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_offsetted\"")
