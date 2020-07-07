@@ -45,10 +45,6 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
         worldmet::importNOAA(
           code = code,
           year = years_to_download,
-          hourly = FALSE,
-          precip = TRUE,
-          PWC = FALSE,
-          parallel = F,
           quiet = T,
           path = cache_folder
         )},
