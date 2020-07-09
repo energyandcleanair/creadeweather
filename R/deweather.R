@@ -30,8 +30,8 @@ deweather <- function(
   #----------------------
   # 0. Set parameters
   #----------------------
-  training_start <- "2017-01-01"
-  training_end_anomaly <- "2020-01-01"
+  training_start <- "2016-12-01"
+  training_end_anomaly <- "2019-11-30"
   training_end_trend <- "2099-01-01"
   
   #----------------------
