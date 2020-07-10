@@ -201,7 +201,7 @@ deweather <- function(
           filter(set=='training') %>%
           mutate(yday=lubridate::yday(date)) %>%
           group_by(yday) %>%
-          summarize(offset=mean(value, na.RM=T))),
+          summarise(offset=mean(value, na.RM=T))),
         normalised=list(predicted %>% 
                           filter(set=='testing') %>%
                           mutate(yday=lubridate::yday(date)) %>%
