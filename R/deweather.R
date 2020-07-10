@@ -5,7 +5,7 @@
 #' @param country 
 #' @param station_id 
 #' @param city 
-#' @param output any combination of "anomaly", "trend" and "anomaly_offsetted"
+#' @param output any combination of "anomaly", "trend", "anomaly_offsetted", "anomaly_offsetted_yday"
 #' @param aggregate_level "station" or "city"
 #' @param upload_results T/F Whether to upload results or not
 #' @param add_gadm1 T/F Whether to aggregate to GADM1 levels after computation
@@ -192,6 +192,30 @@ deweather <- function(
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source)  
   }
   
+  if("anomaly_offsetted_yday" %in% output){
+    results_anomaly_offsetted_yday <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_offsetted_yday <- results_anomaly_offsetted_yday  %>% rowwise()  %>%
+      dplyr::mutate(
+        # offset is basically the mean of values during training period (i.e. 2017-2019)
+        offset=list(predicted %>%
+          filter(set=='training') %>%
+          mutate(yday=lubridate::yday(date)) %>%
+          group_by(yday) %>%
+          summarize(offset=mean(value, na.RM=T))),
+        normalised=list(predicted %>% 
+                          filter(set=='testing') %>%
+                          mutate(yday=lubridate::yday(date)) %>%
+                          merge(offset) %>%
+                          mutate(value=value-predicted+offset) %>%
+                          select(date,value)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly\"",
+                                               "\"output\":\"anomaly_offsetted_yday\"")
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source)  
+  }
+  
   if("trend" %in% output){
     results_trend <- results_nested %>% dplyr::filter(output=='trend') %>% tidyr::unnest(cols=c(result))
     results_trend <- results_trend  %>% rowwise()  %>%
@@ -204,7 +228,8 @@ deweather <- function(
   results <- dplyr::bind_rows(
     results_trend,
     results_anomaly,
-    results_anomaly_offsetted
+    results_anomaly_offsetted,
+    results_anomaly_offsetted_yday
   )  
  
   
