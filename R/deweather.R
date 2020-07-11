@@ -157,6 +157,7 @@ deweather <- function(
   #--------------------------------------
   results_anomaly <- NULL
   results_anomaly_offsetted <- NULL
+  results_anomaly_offsetted_yday <- NULL
   results_trend <- NULL
   
   if("anomaly" %in% output){
