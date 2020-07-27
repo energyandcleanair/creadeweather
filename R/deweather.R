@@ -200,7 +200,8 @@ deweather <- function(
           select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
-                                               "\"output\":\"anomaly_offsetted\"")
+                                               "\"output\":\"anomaly_offsetted\""),
+        output="anomaly_offsetted"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
@@ -223,8 +224,9 @@ deweather <- function(
                           mutate(value=value-predicted+offset) %>%
                           select(date,value)),
         process_deweather=stringr::str_replace(process_deweather,
-                                               "\"output\":\"anomaly\"",
-                                               "\"output\":\"anomaly_yday_offsetted\"")
+                                               "\"output\":\"anomaly_yday\"",
+                                               "\"output\":\"anomaly_yday_offsetted\""),
+        output="anomaly_yday_offsetted"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
