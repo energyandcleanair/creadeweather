@@ -156,6 +156,7 @@ deweather <- function(
   # 5. Post-compute / aggregate results
   #--------------------------------------
   results_anomaly <- NULL
+  results_anomaly_yday <- NULL
   results_anomaly_offsetted <- NULL
   results_anomaly_yday_offsetted <- NULL
   results_trend <- NULL
