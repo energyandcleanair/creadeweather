@@ -210,11 +210,10 @@ utils.attach_city <- function(locs, cities, method="location", ...){
 #'
 #' @examples
 utils.get_bucket_mnt <- function(){
-  
   try(dotenv::load_dot_env())
   bucket <- Sys.getenv("CREA_BUCKET_MNT")
   if(bucket==""){
-    warning("CREA_BUCKET_MNT environment variable undefined")
+    stop("CREA_BUCKET_MNT environment variable undefined")
   }
   return(bucket)
 }
