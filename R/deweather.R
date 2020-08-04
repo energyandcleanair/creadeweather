@@ -212,15 +212,17 @@ deweather <- function(
     results_anomaly_yday_offsetted <- results_anomaly_yday_offsetted  %>% rowwise()  %>%
       dplyr::mutate(
         # offset is basically the mean of values during training period (i.e. 2017-2019)
-        offset=list(predicted %>%
+        offset=predicted %>%
           filter(set=='training') %>%
-          mutate(yday=lubridate::yday(date)) %>%
-          group_by(yday) %>%
-          summarise(offset=mean(value, na.rm=T))),
+            pull(value) %>%
+            mean(na.rm=T),
+          # mutate(yday=lubridate::yday(date)) %>%
+          # group_by(yday) %>%
+          # summarise(offset=mean(value, na.rm=T))),
         normalised=list(predicted %>% 
                           filter(set=='testing') %>%
-                          mutate(yday=lubridate::yday(date)) %>%
-                          merge(offset) %>%
+                          # mutate(yday=lubridate::yday(date)) %>%
+                          # merge(offset) %>%
                           mutate(value=value-predicted+offset) %>%
                           select(date,value)),
         process_deweather=stringr::str_replace(process_deweather,
