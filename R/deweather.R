@@ -10,6 +10,7 @@
 #' @param upload_results T/F Whether to upload results or not
 #' @param add_gadm1 T/F Whether to aggregate to GADM1 levels after computation
 #' @param add_gadm2 T/F Whether to aggregate to GADM2 levels after computation
+#' @param years_force_refresh Force refreshing (i.e. not using cache) of weather data of that year(s)
 #'
 #' @return
 #' @export
@@ -24,7 +25,8 @@ deweather <- function(
  aggregate_level="city",
  upload_results=T,
  add_gadm1=F,
- add_gadm2=F
+ add_gadm2=F,
+ years_force_refresh=lubridate::year(lubridate::today())
  ){
   
   #----------------------
@@ -33,6 +35,7 @@ deweather <- function(
   training_start <- "2016-12-01"
   training_end_anomaly <- "2019-11-30"
   training_end_trend <- "2099-01-01"
+  
   
   #----------------------
   # 1. Get measurements
@@ -67,8 +70,8 @@ deweather <- function(
   #----------------------
   print("2. Adding weather")
   meas_weather <- collect_weather(meas_sf,
-                                  years=seq(lubridate::year(lubridate::date(training_start)), 2020),
-                                  years_force_refresh=2020,
+                                  years=seq(lubridate::year(lubridate::date(training_start)), lubridate::year(lubridate::today())),
+                                  years_force_refresh=years_force_refresh,
                                   add_pbl=F,
                                   add_sunshine=F,
                                   n_per_station=3
