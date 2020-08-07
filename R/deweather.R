@@ -50,8 +50,14 @@ deweather <- function(
                               source=source,
                               deweathered=F,
                               with_metadata=T,
-                              with_geometry=T) %>%
-    group_by(region_id, poll, unit, source, timezone, process_id, country, geometry) %>%
+                              with_geometry=T)
+  
+  # Sometimes, group_by with geometry doesn't work. We split in two steps
+  meas_geom <- meas %>% dplyr::distinct(region_id, geometry)
+  
+  meas <- meas %>%
+    dplyr::select(-c(geometry)) %>%
+    group_by(region_id, poll, unit, source, timezone, process_id, country) %>%
     tidyr::nest() %>%
     rename(station_id=region_id, meas=data) %>%
     ungroup()
@@ -62,6 +68,7 @@ deweather <- function(
 
   meas_sf <- meas %>%
     dplyr::ungroup() %>%
+    dplyr::left_join(meas_geom, by=c("station_id"="region_id")) %>%
     dplyr::mutate(geometry=sf::st_centroid(geometry)) %>%
     sf::st_as_sf(sf_column_name="geometry", crs = 4326)
 
