@@ -102,7 +102,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
 
 
 noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020), cache_folder){
-  
+  print("Adding weather from NOAA")
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
@@ -155,7 +155,7 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
             )
         )
     )
-    
+  print("Done [Adding weather from NOAA]")
 }
 
 
