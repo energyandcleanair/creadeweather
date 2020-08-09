@@ -103,12 +103,14 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
 
 noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020), cache_folder){
   print("Adding weather from NOAA")
+  
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
     dplyr::distinct(station_id, usaf, wban)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
+  print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
   
   stations_weather$weather <- pbapply::pblapply(stations_weather$code, noaa.get_noaa_at_code,
            years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)
