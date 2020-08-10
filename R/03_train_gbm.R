@@ -30,7 +30,7 @@ train_model_gbm <- function(data,
     training_date_cut <- "2099-01-01"
   }
   
-  n_cores <-as.integer(future::availableCores()-1)
+  n_cores <- as.integer(future::availableCores()-1)
   
   link <- if(is.null(link) || is.na(link)) NULL else link
   link_trend <- if(is.null(link_trend) || is.na(link_trend)) NULL else link_trend

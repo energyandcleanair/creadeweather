@@ -144,9 +144,9 @@ train_models <- function(meas_weather,
   }
   
   meas_weather_lag$index <- zoo::index(meas_weather_lag)
-  n_cores <- as.integer(future::availableCores()-1)
+  # n_cores <- as.integer(future::availableCores()-1)
   
-  result <- pbmcapply::pbmcmapply(train_model_safe,
+  result <- pbapply::pbmapply(train_model_safe,
                      index=meas_weather_lag$index,
                      station_id=meas_weather_lag$station_id,
                      data=meas_weather_lag$meas_weather,
@@ -157,7 +157,7 @@ train_models <- function(meas_weather,
                      trees=trees,
                      detect_breaks=detect_breaks,
                      samples=samples,
-                     mc.cores=n_cores,
+                     # mc.cores=n_cores,
                      USE.NAMES=F,
                      SIMPLIFY=FALSE,
                      ...)
