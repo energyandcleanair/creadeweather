@@ -55,8 +55,16 @@ deweather <- function(
   # Sometimes, group_by with geometry doesn't work. We split in two steps
   meas_geom <- meas %>% dplyr::distinct(region_id, geometry)
   
+  # For some timezone or summer/winter time related reasons (or bad aggregation?),
+  # certain (very few) days in some regions have two measurements,
+  # which will ultimately fail due to UNIQUE constraints in Postgres
+  # We prevent this now.
+  meas <- meas %>% 
+    group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country, geometry) %>%
+    dplyr::summarise(value=mean(value, na.rm=T))
+  
   meas <- meas %>%
-    dplyr::select(-c(geometry)) %>%
+    # dplyr::select(-c(geometry)) %>%
     group_by(region_id, poll, unit, source, timezone, process_id, country) %>%
     tidyr::nest() %>%
     rename(station_id=region_id, meas=data) %>%
@@ -65,7 +73,7 @@ deweather <- function(
   if(nrow(meas)==0){
     stop("No measurement found")
   }
-
+  
   meas_sf <- meas %>%
     dplyr::ungroup() %>%
     dplyr::left_join(meas_geom, by=c("station_id"="region_id")) %>%
