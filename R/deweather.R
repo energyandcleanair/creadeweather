@@ -173,15 +173,19 @@ deweather <- function(
   #--------------------------------------
   # 5. Post-compute / aggregate results
   #--------------------------------------
-  results_anomaly <- NULL
-  results_anomaly_yday <- NULL
+  results_anomaly_abs <- NULL
+  results_anomaly_rel <- NULL
+  results_anomaly_yday_abs <- NULL
+  results_anomaly_yday_rel <- NULL
   results_anomaly_offsetted <- NULL
   results_anomaly_yday_offsetted <- NULL
   results_trend <- NULL
   
   if("anomaly" %in% output){
-    results_anomaly <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))  
-    results_anomaly <- results_anomaly  %>% rowwise()  %>%
+    
+    # Anomaly in absolute terms
+    results_anomaly_abs <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))  
+    results_anomaly_abs <- results_anomaly_abs  %>% rowwise()  %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       filter(set=='testing') %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
@@ -189,21 +193,30 @@ deweather <- function(
                     ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
-  }
-  
-  if("anomaly_yday" %in% output){
-    results_anomaly_yday <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))  
-    results_anomaly_yday <- results_anomaly_yday  %>% rowwise()  %>%
-      dplyr::mutate(normalised=list(predicted %>%
-                                      filter(set=='testing') %>%
-                                      mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
-                    unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
+    
+    # Anomaly in relative terms
+    results_anomaly_rel <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_rel <- results_anomaly_rel  %>% rowwise()  %>%
+      dplyr::mutate(
+        #  we use average during training period (i.e. 2017-2019) as reference
+        average=predicted %>%
+          filter(set=='training') %>%
+          pull(value) %>%
+          mean(na.rm=T),
+        normalised=list(predicted %>%
+                          filter(set=='testing') %>%
+                          mutate(value=(value-predicted) / average * 100) %>%
+                          select(date, value)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly\"",
+                                               "\"output\":\"anomaly_percent\""),
+        output="anomaly_percent",
+        unit="%"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
-  }
-  
-  if("anomaly_offsetted" %in% output){
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+    
+    # Anomaly offsetted
     results_anomaly_offsetted <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
     results_anomaly_offsetted <- results_anomaly_offsetted  %>% rowwise()  %>%
       dplyr::mutate(
@@ -213,9 +226,9 @@ deweather <- function(
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-          filter(set=='testing') %>%
-          mutate(value=value-predicted+offset) %>%
-          select(date, value)),
+                          filter(set=='testing') %>%
+                          mutate(value=value-predicted+offset) %>%
+                          select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_offsetted\""),
@@ -225,16 +238,51 @@ deweather <- function(
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
   }
   
-  if("anomaly_yday_offsetted" %in% output){
+  if("anomaly_yday" %in% output){
+    
+    # Anomaly in absolute terms
+    results_anomaly_yday_abs <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))  
+    results_anomaly_yday_abs <- results_anomaly_yday_abs  %>% rowwise()  %>%
+      dplyr::mutate(normalised=list(predicted %>%
+                                      filter(set=='testing') %>%
+                                      mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
+                    unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+    
+    # Anomaly in relative terms
+    results_anomaly_yday_rel <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_yday_rel <- results_anomaly_yday_rel  %>% rowwise()  %>%
+      dplyr::mutate(
+        #  we use average during training period (i.e. 2017-2019) as reference
+        average=predicted %>%
+          filter(set=='training') %>%
+          pull(value) %>%
+          mean(na.rm=T),
+        normalised=list(predicted %>%
+                          filter(set=='testing') %>%
+                          mutate(value=(value-predicted) / average * 100) %>%
+                          select(date, value)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly_yday\"",
+                                               "\"output\":\"anomaly_yday_percent\""),
+        output="anomaly_yday_percent",
+        unit="%"
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+    
+    # Anomaly offsetted
     results_anomaly_yday_offsetted <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
     results_anomaly_yday_offsetted <- results_anomaly_yday_offsetted  %>% rowwise()  %>%
       dplyr::mutate(
         # offset is basically the mean of values during training period (i.e. 2017-2019)
         offset=list(predicted %>%
-          filter(set=='training') %>%
-          mutate(yday=lubridate::yday(date)) %>%
-          group_by(yday) %>%
-          summarise(offset=mean(value, na.rm=T))),
+                      filter(set=='training') %>%
+                      mutate(yday=lubridate::yday(date)) %>%
+                      group_by(yday) %>%
+                      summarise(offset=mean(value, na.rm=T))),
         normalised=list(predicted %>% 
                           filter(set=='testing') %>%
                           mutate(yday=lubridate::yday(date)) %>%
@@ -257,12 +305,13 @@ deweather <- function(
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
   }
-
   
   results <- dplyr::bind_rows(
     results_trend,
-    results_anomaly,
-    results_anomaly_yday,
+    results_anomaly_abs,
+    results_anomaly_rel,
+    results_anomaly_yday_abs,
+    results_anomaly_yday_rel,
     results_anomaly_offsetted,
     results_anomaly_yday_offsetted
   )  
