@@ -5,7 +5,7 @@
 #' @param country 
 #' @param station_id 
 #' @param city 
-#' @param output any combination of "anomaly", "trend", "anomaly_offsetted", "anomaly_yday_offsetted"
+#' @param output any combination of "anomaly", "trend", "anomaly_offsetted"
 #' @param aggregate_level "station" or "city"
 #' @param upload_results T/F Whether to upload results or not
 #' @param add_gadm1 T/F Whether to aggregate to GADM1 levels after computation

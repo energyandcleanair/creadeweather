@@ -23,8 +23,8 @@ prep_data <- function(meas_weather, filename=NULL){
     # Remove infs in all vars
     tbl <- tbl %>% dplyr::mutate_if(is.numeric, function(x) ifelse(is.infinite(x), NA, x))
     
-    # Apply mad filtering to pollutant concentration
-    n_mad <- 30
+    # Apply mad filtering to pollutant peaks (very useful for e.g. sand storms in Beijing)
+    n_mad <- 10
     mad <- stats::mad(tbl$value, na.rm=T)
     n_before <- nrow(tbl)
     tbl <- tbl %>% dplyr::filter(value-median(value, na.rm=T) < n_mad * mad)
