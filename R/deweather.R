@@ -16,8 +16,10 @@
 #' @export
 #'
 deweather <- function(
+ meas=NULL,
  poll=NULL,
  source=NULL,
+ mix_sources=F,
  country=NULL,
  station_id=NULL,
  city=NULL,
@@ -41,16 +43,19 @@ deweather <- function(
   # 1. Get measurements
   #----------------------
   print("1. Getting measurements")
-  meas <- rcrea::measurements(poll=poll,
-                              country=country,
-                              location_id=station_id,
-                              city=city,
-                              aggregate_level=aggregate_level,
-                              date_from=training_start,
-                              source=source,
-                              deweathered=F,
-                              with_metadata=T,
-                              with_geometry=T)
+  if(is.null(meas)){
+    meas <- rcrea::measurements(poll=poll,
+                                country=country,
+                                location_id=station_id,
+                                city=city,
+                                aggregate_level=aggregate_level,
+                                date_from=training_start,
+                                source=source,
+                                mix_sources=mix_sources,
+                                deweathered=F,
+                                with_metadata=T,
+                                with_geometry=T)
+  }
   
   # Sometimes, group_by with geometry doesn't work. We split in two steps
   meas_geom <- meas %>% dplyr::distinct(region_id, geometry)
@@ -60,7 +65,7 @@ deweather <- function(
   # which will ultimately fail due to UNIQUE constraints in Postgres
   # We prevent this now.
   meas <- meas %>% 
-    group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country, geometry) %>%
+    group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country) %>%
     dplyr::summarise(value=mean(value, na.rm=T))
   
   meas <- meas %>%
