@@ -67,7 +67,7 @@ train_models <- function(meas_weather,
   
   # Filter input data
   # Only keep those with values in 2020 and some wind data
-  meas_weather <- meas_weather %>% rowwise() %>% filter(max(meas_weather$date)>'2020-01-01')
+  meas_weather <- meas_weather %>% rowwise() %>% filter(max(meas_weather$date, na.rm=T)>'2020-01-01')
   if(nrow(meas_weather)==0){
     warning("No measurements available in 2020. Returning NA")
     return(NA)
