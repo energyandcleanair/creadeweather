@@ -54,6 +54,7 @@ collect_weather <- function(meas,
   }
   
   # Join weather with measurements
+  print("Attaching weather to measurements")
   if("geometry" %in% colnames(meas)){
     meas <- tibble(meas) %>% dplyr::select(-c(geometry))
   }else{

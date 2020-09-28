@@ -34,7 +34,6 @@ Imports:
     ggthemes,
     scales,
     tibble,
-    worldmet,
     sirad,
     rmweather,
     pbmcapply,
@@ -49,8 +48,11 @@ Imports:
     fuzzyjoin,
     stringi
 Depends:
-    ggplot2
-Remotes: davidcarslaw/deweather
+    ggplot2,
+    worldmet
+Remotes:
+    davidcarslaw/deweather,
+    davidcarslaw/worldmet
 Suggests: 
 VignetteBuilder:
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
