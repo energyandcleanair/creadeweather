@@ -23,7 +23,7 @@ deweather <- function(
  country=NULL,
  station_id=NULL,
  city=NULL,
- output="trend",
+ output=c("trend","anomaly"),
  aggregate_level="city",
  upload_results=T,
  add_gadm1=F,
@@ -124,9 +124,8 @@ deweather <- function(
     output=c('anomaly_yday', 'anomaly', 'trend'),
     training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend)
     ) %>%
-    filter(output %in% !!stringr::str_extract(output, "(.*)[^_offsetted]"))
-  # 'anomaly' computed if output includes 'anomaly' or 'anomaly_offsetted'
-  
+    filter(output %in% !!output)
+
   configs <-  tibble() %>%
     tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
     rowwise() %>%
