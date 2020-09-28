@@ -106,8 +106,6 @@ train_model_deweather <- function(data,
                             dplyr::ungroup() %>%
                             dplyr::select(date, mean, lower, upper))  
       })
-      
     }
-
     res
 }
