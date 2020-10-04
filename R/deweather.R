@@ -28,14 +28,16 @@ deweather <- function(
  upload_results=T,
  add_gadm1=F,
  add_gadm2=F,
- years_force_refresh=lubridate::year(lubridate::today())
+ years_force_refresh=lubridate::year(lubridate::today()),
+ training_start="2016-12-01",
+ training_end_anomaly="2019-11-30"
  ){
   
   #----------------------
   # 0. Set parameters
   #----------------------
-  training_start <- "2016-12-01"
-  training_end_anomaly <- "2019-11-30"
+  # training_start <- "2016-12-01"
+  # training_end_anomaly <- "2019-11-30"
   training_end_trend <- "2099-01-01"
   
   
