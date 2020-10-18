@@ -12,6 +12,7 @@
 #' @export
 #'
 #' @examples
+#' 
 collect_weather <- function(meas,
                             n_per_station=2,
                             years=seq(2015,2020),
