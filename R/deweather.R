@@ -19,7 +19,6 @@ deweather <- function(
  meas=NULL,
  poll=NULL,
  source=NULL,
- mix_sources=F,
  country=NULL,
  station_id=NULL,
  city=NULL,
@@ -30,7 +29,8 @@ deweather <- function(
  add_gadm2=F,
  years_force_refresh=lubridate::year(lubridate::today()),
  training_start="2016-12-01",
- training_end_anomaly="2019-11-30"
+ training_end_anomaly="2019-11-30",
+ fire_mode=F #BIOMASS BURNING, WORK IN DEVELOPMENT
  ){
   
   #----------------------
@@ -53,7 +53,6 @@ deweather <- function(
                                 aggregate_level=aggregate_level,
                                 date_from=training_start,
                                 source=source,
-                                mix_sources=mix_sources,
                                 deweathered=F,
                                 with_metadata=T,
                                 with_geometry=T)
@@ -67,15 +66,15 @@ deweather <- function(
   # which will ultimately fail due to UNIQUE constraints in Postgres
   # We prevent this now.
   meas <- meas %>% 
-    group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country) %>%
+    dplyr::group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country) %>%
     dplyr::summarise(value=mean(value, na.rm=T))
   
   meas <- meas %>%
     # dplyr::select(-c(geometry)) %>%
-    group_by(region_id, poll, unit, source, timezone, process_id, country) %>%
+    dplyr::group_by(region_id, poll, unit, source, timezone, process_id, country) %>%
     tidyr::nest() %>%
-    rename(station_id=region_id, meas=data) %>%
-    ungroup()
+    dplyr::rename(station_id=region_id, meas=data) %>%
+    dplyr::ungroup()
   
   if(nrow(meas)==0){
     stop("No measurement found")
@@ -96,7 +95,8 @@ deweather <- function(
                                   years_force_refresh=years_force_refresh,
                                   add_pbl=F,
                                   add_sunshine=F,
-                                  n_per_station=3
+                                  add_frp=fire_mode,
+                                  n_per_station=4
   )
 
   #----------------------
@@ -119,8 +119,12 @@ deweather <- function(
   engine <- "gbm"
   link <- "log"
   
-  weather_vars <- c(list(c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')))
-
+  weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')
+  if(fire_mode){
+    weather_vars <- c(weather_vars, "frp")
+  }
+  weather_vars <- c(list(weather_vars))
+    
   time_vars_output <- tibble(
     time_vars=c(list(c('yday')), list(c()), list(c('trend'))),
     output=c('anomaly_yday', 'anomaly', 'trend'),
@@ -241,7 +245,21 @@ deweather <- function(
         output="anomaly_offsetted"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+    
+    # Counterfactual
+    results_counterfactual <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
+    results_counterfactual <- results_counterfactual  %>% rowwise()  %>%
+      dplyr::mutate(normalised=list(predicted %>%
+                                      mutate(value=predicted)),
+                    process_deweather=stringr::str_replace(process_deweather,
+                                                           "\"output\":\"anomaly\"",
+                                                           "\"output\":\"anomaly_counterfactual\""),
+                    output="anomaly_counterfactual"
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+    
   }
   
   if("anomaly_yday" %in% output){
@@ -316,6 +334,7 @@ deweather <- function(
     results_trend,
     results_anomaly_abs,
     results_anomaly_rel,
+    results_counterfactual,
     results_anomaly_yday_abs,
     results_anomaly_yday_rel,
     results_anomaly_offsetted,
