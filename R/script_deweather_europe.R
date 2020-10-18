@@ -12,7 +12,7 @@ scripts.deweather_europe <- function(){
   # Cities of interest (only those with measurements will ultimately be kept)
   # Getting capitals or cities with a population larger than 1M
   cities <- maps::world.cities %>%
-    filter(capital==1 | pop > 1e6) %>%
+    filter(capital==1 | pop > 1e5) %>%
     mutate(iso2=countrycode::countrycode(country.etc, "country.name","iso2c"),
            iso3=countrycode::countrycode(country.etc, "country.name","iso3c"),
            eu28=countrycode::countrycode(country.etc, "country.name","eu28"),
@@ -48,10 +48,12 @@ scripts.deweather_europe <- function(){
   #   upload_results=T
   # )
   
+  source="eea"
+  
   results <- deweather(
     poll=c(rcrea::NO2),
-    source=c("eea"),
-    station_id=cities$name,
+    source=source,
+    city=cities$name,
     aggregate_level="city",
     output="anomaly_offsetted",
     upload_results=T
