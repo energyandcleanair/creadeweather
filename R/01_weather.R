@@ -12,12 +12,14 @@
 #' @export
 #'
 #' @examples
+#' 
 collect_weather <- function(meas,
                             n_per_station=2,
                             years=seq(2015,2020),
                             years_force_refresh=NULL,
                             add_pbl=T,
                             add_sunshine=T,
+                            add_frp=F, #Fire radiative potential (will compute trajectories)
                             filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -27,9 +29,10 @@ collect_weather <- function(meas,
   cache_folder <- utils.get_cache_folder("weather")
 
   # Find unique AQ stations
-  stations <- meas %>% ungroup() %>%
-    dplyr::select(station_id, geometry) %>%
-    distinct(station_id, .keep_all = T)
+  stations <- meas %>%
+    dplyr::ungroup() %>%
+    dplyr::select(country, station_id, geometry) %>%
+    dplyr::distinct(country, station_id, .keep_all = T)
 
   # Find weather stations nearby
   stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
@@ -38,8 +41,8 @@ collect_weather <- function(meas,
   weather <- noaa.add_weather(stations_w_noaa, years=years,
                                      years_force_refresh = years_force_refresh,
                                      cache_folder = cache_folder) %>%
-    ungroup() %>%
-    filter(!is.null(weather))
+    dplyr::ungroup() %>%
+    dplyr::filter(!is.null(weather))
   
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
@@ -53,6 +56,12 @@ collect_weather <- function(meas,
     weather <- sirad.add_sunshine(weather)  
   }
   
+  # Add fire radiative power
+  if(add_frp){
+    print("Getting Fire Radiative Power (will compute trajectories if required)")
+    weather <- frp.add_frp(weather)  
+  }
+  
   # Join weather with measurements
   print("Attaching weather to measurements")
   if("geometry" %in% colnames(meas)){
@@ -62,16 +71,16 @@ collect_weather <- function(meas,
   }
   
   meas_w_weather <- tibble(meas) %>%
-    left_join(weather %>% dplyr::select(station_id, weather)) %>%
-    rowwise() %>%
-    filter(!is.null(weather)) %>%
-    filter(!is.null(meas)) %>%
-    mutate(meas=list(
+    dplyr::left_join(weather %>% dplyr::select(station_id, weather)) %>%
+    dplyr::rowwise() %>%
+    dplyr::filter(!is.null(weather)) %>%
+    dplyr::filter(!is.null(meas)) %>%
+    dplyr::mutate(meas=list(
       meas %>%
-        mutate(date=lubridate::date(date)) %>%
-        left_join(weather)
+        dplyr::mutate(date=lubridate::date(date)) %>%
+        dplyr::left_join(weather)
     )) %>%
-    rename(meas_weather=meas) %>%
+    dplyr::rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))
  
   if(!is.null(filename)){

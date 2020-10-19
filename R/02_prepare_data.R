@@ -43,19 +43,20 @@ prep_data <- function(meas_weather, filename=NULL){
     # We only coalesce weather data where other weather data exists
     weather_rows_idxs <- which(apply(tbl %>% dplyr::select(wd, precip, ceil_hgt, atmos_pres, wd, visibility, air_temp), 1, function(x) any(!is.na(x))))
   
-      if(length(weather_rows_idxs)>0){
-      # If all NAs
-      if(all(is.na(tbl$ws))) tbl[weather_rows_idxs,]$ws <-0
-      if(all(is.na(tbl$precip))) tbl[weather_rows_idxs,]$precip <-0
-      if(all(is.na(tbl$ceil_hgt))) tbl[weather_rows_idxs,]$ceil_hgt <-0
-      if(all(is.na(tbl$atmos_pres))) tbl[weather_rows_idxs,]$atmos_pres <-0
-      if(all(is.na(tbl$wd))) tbl[weather_rows_idxs,]$wd <-0
-      if(all(is.na(tbl$visibility))) tbl[weather_rows_idxs,]$visibility <-0
-      if(all(is.na(tbl$air_temp_min))) tbl[weather_rows_idxs,]$air_temp_min <-0
-      if(all(is.na(tbl$air_temp_max))) tbl[weather_rows_idxs,]$air_temp_max <-0
-      if(all(is.na(tbl$air_temp))) tbl[weather_rows_idxs,]$air_temp <-0
-      if('sunshine' %in% colnames(tbl) && all(is.na(tbl$sunshine))) tbl[weather_rows_idxs,]$sunshine <-0
+    if(length(weather_rows_idxs)>0){
       
+      fill_value <- function(v){
+        if(all(is.na(v)) | ! (0 %in% unique(v))) v[is.na(v)] <- 0
+        v
+      }
+        
+      # If all NAs
+      tbl <- tbl %>% mutate_at(c("ws","precip","ceil_hgt",
+                          "atmos_pres","wd","visibility",
+                          "air_temp_min","air_temp_max","air_temp"),
+                        fill_value)
+
+      if('sunshine' %in% colnames(tbl)) tbl$sunshine <- fill_value(tbl$sunshine)
       
       # If only some of them are NAs
       try(tbl <- tbl %>% mutate(sunshine=zoo::na.approx(sunshine, date, na.rm=FALSE)) %>% ungroup(), TRUE)

@@ -46,13 +46,17 @@ Imports:
     caTools,
     dotenv,
     fuzzyjoin,
-    stringi
+    stringi,
+    exactextractr
 Depends:
     ggplot2,
     worldmet
 Remotes:
     davidcarslaw/deweather,
-    davidcarslaw/worldmet
+    davidcarslaw/worldmet,
+    rich-iannone/splitr,
+    MatMatt/MODIS@develop,
+    hubert-thieriot/MODIStsp
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
