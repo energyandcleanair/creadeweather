@@ -9,7 +9,6 @@ License: TBC
 Encoding: UTF-8
 LazyData: true
 Imports:
-    rcrea,
     dplyr,
     purrr,
     readr,
@@ -56,7 +55,8 @@ Remotes:
     davidcarslaw/deweather,
     rich-iannone/splitr,
     MatMatt/MODIS@develop,
-    hubert-thieriot/MODIStsp
+    hubert-thieriot/MODIStsp,
+    energyandcleanair/rcrea
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
