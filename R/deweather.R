@@ -28,7 +28,7 @@ deweather <- function(
  add_gadm1=F,
  add_gadm2=F,
  years_force_refresh=lubridate::year(lubridate::today()),
- training_start="2016-12-01",
+ training_start_anomaly="2016-12-01",
  training_end_anomaly="2019-11-30",
  fire_mode=F #BIOMASS BURNING, WORK IN DEVELOPMENT
  ){
@@ -38,8 +38,16 @@ deweather <- function(
   #----------------------
   # training_start <- "2016-12-01"
   # training_end_anomaly <- "2019-11-30"
+  training_start_trend <- "2015-01-01"
   training_end_trend <- "2099-01-01"
   
+  time_vars_output <- tibble(
+    time_vars=c(list(c('yday')), list(c()), list(c('trend'))),
+    output=c('anomaly_yday', 'anomaly', 'trend'),
+    training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend),
+    training_start=c(training_start_anomaly, training_start_anomaly, training_start_trend)
+  ) %>%
+    filter(output %in% !!output)
   
   #----------------------
   # 1. Get measurements
@@ -51,7 +59,7 @@ deweather <- function(
                                 location_id=station_id,
                                 city=city,
                                 aggregate_level=aggregate_level,
-                                date_from=training_start,
+                                date_from=min(time_vars_output$training_start),
                                 source=source,
                                 deweathered=F,
                                 with_metadata=T,
@@ -90,8 +98,9 @@ deweather <- function(
   # 2. Add weather
   #----------------------
   print("2. Adding weather")
-  meas_weather <- collect_weather(meas_sf,
-                                  years=seq(lubridate::year(lubridate::date(training_start)), lubridate::year(lubridate::today())),
+  meas_weather <- creadeweather::collect_weather(meas_sf,
+                                  years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),
+                                            lubridate::year(lubridate::today())),
                                   years_force_refresh=years_force_refresh,
                                   add_pbl=F,
                                   add_sunshine=F,
@@ -125,12 +134,7 @@ deweather <- function(
   }
   weather_vars <- c(list(weather_vars))
     
-  time_vars_output <- tibble(
-    time_vars=c(list(c('yday')), list(c()), list(c('trend'))),
-    output=c('anomaly_yday', 'anomaly', 'trend'),
-    training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend)
-    ) %>%
-    filter(output %in% !!output)
+
 
   configs <-  tibble() %>%
     tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
@@ -185,6 +189,7 @@ deweather <- function(
   #--------------------------------------
   results_anomaly_abs <- NULL
   results_anomaly_rel <- NULL
+  results_counterfactual <- NULL
   results_anomaly_yday_abs <- NULL
   results_anomaly_yday_rel <- NULL
   results_anomaly_offsetted <- NULL

@@ -47,7 +47,7 @@ collect_weather <- function(meas,
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
     print("Getting Planet Boundary Layer")
-    weather <- ncar.add_pbl(weather, years)  
+    weather <- ncep.add_pbl(weather, years)  
   }
   
   # Add sunshine
