@@ -254,3 +254,29 @@ utils.get_output_folder <- function(subfolder=NULL){
   return(folder)
 }
 
+#' Download a file only if it hasn't changed since \code{last_modified}
+#' 
+#' @param URL url of file
+#' @param fil path to write file
+#' @param last_modified \code{POSIXct}. Ideally, the output from the first 
+#'        successful run of \code{get_file()}
+#' @param overwrite overwrite the file if it exists?
+#' @param .verbose output a message if the file was unchanged?
+utils.download_file <- function(URL, fil, last_modified=NULL, overwrite=TRUE, .verbose=TRUE) {
+  
+  if ((!file.exists(fil)) || is.null(last_modified)) {
+    res <- GET(URL, write_disk(fil, overwrite))
+    return(httr::parse_http_date(res$headers$`last-modified`))
+  } else if (inherits(last_modified, "POSIXct")) {
+    res <- HEAD(URL)
+    cur_last_mod <- httr::parse_http_date(res$headers$`last-modified`)
+    if (cur_last_mod != last_modified) {
+      res <- GET(URL, write_disk(fil, overwrite))
+      return(httr::parse_http_date(res$headers$`last-modified`))
+    }
+    if (.verbose) message(sprintf("'%s' unchanged since %s", URL, last_modified))
+    return(last_modified)
+  } 
+  
+}
+
