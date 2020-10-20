@@ -209,15 +209,15 @@ utils.attach_city <- function(locs, cities, method="location", ...){
 #' @return Local path to mounted bucket
 #'
 #' @examples
-utils.get_bucket_mnt <- function(){
+utils.get_dir_data <- function(){
   try(dotenv::load_dot_env())
   
-  bucket <- Sys.getenv("CREA_BUCKET_MNT")
-  if(bucket==""){
-    warning("CREA_BUCKET_MNT environment variable undefined. Using working directory.")
-    bucket = getwd()
+  dir_data <- Sys.getenv("DIR_DATA")
+  if(dir_data==""){
+    warning("DIR_DATA environment variable undefined. Using working directory.")
+    dir_data = getwd()
   }
-  return(bucket)
+  return(dir_data)
 }
 
 #' Cache folder in mounted CREA bucket
@@ -227,7 +227,7 @@ utils.get_bucket_mnt <- function(){
 #'
 #' @export
 utils.get_cache_folder <- function(subfolder=NULL){
-  folder <- file.path(utils.get_bucket_mnt(), "cache")
+  folder <- file.path(utils.get_dir_data(), "cache")
   
   if(!is.null(subfolder)){
     folder <- file.path(folder, subfolder)
@@ -244,7 +244,7 @@ utils.get_cache_folder <- function(subfolder=NULL){
 #'
 #' @export
 utils.get_output_folder <- function(subfolder=NULL){
-  folder <- file.path(utils.get_bucket_mnt(), "output")
+  folder <- file.path(utils.get_dir_data(), "output")
   
   if(!is.null(subfolder)){
     folder <- file.path(folder, subfolder)

@@ -102,7 +102,7 @@ deweather <- function(
                                   years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),
                                             lubridate::year(lubridate::today())),
                                   years_force_refresh=years_force_refresh,
-                                  add_pbl=F,
+                                  add_pbl=T,
                                   add_sunshine=F,
                                   add_frp=fire_mode,
                                   n_per_station=4
