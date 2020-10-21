@@ -100,9 +100,15 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
     return(NULL)})
 }
 
+noaa.get_folder <- function(){
+  dir_noaa <- Sys.getenv("DIR_NOAA_ISD")
+  dir.create(dir_noaa, showWarnings = F, recursive = T)
+  dir_noaa
+}
 
-noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020), cache_folder){
+noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020)){
   print("Adding weather from NOAA")
+  cache_folder <- noaa.get_folder()
   
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%

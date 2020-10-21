@@ -39,8 +39,7 @@ collect_weather <- function(meas,
 
   # Get weather at these stations
   weather <- noaa.add_weather(stations_w_noaa, years=years,
-                                     years_force_refresh = years_force_refresh,
-                                     cache_folder = cache_folder) %>%
+                                     years_force_refresh = years_force_refresh) %>%
     dplyr::ungroup() %>%
     dplyr::filter(!is.null(weather))
   

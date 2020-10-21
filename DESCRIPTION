@@ -46,7 +46,8 @@ Imports:
     dotenv,
     fuzzyjoin,
     stringi,
-    exactextractr
+    exactextractr,
+    httr
 Depends:
     ggplot2,
     worldmet

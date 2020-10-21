@@ -209,15 +209,15 @@ utils.attach_city <- function(locs, cities, method="location", ...){
 #' @return Local path to mounted bucket
 #'
 #' @examples
-utils.get_bucket_mnt <- function(){
+utils.get_dir_data <- function(){
   try(dotenv::load_dot_env())
   
-  bucket <- Sys.getenv("CREA_BUCKET_MNT")
-  if(bucket==""){
-    warning("CREA_BUCKET_MNT environment variable undefined. Using working directory.")
-    bucket = getwd()
+  dir_data <- Sys.getenv("DIR_DATA")
+  if(dir_data==""){
+    warning("DIR_DATA environment variable undefined. Using working directory.")
+    dir_data = getwd()
   }
-  return(bucket)
+  return(dir_data)
 }
 
 #' Cache folder in mounted CREA bucket
@@ -227,7 +227,7 @@ utils.get_bucket_mnt <- function(){
 #'
 #' @export
 utils.get_cache_folder <- function(subfolder=NULL){
-  folder <- file.path(utils.get_bucket_mnt(), "cache")
+  folder <- file.path(utils.get_dir_data(), "cache")
   
   if(!is.null(subfolder)){
     folder <- file.path(folder, subfolder)
@@ -244,7 +244,7 @@ utils.get_cache_folder <- function(subfolder=NULL){
 #'
 #' @export
 utils.get_output_folder <- function(subfolder=NULL){
-  folder <- file.path(utils.get_bucket_mnt(), "output")
+  folder <- file.path(utils.get_dir_data(), "output")
   
   if(!is.null(subfolder)){
     folder <- file.path(folder, subfolder)
@@ -252,5 +252,31 @@ utils.get_output_folder <- function(subfolder=NULL){
   
   if(!dir.exists(folder)) dir.create(folder, recursive = T)
   return(folder)
+}
+
+#' Download a file only if it hasn't changed since \code{last_modified}
+#' 
+#' @param URL url of file
+#' @param fil path to write file
+#' @param last_modified \code{POSIXct}. Ideally, the output from the first 
+#'        successful run of \code{get_file()}
+#' @param overwrite overwrite the file if it exists?
+#' @param .verbose output a message if the file was unchanged?
+utils.download_file <- function(URL, fil, last_modified=NULL, overwrite=TRUE, .verbose=TRUE) {
+  
+  if ((!file.exists(fil)) || is.null(last_modified)) {
+    res <- GET(URL, write_disk(fil, overwrite))
+    return(httr::parse_http_date(res$headers$`last-modified`))
+  } else if (inherits(last_modified, "POSIXct")) {
+    res <- HEAD(URL)
+    cur_last_mod <- httr::parse_http_date(res$headers$`last-modified`)
+    if (cur_last_mod != last_modified) {
+      res <- GET(URL, write_disk(fil, overwrite))
+      return(httr::parse_http_date(res$headers$`last-modified`))
+    }
+    if (.verbose) message(sprintf("'%s' unchanged since %s", URL, last_modified))
+    return(last_modified)
+  } 
+  
 }
 

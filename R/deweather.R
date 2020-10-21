@@ -30,7 +30,8 @@ deweather <- function(
  years_force_refresh=lubridate::year(lubridate::today()),
  training_start_anomaly="2016-12-01",
  training_end_anomaly="2019-11-30",
- fire_mode=F #BIOMASS BURNING, WORK IN DEVELOPMENT
+ fire_mode=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
+ add_pbl=F #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  ){
   
   #----------------------
@@ -102,7 +103,7 @@ deweather <- function(
                                   years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),
                                             lubridate::year(lubridate::today())),
                                   years_force_refresh=years_force_refresh,
-                                  add_pbl=F,
+                                  add_pbl=add_pbl,
                                   add_sunshine=F,
                                   add_frp=fire_mode,
                                   n_per_station=4
@@ -129,9 +130,13 @@ deweather <- function(
   link <- "log"
   
   weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')
+  if(add_pbl){
+    weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
+  }
   if(fire_mode){
     weather_vars <- c(weather_vars, "frp")
   }
+  
   weather_vars <- c(list(weather_vars))
     
 
