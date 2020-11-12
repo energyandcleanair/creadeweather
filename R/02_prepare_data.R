@@ -45,25 +45,30 @@ prep_data <- function(meas_weather, filename=NULL){
   
     if(length(weather_rows_idxs)>0){
       
+      # If only some of them are NAs
+      max_gap = 5
+      try(tbl <- tbl %>% mutate(sunshine=zoo::na.approx(sunshine, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      try(tbl <- tbl %>% mutate(atmos_pres=zoo::na.approx(atmos_pres, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      try(tbl <- tbl %>% mutate(air_temp_min=zoo::na.approx(air_temp_min, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      try(tbl <- tbl %>% mutate(air_temp_max=zoo::na.approx(air_temp_max, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      try(tbl <- tbl %>% mutate(air_temp=zoo::na.approx(air_temp, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      
+      
+      # If all NAs
       fill_value <- function(v){
-        if(all(is.na(v)) | ! (0 %in% unique(v))) v[is.na(v)] <- 0
+        # if(all(is.na(v)) | ! (0 %in% unique(v))) v[is.na(v)] <- 0
+        if(all(is.na(v))) v[is.na(v)] <- 0
         v
       }
-        
-      # If all NAs
-      tbl <- tbl %>% mutate_at(c("ws","precip","ceil_hgt",
-                          "atmos_pres","wd","visibility",
-                          "air_temp_min","air_temp_max","air_temp"),
-                        fill_value)
 
+      tbl <- tbl %>% mutate_at(c("ws","precip","ceil_hgt",
+                                 "atmos_pres","wd","visibility",
+                                 "air_temp_min","air_temp_max","air_temp"),
+                               fill_value)
+      
       if('sunshine' %in% colnames(tbl)) tbl$sunshine <- fill_value(tbl$sunshine)
       
-      # If only some of them are NAs
-      try(tbl <- tbl %>% mutate(sunshine=zoo::na.approx(sunshine, date, na.rm=FALSE)) %>% ungroup(), TRUE)
-      try(tbl <- tbl %>% mutate(atmos_pres=zoo::na.approx(atmos_pres, date, na.rm=FALSE)) %>% ungroup(), TRUE)
-      try(tbl <- tbl %>% mutate(air_temp_min=zoo::na.approx(air_temp_min, date, na.rm=FALSE)) %>% ungroup(), TRUE)
-      try(tbl <- tbl %>% mutate(air_temp_max=zoo::na.approx(air_temp_max, date, na.rm=FALSE)) %>% ungroup(), TRUE)
-      try(tbl <- tbl %>% mutate(air_temp=zoo::na.approx(air_temp, date, na.rm=FALSE)) %>% ungroup(), TRUE)
+      
       
       # tbl[weather_rows_idxs,]$precip <- coalesce(tbl[weather_rows_idxs,]$precip, 0) # Precip is a bit special
     }
