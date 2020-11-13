@@ -103,6 +103,9 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
 noaa.get_folder <- function(){
   dir_noaa <- Sys.getenv("DIR_NOAA_ISD")
   dir.create(dir_noaa, showWarnings = F, recursive = T)
+  if(!dir.exists(dir_noaa)){
+    stop("Failed to read/create DIR_NOAA_ISD")
+  }
   dir_noaa
 }
 

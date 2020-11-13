@@ -176,7 +176,7 @@ frp.geotiffs <- function(date_from, date_to, extent, ...){
            password = Sys.getenv("EARTHDATA_PWD"),
            downloader = "http",
            download_range = "Full",
-           out_projsel     = "Used Defined",
+           out_projsel = "Used Defined",
            output_proj = "3857",
            out_res_sel = "Native",
            out_res = NULL,

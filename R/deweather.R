@@ -68,7 +68,7 @@ deweather <- function(
   }
   
   # Sometimes, group_by with geometry doesn't work. We split in two steps
-  meas_geom <- meas %>% dplyr::distinct(region_id, geometry)
+  meas_geom <- meas %>% dplyr::distinct(region_id, geometry, timezone)
   
   # For some timezone or summer/winter time related reasons (or bad aggregation?),
   # certain (very few) days in some regions have two measurements,
@@ -80,7 +80,7 @@ deweather <- function(
   
   meas <- meas %>%
     # dplyr::select(-c(geometry)) %>%
-    dplyr::group_by(region_id, poll, unit, source, timezone, process_id, country) %>%
+    dplyr::group_by(region_id, poll, unit, source, process_id, country) %>%
     tidyr::nest() %>%
     dplyr::rename(station_id=region_id, meas=data) %>%
     dplyr::ungroup()
@@ -194,9 +194,11 @@ deweather <- function(
   #--------------------------------------
   results_anomaly_abs <- NULL
   results_anomaly_rel <- NULL
+  results_anomaly_rel_cf <- NULL
   results_counterfactual <- NULL
   results_anomaly_yday_abs <- NULL
   results_anomaly_yday_rel <- NULL
+  results_anomaly_yday_rel_cf <- NULL
   results_anomaly_offsetted <- NULL
   results_anomaly_yday_offsetted <- NULL
   results_trend <- NULL
@@ -214,7 +216,7 @@ deweather <- function(
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
     
-    # Anomaly in relative terms
+    # Anomaly in relative terms (vs average)
     results_anomaly_rel <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
     results_anomaly_rel <- results_anomaly_rel  %>% rowwise()  %>%
       dplyr::mutate(
@@ -231,6 +233,28 @@ deweather <- function(
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_percent\""),
         output="anomaly_percent",
+        unit="%"
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+    
+    # Anomaly in relative terms (vs counterfactual)
+    results_anomaly_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_rel_cf <- results_anomaly_rel_cf  %>% rowwise()  %>%
+      dplyr::mutate(
+        #  we use average during training period (i.e. 2017-2019) as reference
+        average=predicted %>%
+          filter(set=='training') %>%
+          pull(value) %>%
+          mean(na.rm=T),
+        normalised=list(predicted %>%
+                          filter(set=='testing') %>%
+                          mutate(value=(value-predicted) / predicted) %>%
+                          select(date, value)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly\"",
+                                               "\"output\":\"anomaly_vs_counterfactual\""),
+        output="anomaly_vs_counterfactual",
         unit="%"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
@@ -307,6 +331,28 @@ deweather <- function(
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
     
+    # Anomaly in relative terms (vs counterfactual)
+    results_anomaly_yday_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
+    results_anomaly_yday_rel_cf <- results_anomaly_yday_rel_cf  %>% rowwise()  %>%
+      dplyr::mutate(
+        #  we use average during training period (i.e. 2017-2019) as reference
+        average=predicted %>%
+          filter(set=='training') %>%
+          pull(value) %>%
+          mean(na.rm=T),
+        normalised=list(predicted %>%
+                          filter(set=='testing') %>%
+                          mutate(value=(value-predicted) / average * 100) %>%
+                          select(date, value)),
+        process_deweather=stringr::str_replace(process_deweather,
+                                               "\"output\":\"anomaly_yday\"",
+                                               "\"output\":\"anomaly_yday_vs_counterfactual\""),
+        output="anomaly_yday_vs_counterfactual",
+        unit="%"
+      ) %>%
+      dplyr::rename(region_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+    
     # Anomaly offsetted
     results_anomaly_yday_offsetted <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
     results_anomaly_yday_offsetted <- results_anomaly_yday_offsetted  %>% rowwise()  %>%
@@ -344,10 +390,12 @@ deweather <- function(
     results_trend,
     results_anomaly_abs,
     results_anomaly_rel,
+    results_anomaly_rel_cf,
+    results_anomaly_offsetted,
     results_counterfactual,
     results_anomaly_yday_abs,
     results_anomaly_yday_rel,
-    results_anomaly_offsetted,
+    results_anomaly_yday_rel_cf,
     results_anomaly_yday_offsetted
   )  
  

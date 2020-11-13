@@ -26,13 +26,13 @@ collect_weather <- function(meas,
     stop("Measurements should be nested in meas column")
   }
 
-  cache_folder <- utils.get_cache_folder("weather")
+  # cache_folder <- utils.get_cache_folder("weather")
 
   # Find unique AQ stations
   stations <- meas %>%
     dplyr::ungroup() %>%
-    dplyr::select(country, station_id, geometry) %>%
-    dplyr::distinct(country, station_id, .keep_all = T)
+    dplyr::select(country, station_id, geometry, timezone) %>%
+    dplyr::distinct(country, station_id, timezone, .keep_all = T)
 
   # Find weather stations nearby
   stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
@@ -46,7 +46,8 @@ collect_weather <- function(meas,
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
     print("Getting Planet Boundary Layer")
-    weather <- ncar.add_pbl(weather, years)  
+    weather <- cfs.add_pbl(weather, years)  
+    #weather <- ncar.add_pbl(weather, years)  
   }
   
   # Add sunshine
