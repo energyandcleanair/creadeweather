@@ -34,6 +34,9 @@ deweather <- function(
  add_pbl=F #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  ){
   
+  try(dotenv::load_dot_env(file = ".env"))
+  try(readRenviron(".Renviron"))
+  
   #----------------------
   # 0. Set parameters
   #----------------------
