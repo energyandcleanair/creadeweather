@@ -33,10 +33,31 @@ cfs.processed_dates <- function(){
 cfs.processable_dates <- function(years){
   l <- lapply(years,
          function(y){seq(min(lubridate::today() - lubridate::days(1),lubridate::date(paste0(y,"-01-01"))),
-                         min(lubridate::today() - lubridate::days(1), lubridate::date(paste0(y,"-12-31"))),
+                         min(lubridate::today() - lubridate::days(2), lubridate::date(paste0(y,"-12-31"))),
                          by="d")})
 
-  tibble::tibble(l) %>% tidyr::unnest(l) %>% dplyr::pull()
+  unavailable <- lubridate::date(
+    c("2017-08-15",
+      "2017-08-16",
+      "2019-03-19",
+      "2019-03-20",
+      "2019-10-07",
+      "2019-10-08",
+      "2019-10-09",
+      "2019-10-16",
+      "2019-10-17",
+      "2020-01-20",
+      "2020-01-21",
+      "2020-01-28",
+      "2020-01-29",
+      "2020-02-27",
+      "2020-02-28"
+      ))
+
+  tibble::tibble(l) %>%
+    tidyr::unnest(l) %>%
+    filter(!l %in% unavailable) %>%
+    dplyr::pull()
 }
  
 
@@ -189,7 +210,13 @@ cfs.hour_to_filepath <- function(h, dir_cfs){
               ".nc"))
 }
 
-cfs.add_pbl <- function(weather, years){
+cfs.date_to_filepaths <- function(d, dir_pbl, vars=c("pbl_min","pbl_max","pbl_mean")){
+  tibble(variable=vars,
+         fp=file.path(dir_pbl,
+            paste0(gsub("-","",d),gsub("pbl","",vars),".nc")))
+}
+
+cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
   
   cfs.refresh_files(years)
   
@@ -199,70 +226,60 @@ cfs.add_pbl <- function(weather, years){
   
   
   dir_cfs <- cfs.folder_cfs()
-  # Sys.glob(file.path(folder, "*", "*", "*", "*.nc"))
-  # files <- list.files(folder, "*.grb2$", full.names = T)
-  # pat = 'cdas1\\.(\\d{8})\\.'
-  # dates <- lubridate::ymd(stringr::str_match(files, pat)[, 2])
-  
-  
+  dir_pbl <- cfs.folder_pbl()
   
   dates <- weather %>%
     rowwise() %>%
-    mutate(dates=list(unique((weather$date)))) %>%
-    dplyr::select(station_id, timezone, dates, geometry) %>%
-    tidyr::unnest(dates) %>%
-    distinct(station_id, timezone, dates, geometry) %>%
-    rowwise() %>%
-    mutate(hours=list(day_to_utc_hours(dates, timezone)))
+    mutate(date=list(unique((weather$date)))) %>%
+    dplyr::select(station_id, timezone, date, geometry) %>%
+    tidyr::unnest(date) %>%
+    distinct(station_id, timezone, date, geometry) %>%
+    rowwise()
   
   # Collecting all positions to be read for each file
   # And group so we can use raster::stack
   dates_files <- dates %>%
-    tidyr::unnest(hours) %>%
     rowwise() %>%
-    mutate(fp=hour_to_filepath(hours),
-           time_group=strftime(hours,"%Y%m%d")) %>%
-    tidyr::nest(data=-time_group)
+    mutate(fp=list(cfs.date_to_filepaths(date, dir_pbl, vars)),
+           date_group=strftime(date,"%Y%m")) %>%
+    tidyr::unnest(fp) %>%
+    tidyr::nest(data=-date_group)
     
   
-  process_date_group <- function(data, dir_cfs){
+  process_date_group <- function(data){
    
-    fps <- data %>% distinct(fp, hours)
-    rs <- raster::stack(fps$fp, varname="HPBL_surface")
+    fps <- data %>% distinct(fp, date, variable) %>%
+      filter(file.exists(fp))
+    
+    rs <- raster::stack(fps$fp, varname="layer")
+    
     # gs <- unique(data$geometry)
     gs <- sf::st_as_sf(data %>% distinct(station_id,geometry))
     pbls <- raster::extract(rs, gs)
     
-    pbls.df <- data.frame(t(pbls))
+    pbls.df <- data.frame(value=t(pbls))
     names(pbls.df) <- gs$station_id
-    pbls.df$hours <- fps$hours
-    
+    pbls.df$variable <- fps$variable
+    pbls.df$date <- fps$date
+  
     pbls.tojoin <- tibble(pbls.df) %>%
-      tidyr::pivot_longer(cols=-hours, names_to="station_id", values_to="pbl")
+      tidyr::pivot_longer(cols=-c(date, variable), names_to="station_id", values_to="value") %>%
+      tidyr::pivot_wider(names_from=variable, values_from=value)
     
     data %>%
-      dplyr::left_join(pbls.tojoin) %>%
-      select(-c(fp))
+      distinct(station_id, date) %>%
+      dplyr::left_join(pbls.tojoin)
   }
   
-  pbl_values <- pbapply::pblapply(dates_files$data, process_date_group, dir_cfs=dir_cfs)
-   
-  dates_files$data[[100]]
-  
-  ptm <- proc.time()
-  process_date_group(dates_files$data[[2060]], dir_cfs)
-  proc.time() - ptm
-  
-  ptm <- proc.time()
-  process_date_group(dates_files$data[[2060]], "/mnt/data/weather/cfs_lev_2/")
-  proc.time() - ptm
-  
-  # dates_pbl <- pbapply::pbmapply(process_date, hours=dates$hours, geometry=dates$geometry, dir_cfs=dir_cfs)
+  pbl_values <- do.call("rbind", pbapply::pblapply(dates_files$data, process_date_group))
   
   # Join to weather data
-  joined <- weather %>% dplyr::rowwise() %>% dplyr::filter(!is.null(weather)) %>%
-    dplyr::mutate(weather_station_id=station_id, weather=list(weather %>% left_join(
-      pbl_values %>% dplyr::filter(station_id==weather_station_id)
+  joined <- weather %>%
+    dplyr::rowwise() %>%
+    dplyr::filter(!is.null(weather)) %>%
+    dplyr::mutate(weather_station_id=station_id,
+                  weather=list(weather %>% left_join(
+                    pbl_values %>% dplyr::filter(station_id==weather_station_id)
     ))) %>% dplyr::select(-c(weather_station_id))
   
   return(joined)

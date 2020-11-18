@@ -53,6 +53,10 @@ prep_data <- function(meas_weather, filename=NULL){
       try(tbl <- tbl %>% mutate(air_temp_max=zoo::na.approx(air_temp_max, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
       try(tbl <- tbl %>% mutate(air_temp=zoo::na.approx(air_temp, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
       
+      if('pbl_min' %in% colnames(tbl)) try(tbl <- tbl %>% mutate(pbl_min=zoo::na.approx(pbl_min, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      if('pbl_max' %in% colnames(tbl)) try(tbl <- tbl %>% mutate(pbl_max=zoo::na.approx(pbl_max, date, na.rm=FALSE, maxgap=max_gap)) %>% ungroup(), TRUE)
+      
+      
       
       # If all NAs
       fill_value <- function(v){

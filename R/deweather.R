@@ -22,7 +22,7 @@ deweather <- function(
  country=NULL,
  station_id=NULL,
  city=NULL,
- output=c("trend","anomaly"),
+ output=c("anomaly"), #c("trend","anomaly")
  aggregate_level="city",
  upload_results=T,
  add_gadm1=F,
@@ -133,17 +133,17 @@ deweather <- function(
   link <- "log"
   
   weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')
+  
   if(add_pbl){
     weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
   }
+  
   if(fire_mode){
     weather_vars <- c(weather_vars, "frp")
   }
   
   weather_vars <- c(list(weather_vars))
     
-
-
   configs <-  tibble() %>%
     tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
     rowwise() %>%
@@ -195,6 +195,8 @@ deweather <- function(
   #--------------------------------------
   # 5. Post-compute / aggregate results
   #--------------------------------------
+  print("5. Post-computing")
+  
   results_anomaly_abs <- NULL
   results_anomaly_rel <- NULL
   results_anomaly_rel_cf <- NULL
@@ -440,6 +442,7 @@ deweather <- function(
   #--------------------
   # 6. Upload results
   #--------------------
+  print("6. Uploading results")
   if(upload_results){
     
     processes <- results %>% distinct(process_id, process_deweather)
