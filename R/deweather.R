@@ -445,7 +445,7 @@ deweather <- function(
   print("6. Uploading results")
   if(upload_results){
     
-    prcs <- rcrea::processes() %>% collect()
+    prcs <- rcrea::processes() %>% dplyr::collect()
     process_id_to_filter_type <- function(process_id, prcs){
       prcs %>%
         filter(id == !!process_id) %>%
