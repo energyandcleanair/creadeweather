@@ -445,12 +445,24 @@ deweather <- function(
   print("6. Uploading results")
   if(upload_results){
     
+    prcs <- rcrea::processes() %>% collect()
+    process_id_to_filter_type <- function(process_id, prcs){
+      prcs %>%
+        filter(id == !!process_id) %>%
+        pull(filter_type)
+    }
+    
     processes <- results %>% distinct(process_id, process_deweather)
     
     results_uploaded <- results %>%
       rowwise() %>%
       rename(output_=output) %>%
-      mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0(output_,"_gbm_lag",lag,"_",aggregate_level)))
+      mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source,
+                                                      preferred_name=paste0(output_,
+                                                                            "_gbm_lag",lag,
+                                                                            "_",aggregate_level,
+                                                                            "_",process_id_to_filter_type(process_id, prcs),
+                                                                            ifelse(add_pbl, "_pbl", ""))))
     
     if(add_gadm1){
       results_gadm1_uploaded <- results_gadm1 %>%
