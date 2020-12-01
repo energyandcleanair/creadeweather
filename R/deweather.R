@@ -238,7 +238,7 @@ deweather <- function(
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_vs_average\""),
         output="anomaly_vs_average",
-        unit="%"
+        unit="-"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
@@ -260,7 +260,7 @@ deweather <- function(
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_vs_counterfactual\""),
         output="anomaly_vs_counterfactual",
-        unit="%"
+        unit="-"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
@@ -331,7 +331,7 @@ deweather <- function(
                                                "\"output\":\"anomaly_yday\"",
                                                "\"output\":\"anomaly_yday_vs_average\""),
         output="anomaly_yday_vs_average",
-        unit="%"
+        unit="-"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
@@ -353,7 +353,7 @@ deweather <- function(
                                                "\"output\":\"anomaly_yday\"",
                                                "\"output\":\"anomaly_yday_vs_counterfactual\""),
         output="anomaly_yday_vs_counterfactual",
-        unit="%"
+        unit="-"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
