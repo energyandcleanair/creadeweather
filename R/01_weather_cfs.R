@@ -271,7 +271,9 @@ cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
       dplyr::left_join(pbls.tojoin)
   }
   
+  print(paste("Extracting pbl..."))
   pbl_values <- do.call("rbind", pbapply::pblapply(dates_files$data, process_date_group))
+  print(paste("Done"))
   
   # Join to weather data
   joined <- weather %>%
