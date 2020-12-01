@@ -232,12 +232,12 @@ deweather <- function(
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
-                          mutate(value=(value-predicted) / average * 100) %>%
+                          mutate(value=(value-predicted) / average) %>%
                           select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
-                                               "\"output\":\"anomaly_percent\""),
-        output="anomaly_percent",
+                                               "\"output\":\"anomaly_vs_average\""),
+        output="anomaly_vs_average",
         unit="%"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
@@ -293,8 +293,8 @@ deweather <- function(
                                       mutate(value=predicted)),
                     process_deweather=stringr::str_replace(process_deweather,
                                                            "\"output\":\"anomaly\"",
-                                                           "\"output\":\"anomaly_counterfactual\""),
-                    output="anomaly_counterfactual"
+                                                           "\"output\":\"counterfactual\""),
+                    output="counterfactual"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
@@ -325,12 +325,12 @@ deweather <- function(
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
-                          mutate(value=(value-predicted) / average * 100) %>%
+                          mutate(value=(value-predicted) / average) %>%
                           select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly_yday\"",
-                                               "\"output\":\"anomaly_yday_percent\""),
-        output="anomaly_yday_percent",
+                                               "\"output\":\"anomaly_yday_vs_average\""),
+        output="anomaly_yday_vs_average",
         unit="%"
       ) %>%
       dplyr::rename(region_id=station_id) %>%
@@ -347,7 +347,7 @@ deweather <- function(
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
-                          mutate(value=(value-predicted) / average * 100) %>%
+                          mutate(value=(value-predicted) / predicted) %>%
                           select(date, value)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly_yday\"",
