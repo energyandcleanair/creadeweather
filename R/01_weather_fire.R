@@ -1,7 +1,7 @@
 
-frp.cache.filename <- function(region_id, country, met_type, height, duration_hour, date){
+frp.cache.filename <- function(location_id, country, met_type, height, duration_hour, date){
   paste(tolower(country),
-        tolower(region_id),
+        tolower(location_id),
         gsub("\\.","",tolower(met_type)),
         height,
         duration_hour,
@@ -53,10 +53,10 @@ frp.hysplit.trajs_at_date <- function(date, geometry, height, duration_hour, met
 
 # Trajectories ------------------------------------------------------------
 
-frp.trajs_at_date <- function(date, region_id, geometry, country, met_type, height, duration_hour, ...){
+frp.trajs_at_date <- function(date, location_id, geometry, country, met_type, height, duration_hour, ...){
   tryCatch({
     cache_folder <- utils.get_cache_folder("trajs")
-    filename <- frp.cache.filename(region_id, country, met_type, height, duration_hour, date)
+    filename <- frp.cache.filename(location_id, country, met_type, height, duration_hour, date)
     filepath <- file.path(cache_folder, filename)
     
     if(!file.exists(filepath)){
@@ -119,13 +119,13 @@ frp.average <- function(trajs.day, r, buffer_km){
   return(mean(unlist(vs)))
 }
 
-frp.frp_at_traj <- function(trajs, country, region_id, ..., frp.rasters, buffer_km){
+frp.frp_at_traj <- function(trajs, country, location_id, ..., frp.rasters, buffer_km){
   
   tryCatch({
     traj.sf <- sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
       st_transform(crs=3857)
     
-    r <- frp.rasters %>% filter(country==!!country, region_id==!!region_id)
+    r <- frp.rasters %>% filter(country==!!country, location_id==!!location_id)
     
     frp.day <- trajs %>%
       group_by(date=lubridate::date(traj_dt)) %>%
@@ -205,7 +205,7 @@ frp.add_frp <- function(weather, met_type="reanalysis", height=500, duration_hou
     tidyr::nest(meas=!cols)
   
   wt <- w %>%
-    rename(region_id=station_id) %>%
+    rename(location_id=station_id) %>%
     mutate(trajs=purrr::pmap(., frp.trajs_at_date, met_type=met_type, height=height, duration_hour=duration_hour)) %>%
     mutate(trajs_extent=purrr::map(trajs, frp.traj_extent, buffer_km=buffer_km))
   
@@ -217,12 +217,12 @@ frp.add_frp <- function(weather, met_type="reanalysis", height=500, duration_hou
   #   quiet=F)
   
   frp.rasters <- wt %>%
-    group_by(country, region_id) %>% 
+    group_by(country, location_id) %>% 
     summarise(extent=frp.union_extents(trajs_extent),
               date_from=min(date)-lubridate::hours(duration_hour),
               date_to=max(date)) %>%
     mutate(geotiffs=purrr::pmap(., frp.geotiffs)) %>%
-    dplyr::select(country, region_id, geotiffs) %>%
+    dplyr::select(country, location_id, geotiffs) %>%
     tidyr::unnest(geotiffs)
   
   # Calculate mean frp along trajectories
@@ -230,8 +230,8 @@ frp.add_frp <- function(weather, met_type="reanalysis", height=500, duration_hou
     mutate(frp=purrr::pmap_dbl(., frp.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
   
   wtfd <- wtf %>%
-    dplyr::select(country, region_id, date, frp) %>%
-    dplyr::group_by(country, region_id) %>%
+    dplyr::select(country, location_id, date, frp) %>%
+    dplyr::group_by(country, location_id) %>%
     tidyr::nest(frp=c(date,frp))
   
   # Adding frp to weather data

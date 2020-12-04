@@ -40,6 +40,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
     
     download_data <- function(year, code, cache_folder){
+
       tryCatch({
         worldmet::importNOAA(
           code = code,

@@ -71,21 +71,21 @@ deweather <- function(
   }
   
   # Sometimes, group_by with geometry doesn't work. We split in two steps
-  meas_geom <- meas %>% dplyr::distinct(region_id, geometry, timezone)
+  meas_geom <- meas %>% dplyr::distinct(location_id, geometry, timezone)
   
   # For some timezone or summer/winter time related reasons (or bad aggregation?),
   # certain (very few) days in some regions have two measurements,
   # which will ultimately fail due to UNIQUE constraints in Postgres
   # We prevent this now.
   meas <- meas %>% 
-    dplyr::group_by(date=lubridate::date(date), region_id, poll, unit, source, timezone, process_id, country) %>%
+    dplyr::group_by(date=lubridate::date(date), location_id, poll, unit, source, timezone, process_id, country) %>%
     dplyr::summarise(value=mean(value, na.rm=T))
   
   meas <- meas %>%
     # dplyr::select(-c(geometry)) %>%
-    dplyr::group_by(region_id, poll, unit, source, process_id, country) %>%
+    dplyr::group_by(location_id, poll, unit, source, process_id, country) %>%
     tidyr::nest() %>%
-    dplyr::rename(station_id=region_id, meas=data) %>%
+    dplyr::rename(station_id=location_id, meas=data) %>%
     dplyr::ungroup()
   
   if(nrow(meas)==0){
@@ -94,7 +94,7 @@ deweather <- function(
   
   meas_sf <- meas %>%
     dplyr::ungroup() %>%
-    dplyr::left_join(meas_geom, by=c("station_id"="region_id")) %>%
+    dplyr::left_join(meas_geom, by=c("station_id"="location_id")) %>%
     dplyr::mutate(geometry=sf::st_centroid(geometry)) %>%
     sf::st_as_sf(sf_column_name="geometry", crs = 4326)
 
@@ -218,8 +218,8 @@ deweather <- function(
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
                     ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
     # Anomaly in relative terms (vs average)
     results_anomaly_rel <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
@@ -240,8 +240,8 @@ deweather <- function(
         output="anomaly_vs_average",
         unit="-"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly in relative terms (vs counterfactual)
     results_anomaly_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
@@ -262,8 +262,8 @@ deweather <- function(
         output="anomaly_vs_counterfactual",
         unit="-"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly offsetted
     results_anomaly_offsetted <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
@@ -283,8 +283,8 @@ deweather <- function(
                                                "\"output\":\"anomaly_offsetted\""),
         output="anomaly_offsetted"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Counterfactual
     results_counterfactual <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
@@ -296,8 +296,8 @@ deweather <- function(
                                                            "\"output\":\"counterfactual\""),
                     output="counterfactual"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
   }
   
@@ -311,8 +311,8 @@ deweather <- function(
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
     # Anomaly in relative terms
     results_anomaly_yday_rel <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
@@ -333,8 +333,8 @@ deweather <- function(
         output="anomaly_yday_vs_average",
         unit="-"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly in relative terms (vs counterfactual)
     results_anomaly_yday_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
@@ -355,8 +355,8 @@ deweather <- function(
         output="anomaly_yday_vs_counterfactual",
         unit="-"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly offsetted
     results_anomaly_yday_offsetted <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
@@ -379,16 +379,16 @@ deweather <- function(
                                                "\"output\":\"anomaly_yday_offsetted\""),
         output="anomaly_yday_offsetted"
       ) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)  
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
   }
   
   if("trend" %in% output){
     results_trend <- results_nested %>% dplyr::filter(output=='trend') %>% tidyr::unnest(cols=c(result))
     results_trend <- results_trend  %>% rowwise()  %>%
       dplyr::mutate(normalised=list(trend)) %>%
-      dplyr::rename(region_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, region_id, source, output)
+      dplyr::rename(location_id=station_id) %>%
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
   }
   
   results <- dplyr::bind_rows(
@@ -408,27 +408,30 @@ deweather <- function(
   # Group by GADM2 and GADM1
   # results_anomaly_gadm1
   # process_id replace city->gadm
-  locs <- rcrea::locations(source=source, with_meta = T) %>% mutate(city=tolower(city))
   agg_gadm1 <- function(results, locs){
     results %>%
-      dplyr::left_join(locs %>% dplyr::select(city, gid_1), by=c("region_id"="city")) %>%
+      dplyr::left_join(locs %>% dplyr::select(city, gid_1), by=c("location_id"="city")) %>%
       dplyr::mutate(process_id=gsub("city","gadm1",process_id)) %>%
       tidyr::unnest(cols=normalised) %>%
       dplyr::group_by(process_id, process_deweather, poll, unit, source, gid_1, date, output) %>%
       dplyr::summarise(value=mean(value, na.rm=T)) %>%
       tidyr::nest() %>%
-      rename(region_id=gid_1, normalised=data)
+      rename(location_id=gid_1, normalised=data)
   }
 
   agg_gadm2 <- function(results, locs){
     results %>%
-      left_join(locs %>% dplyr::select(city, gid_1, gid_2), by=c("region_id"="city")) %>%
+      left_join(locs %>% dplyr::select(city, gid_1, gid_2), by=c("location_id"="city")) %>%
       mutate(process_id=gsub("city","gadm2",process_id)) %>%
       tidyr::unnest(cols=normalised) %>%
       group_by(process_id, process_deweather, poll, unit, source, gid_2, date, output) %>%
       summarise(value=mean(value, na.rm=T)) %>%
       tidyr::nest() %>%
-      rename(region_id=gid_2, normalised=data)
+      rename(location_id=gid_2, normalised=data)
+  }
+  
+  if(add_gadm1 | add_gadm2){
+    locs <- rcrea::locations(level="city", source=source, with_meta = T) %>% mutate(city=tolower(city_name))
   }
   
   if(add_gadm1){
@@ -457,7 +460,7 @@ deweather <- function(
     results_uploaded <- results %>%
       rowwise() %>%
       rename(output_=output) %>%
-      mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source,
+      mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, location_id, normalised, source,
                                                       preferred_name=paste0(output_,
                                                                             "_gbm_lag",lag,
                                                                             "_",aggregate_level,
@@ -468,7 +471,7 @@ deweather <- function(
       results_gadm1_uploaded <- results_gadm1 %>%
         rowwise() %>%
         rename(output_=output) %>%
-        mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0(output_,"_gbm_lag",lag,"_gadm1",)))
+        mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, location_id, normalised, source, paste0(output_,"_gbm_lag",lag,"_gadm1",)))
       results_uploaded <- rbind(
         results_uploaded,
         results_anomaly_gadm1_uploaded)
@@ -478,7 +481,7 @@ deweather <- function(
       results_gadm2_uploaded <- results_gadm2 %>%
         rowwise() %>%
         rename(output_=output) %>%
-        mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, region_id, normalised, source, paste0(output_,"_gbm_lag",lag,"_gadm2",)))
+        mutate(deweather_process_id=upload_process_meas(process_id, process_deweather, poll, unit, location_id, normalised, source, paste0(output_,"_gbm_lag",lag,"_gadm2",)))
       results_uploaded <- rbind(
         results_uploaded,
         results_anomaly_gadm2_uploaded)

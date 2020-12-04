@@ -1,4 +1,4 @@
-upload_process_meas <- function(meas_process_id, process_deweather, poll, unit, region_id, normalised, source, preferred_name=NULL){
+upload_process_meas <- function(meas_process_id, process_deweather, poll, unit, location_id, normalised, source, preferred_name=NULL){
   
   # Create or retrieve process
   meas_process <- rcrea::processes() %>% filter(id==meas_process_id) %>% dplyr::collect()
@@ -14,7 +14,7 @@ upload_process_meas <- function(meas_process_id, process_deweather, poll, unit, 
            poll=poll,
            unit=unit,
            source=source,
-           region_id=region_id
+           location_id=location_id
            )
   
   rcrea::upsert_meas(normalised_meas)
