@@ -133,7 +133,7 @@ train_models <- function(meas_weather,
 
   train_model_safe <- function(index, station_id, ...){
     tryCatch({
-      print(paste("Training model on station", station_id))
+      print(paste("Training model on location", station_id))
       res <- train_model(...)
       res$index <- index
       return(res)

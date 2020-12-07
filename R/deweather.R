@@ -31,7 +31,7 @@ deweather <- function(
  training_start_anomaly="2016-12-01",
  training_end_anomaly="2019-11-30",
  fire_mode=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
- add_pbl=F #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
+ add_pbl=T #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  ){
   
   try(dotenv::load_dot_env(file = ".env"))
