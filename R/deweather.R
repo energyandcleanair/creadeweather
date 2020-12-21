@@ -3,7 +3,7 @@
 #' @param poll 
 #' @param source 
 #' @param country 
-#' @param station_id 
+#' @param location_id 
 #' @param city 
 #' @param output any combination of "anomaly", "trend", "anomaly_offsetted"
 #' @param aggregate_level "station" or "city"
@@ -20,7 +20,7 @@ deweather <- function(
  poll=NULL,
  source=NULL,
  country=NULL,
- station_id=NULL,
+ location_id=NULL,
  city=NULL,
  output=c("anomaly"), #c("trend","anomaly")
  aggregate_level="city",
@@ -60,7 +60,7 @@ deweather <- function(
   if(is.null(meas)){
     meas <- rcrea::measurements(poll=poll,
                                 country=country,
-                                location_id=station_id,
+                                location_id=location_id,
                                 city=city,
                                 aggregate_level=aggregate_level,
                                 date_from=min(time_vars_output$training_start),
