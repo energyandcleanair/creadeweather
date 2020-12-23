@@ -21,6 +21,7 @@ deweather <- function(
  source=NULL,
  country=NULL,
  location_id=NULL,
+ location_type=NULL,
  city=NULL,
  output=c("anomaly"), #c("trend","anomaly")
  aggregate_level="city",
@@ -61,6 +62,7 @@ deweather <- function(
     meas <- rcrea::measurements(poll=poll,
                                 country=country,
                                 location_id=location_id,
+                                location_type=location_type,
                                 city=city,
                                 aggregate_level=aggregate_level,
                                 date_from=min(time_vars_output$training_start),
@@ -464,6 +466,7 @@ deweather <- function(
                                                       preferred_name=paste0(output_,
                                                                             "_gbm_lag",lag,
                                                                             "_",aggregate_level,
+                                                                            ifelse(!is.null(location_type), paste0("_",location_type), ""),
                                                                             "_",process_id_to_filter_type(process_id, prcs),
                                                                             ifelse(add_pbl, "_pbl", ""))))
     
