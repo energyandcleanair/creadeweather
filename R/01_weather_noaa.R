@@ -17,7 +17,7 @@ noaa.add_close_stations <- function(meas, n_per_station){
     ))
 
   meas %>% 
-    dplyr::left_join(meas_stations  %>% dplyr::select(-c(geometry)))
+    dplyr::left_join(as.data.frame(meas_stations  %>% dplyr::select(-c(geometry))))
 }
 
 
@@ -138,7 +138,7 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
     stop("Failed to find weather data")
   }
   meas_w_stations <- meas_w_stations %>%
-    left_join(
+    dplyr::left_join(
       stations_weather %>%
         dplyr::select(station_id, weather) %>%
         dplyr::rowwise() %>%
@@ -165,7 +165,8 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    RH_max=max(RH, na.rm=T)
                  )
             )
-        )
+        ) %>%
+        as.data.frame()
     )
   print("Done [Adding weather from NOAA]")
   return(meas_w_stations)

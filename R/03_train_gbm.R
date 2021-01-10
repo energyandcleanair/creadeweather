@@ -62,7 +62,7 @@ train_model_gbm <- function(data,
   }
   
   data_prepared <- data %>%
-    # dplyr::select(-c(geometry)) %>%
+    dplyr::select(-c(geometry)) %>%
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
  
