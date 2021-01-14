@@ -20,25 +20,34 @@ noaa.add_close_stations <- function(meas, n_per_station){
     dplyr::left_join(as.data.frame(meas_stations  %>% dplyr::select(-c(geometry))))
 }
 
+noaa.valid_years_cached <- function(code, years, cache_folder){
+  files <- list.files(path=cache_folder, pattern =paste0(code,'_',years,'.rds',collapse="|"), full.names = T)
+  years <- stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
+  # Only keep files who have been updated after the end of the year
+  # But also keep those who have been updated today
+  is_valid <- file.info(files)$mtime >= pmin(as.POSIXct(paste0(as.numeric(years)+1,"-01-01")),
+                                            lubridate::today())
+  return(years[is_valid])
+}
 
-noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cache_folder){
+noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_folder){
   # Get NOAA data, first trying to use cached files for complete years
   tryCatch({
     # Reading cache files
     years_try_cache <- setdiff(years, years_force_refresh)
-    files <- list.files(path=cache_folder, pattern =paste0(code,'_',years_try_cache,'.rds',collapse="|"), full.names = T)
-    # files <- file.path(cache_folder, paste0(code,'_',years_try_cache,'.rds'))
-    years_cached <- stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
+    years_cached <- noaa.valid_years_cached(code, years_try_cache, cache_folder)
+    files_cached <- list.files(path=cache_folder, pattern =paste0(code,'_',years_cached,'.rds',collapse="|"), full.names = T)
+    
     readFile <- function(path){
       if(file.exists(path)) readRDS(path) else NULL
     }
     
-    data_cached <- files %>%
+    data_cached <- files_cached %>%
       purrr::map_dfr(readFile) %>% 
       bind_rows()
     
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
-    
+
     download_data <- function(year, code, cache_folder){
 
       tryCatch({

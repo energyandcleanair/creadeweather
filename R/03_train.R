@@ -113,7 +113,8 @@ train_models <- function(meas_weather,
       res$index <- index
       return(res)
     }, error=function(err){
-      warning(paste("Failed to train model:",err))
+      #warming(paste("Failed to train model:",err))
+      print(paste("Failed to train model:",err))
       NA
     })
   }

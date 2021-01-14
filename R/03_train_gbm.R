@@ -61,8 +61,11 @@ train_model_gbm <- function(data,
     stop("link_trend can only be NULL or 'log'")
   }
   
+  if("geometry" %in% data){
+    data %<>% dplyr::select(-c(geometry)) 
+  }
+  
   data_prepared <- data %>%
-    dplyr::select(-c(geometry)) %>%
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
  
