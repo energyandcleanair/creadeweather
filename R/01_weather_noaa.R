@@ -20,12 +20,30 @@ noaa.add_close_stations <- function(meas, n_per_station){
     dplyr::left_join(as.data.frame(meas_stations  %>% dplyr::select(-c(geometry))))
 }
 
+noaa.available_years <- function(code){
+
+  # Update cache file if from previous year (we give NOAA 10 days to update it)
+  n_days <- 10
+  f <- rnoaa::isd_cache$cache_path_get()
+  refresh <- !file.exists(f) | 
+    (file.info(f)$ctime < 
+       min(lubridate::today(),
+           lubridate::floor_date(lubridate::today(), "year") + n_days))
+    
+  d <- suppressMessages(rnoaa::isd_stations(refresh=refresh)) %>%
+    filter(paste0(usaf,"-",wban)==!!code) %>%
+    summarise(begin=as.integer(min(begin/10000)),
+              end=as.integer(max(end/10000)))
+  
+  seq(d$begin, d$end)
+}
+
 noaa.valid_years_cached <- function(code, years, cache_folder){
   files <- list.files(path=cache_folder, pattern =paste0(code,'_',years,'.rds',collapse="|"), full.names = T)
-  years <- stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)")
+  years <- as.numeric(stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)"))
   # Only keep files who have been updated after the end of the year
   # But also keep those who have been updated today
-  is_valid <- file.info(files)$mtime >= pmin(as.POSIXct(paste0(as.numeric(years)+1,"-01-01")),
+  is_valid <- file.info(files)$mtime >= pmin(as.POSIXct(paste0(years+1,"-01-01")),
                                             lubridate::today())
   return(years[is_valid])
 }
@@ -34,6 +52,9 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
   # Get NOAA data, first trying to use cached files for complete years
   tryCatch({
     # Reading cache files
+    years_available <- noaa.available_years(code)
+    years <- intersect(years, years_available)
+    
     years_try_cache <- setdiff(years, years_force_refresh)
     years_cached <- noaa.valid_years_cached(code, years_try_cache, cache_folder)
     files_cached <- list.files(path=cache_folder, pattern =paste0(code,'_',years_cached,'.rds',collapse="|"), full.names = T)
@@ -47,7 +68,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
       bind_rows()
     
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
-
+    
     download_data <- function(year, code, cache_folder){
 
       tryCatch({

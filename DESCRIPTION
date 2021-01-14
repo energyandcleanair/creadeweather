@@ -47,7 +47,8 @@ Imports:
     fuzzyjoin,
     stringi,
     exactextractr,
-    httr
+    httr,
+    terra
 Depends:
     ggplot2,
     worldmet

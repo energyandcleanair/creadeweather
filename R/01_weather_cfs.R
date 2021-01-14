@@ -165,7 +165,7 @@ cfs.refresh_files <- function(years){
   to_process <-  processable[!processable %in% processed]
 
   cache_rs=NULL
-  for(i in seq(1:length(to_process))){
+  for(i in seq_along(to_process)){
     d <- to_process[i]
     print(paste("Processing", d))
     cache_rs=cfs.process_date(d, cache_rs)
@@ -245,7 +245,7 @@ cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
   dates_files <- dates %>%
     rowwise() %>%
     mutate(fp=list(cfs.date_to_filepaths(date, dir_pbl, vars)),
-           date_group=strftime(date,"%Y%m")) %>%
+           date_group=strftime(date,"%Y")) %>%
     tidyr::unnest(fp) %>%
     tidyr::nest(data=-date_group)
     
@@ -255,11 +255,10 @@ cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
     fps <- data %>% distinct(fp, date, variable) %>%
       filter(file.exists(fp))
     
-    rs <- raster::stack(fps$fp, varname="layer")
-    
-    # gs <- unique(data$geometry)
     gs <- sf::st_as_sf(data %>% distinct(station_id,geometry))
-    pbls <- raster::extract(rs, gs)
+    ts <- terra::rast(fps$fp)
+    pbls <- terra::extract(ts, st_coordinates(gs))
+    
     
     pbls.df <- data.frame(value=t(pbls))
     names(pbls.df) <- gs$station_id
