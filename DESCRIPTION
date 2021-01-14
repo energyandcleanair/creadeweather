@@ -52,7 +52,7 @@ Depends:
     ggplot2,
     worldmet
 Remotes:
-    davidcarslaw/worldmet,
+    hubert-thieriot/worldmet,
     davidcarslaw/deweather,
     rich-iannone/splitr,
     MatMatt/MODIS@develop,

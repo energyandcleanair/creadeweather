@@ -10,7 +10,6 @@
 #' @param normalise 
 #' @param detect_breaks 
 #' @param add_timestamp_var 
-#' @param exp_suffix 
 #'
 #' @return
 #' @export
@@ -27,10 +26,6 @@ train_models <- function(meas_weather,
                          normalise=F,
                          detect_breaks=F,
                          training_date_cut,
-                         exp_name=NULL,
-                         exp_suffix=NULL,
-                         return_result=T, # If False, return folder if exists
-                         save_result=T,
                          ...
 ){
   
@@ -42,26 +37,6 @@ train_models <- function(meas_weather,
   # Check input
   if(!engine %in% c('gbm', 'svr', 'rmweather', 'deweather')){
     stop("'engine' should be either 'gbm', 'svr', 'rmweather' or 'deweather'")
-  }
-  
-  # Experiment name for storage
-  if(is.null(exp_name)){
-    exp_name <- paste0('lag',lag,'_',paste(tolower(pollutants),collapse='_'),
-                       '_trees',trees,
-                       '_samples',samples,
-                       '_norm',substr(as.character(normalise),1,1))
-    if(!is.null(exp_suffix)){
-      exp_name <- paste0(exp_name, exp_suffix)  
-    }
-  }
-  
-  # Files and folder
-  if(save_result){
-    output_folder <- file.path('data', '03_train_models', 'output')
-    if(!dir.exists(output_folder)) dir.create(output_folder, recursive = T)
-    org_file <- ifelse(rstudioapi::isAvailable(),
-                       rstudioapi::getActiveDocumentContext()$path,
-                       'R/03_train_model_rmweather.R')
   }
   
   
@@ -176,28 +151,7 @@ train_models <- function(meas_weather,
                                         by="index") %>%
     dplyr::select(-c(index))
   
-  
-  ### Result folder
-  if(save_result){
-    # Create results folder
-    timestamp_str <- format(Sys.time(), "%Y%m%d_%H%M%S")
-    result_folder <- file.path(output_folder, paste(timestamp_str,exp_name,sep='_'))
-    dir.create(result_folder)
-    
-    # Save script file
-    file.copy(org_file, result_folder, overwrite = T)
-    file.rename(from = file.path(result_folder, basename(org_file)),
-                to = file.path(result_folder, paste0(timestamp_str, '_', tools::file_path_sans_ext(basename(org_file)),'.R')))
-    
-    # Save result
-    saveRDS(result, file=file.path(result_folder,paste0('result.RDS')))
-  }
-  
-  if(return_result){
-    return(result)
-  }else{
-    return(result_folder)  
-  }
+  return(result)
 }
 
 

@@ -22,6 +22,7 @@ deweather <- function(
  country=NULL,
  location_id=NULL,
  location_type=NULL,
+ process_id=NULL,
  city=NULL,
  output=c("anomaly"), #c("trend","anomaly")
  aggregate_level="city",
@@ -68,6 +69,7 @@ deweather <- function(
                                 date_from=min(time_vars_output$training_start),
                                 source=source,
                                 deweathered=F,
+                                process_id=process_id,
                                 with_metadata=T,
                                 with_geometry=T)
   }
@@ -182,9 +184,7 @@ deweather <- function(
         link=link,
         normalise=normalise,
         detect_breaks=detect_breaks,
-        training_date_cut=training_end,
-        save_result=F,
-        return_result=T)
+        training_date_cut=training_end)
       )) %>%
     rowwise() %>%
     filter(any(!is.na(result)))

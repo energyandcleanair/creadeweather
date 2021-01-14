@@ -54,11 +54,12 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=c(2020), cach
           tryCatch({
             files %>% purrr::map_dfr(readFile) %>% bind_rows()
           }, error=function(c){
+            print(c)
             NULL
           })
         })
     }
-    
+
     # Downloading fresh data
     if(length(years_to_download)>0){
       data_downloaded <- do.call("bind_rows",
