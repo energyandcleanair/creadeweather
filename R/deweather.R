@@ -99,7 +99,7 @@ deweather <- function(
   meas_sf <- meas %>%
     dplyr::ungroup() %>%
     dplyr::left_join(meas_geom, by=c("station_id"="location_id")) %>%
-    dplyr::mutate(geometry=sf::st_centroid(geometry)) %>%
+    dplyr::mutate(geometry=suppressWarnings(sf::st_centroid(geometry))) %>%
     sf::st_as_sf(sf_column_name="geometry", crs = 4326)
 
   #----------------------

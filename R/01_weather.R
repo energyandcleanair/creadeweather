@@ -35,7 +35,8 @@ collect_weather <- function(meas,
     dplyr::distinct(country, station_id, timezone, .keep_all = T)
 
   # Find weather stations nearby
-  stations_w_noaa <- noaa.add_close_stations(stations, n_per_station = n_per_station)
+  stations_w_noaa <- suppressMessages(
+    noaa.add_close_stations(stations, n_per_station = n_per_station))
 
   # Get weather at these stations
   weather <- noaa.add_weather(stations_w_noaa, years=years,
