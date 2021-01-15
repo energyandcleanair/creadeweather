@@ -233,6 +233,7 @@ cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
   dir_pbl <- cfs.folder_pbl()
   
   dates <- weather %>%
+    as.data.frame() %>%
     rowwise() %>%
     mutate(date=list(unique((weather$date)))) %>%
     dplyr::select(station_id, timezone, date, geometry) %>%

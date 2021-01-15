@@ -171,6 +171,7 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
   meas_w_stations <- meas_w_stations %>%
     dplyr::left_join(
       stations_weather %>%
+        as.data.frame() %>%
         dplyr::select(station_id, weather) %>%
         dplyr::rowwise() %>%
         dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
@@ -196,9 +197,8 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    RH_max=max(RH, na.rm=T)
                  )
             )
-        ) %>%
-        as.data.frame()
-    )
+        )
+      )
   print("Done [Adding weather from NOAA]")
   return(meas_w_stations)
 }
