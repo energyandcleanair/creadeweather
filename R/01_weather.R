@@ -72,14 +72,15 @@ collect_weather <- function(meas,
   }
   
   meas_w_weather <- tibble(meas) %>%
-    dplyr::left_join(weather %>% dplyr::select(station_id, weather)) %>%
+    dplyr::left_join(weather %>% dplyr::select(station_id, weather) %>% as.data.frame(),
+                     by="station_id") %>%
     dplyr::rowwise() %>%
     dplyr::filter(!is.null(weather)) %>%
     dplyr::filter(!is.null(meas)) %>%
     dplyr::mutate(meas=list(
       meas %>%
         dplyr::mutate(date=lubridate::date(date)) %>%
-        dplyr::left_join(weather)
+        dplyr::left_join(weather, by="date")
     )) %>%
     dplyr::rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))

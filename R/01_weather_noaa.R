@@ -40,25 +40,30 @@ noaa.available_years <- function(code){
 
 noaa.valid_years_cached <- function(code, years, cache_folder){
   files <- list.files(path=cache_folder, pattern =paste0(code,'_',years,'.rds',collapse="|"), full.names = T)
+  if(length(files)==0){
+   return(c()) 
+  }
+    
   years <- as.numeric(stringr::str_extract(files, "(?<=_)\\d{4}(?=\\.rds)"))
   # Only keep files who have been updated after the end of the year
   # But also keep those who have been updated today
+  
   is_valid <- file.info(files)$mtime >= pmin(as.POSIXct(paste0(years+1,"-01-01")),
                                             lubridate::today())
   return(years[is_valid])
 }
 
+
 noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_folder){
+  
   # Get NOAA data, first trying to use cached files for complete years
   tryCatch({
     # Reading cache files
     years_available <- noaa.available_years(code)
     years <- intersect(years, years_available)
-    
     years_try_cache <- setdiff(years, years_force_refresh)
     years_cached <- noaa.valid_years_cached(code, years_try_cache, cache_folder)
     files_cached <- list.files(path=cache_folder, pattern =paste0(code,'_',years_cached,'.rds',collapse="|"), full.names = T)
-    
     readFile <- function(path){
       if(file.exists(path)) readRDS(path) else NULL
     }
@@ -68,7 +73,7 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
       bind_rows()
     
     years_to_download <- unique(c(setdiff(years, years_cached), years_force_refresh))
-    
+
     download_data <- function(year, code, cache_folder){
 
       tryCatch({
@@ -79,11 +84,14 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
           path = cache_folder
           )},
         error=function(cond){
+          print("DEBUG: ERROR IN importNOAA")
+          print(paste("Failed to get new data for years", years_to_download,". Using cache instead"))
           warning(paste("Failed to get new data for years", years_to_download,". Using cache instead"))
           files <- list.files(path=cache_folder, pattern =paste0(code,'_',year,'.rds',collapse="|"), full.names = T)
           tryCatch({
             files %>% purrr::map_dfr(readFile) %>% bind_rows()
           }, error=function(c){
+            print("DEBUG: ERROR IN importNOAA")
             print(c)
             NULL
           })
@@ -101,11 +109,9 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
       data_downloaded <- NULL
     }
     
-    
     # Binding and returning
     result <- bind_rows(data_cached, data_downloaded)
     if(nrow(result)==0){return(NULL)}
-    
     
     # Aggregate per day
     result <- result %>%
@@ -125,12 +131,15 @@ noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_f
         RH_min=min(RH, na.rm=T),
         RH_max=max(RH, na.rm=T)
       )
-      
-    return(result)
+    
+    result
   }, error=function(err){
+    message(err)
     warning(err)
-    return(NULL)})
+    return(NULL)}
+  )
 }
+
 
 noaa.get_folder <- function(){
   dir_noaa <- Sys.getenv("DIR_NOAA_ISD")
@@ -141,7 +150,9 @@ noaa.get_folder <- function(){
   dir_noaa
 }
 
+
 noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020)){
+  
   print("Adding weather from NOAA")
   cache_folder <- noaa.get_folder()
   
@@ -153,8 +164,17 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
   
-  stations_weather$weather <- pbapply::pblapply(stations_weather$code, noaa.get_noaa_at_code,
-           years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)
+  stations_weather$weather <- tryCatch({
+    pbapply::pblapply(stations_weather$code, noaa.get_noaa_at_code,
+                      years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)  
+  }, error=function(err){
+    print("DEBUG: ERROR IN PBLAPPLY")
+    message(err)
+    warning(err)
+    print(err)
+    return(NA)
+  })
+  
 
   to_date <- function(d){
     tryCatch({
@@ -166,6 +186,7 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
   }
   
   if(nrow(stations_weather %>% rowwise() %>% filter(!is.null(weather)))==0){
+    print("Failed to find weather data")
     stop("Failed to find weather data")
   }
   meas_w_stations <- meas_w_stations %>%
@@ -197,7 +218,8 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
                    RH_max=max(RH, na.rm=T)
                  )
             )
-        )
+        ),
+      by="station_id"
       )
   print("Done [Adding weather from NOAA]")
   return(meas_w_stations)
