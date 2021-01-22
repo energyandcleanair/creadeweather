@@ -32,6 +32,7 @@ deweather <- function(
  years_force_refresh=NULL,
  training_start_anomaly="2016-12-01",
  training_end_anomaly="2019-11-30",
+ lag=1,
  fire_mode=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
  add_pbl=T #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  ){
@@ -132,7 +133,6 @@ deweather <- function(
   samples <- 100
   interaction.depth <- c(2)
   learning.rate <- c(0.01)
-  lag <- 1
   engine <- "gbm"
   link <- "log"
   
