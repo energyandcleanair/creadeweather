@@ -285,7 +285,8 @@ cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
     dplyr::filter(!is.null(weather)) %>%
     dplyr::mutate(weather_station_id=station_id,
                   weather=list(weather %>% left_join(
-                    pbl_values %>% dplyr::filter(station_id==weather_station_id)
+                    pbl_values %>% dplyr::filter(station_id==weather_station_id) %>%
+                      select(-c(station_id))
     ))) %>% dplyr::select(-c(weather_station_id))
   
   return(joined)
