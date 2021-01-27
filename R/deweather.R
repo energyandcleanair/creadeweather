@@ -466,7 +466,8 @@ deweather <- function(
                                                                             "_",aggregate_level,
                                                                             ifelse(!is.null(location_type), paste0("_",location_type), ""),
                                                                             "_",process_id_to_filter_type(process_id, prcs),
-                                                                            ifelse(add_pbl, "_pbl", ""))))
+                                                                            ifelse(add_pbl, "_pbl", ""),
+                                                                            ifelse(add_fire, "_fire", ""))))
     
     if(add_gadm1){
       results_gadm1_uploaded <- results_gadm1 %>%

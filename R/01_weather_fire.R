@@ -172,21 +172,29 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   files_archive <- list.files(d,"fire_.*.csv", full.names = T)
   files <- c(files_nrt, files_archive)
   
-  f_to_date <- function(f){
-    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f),
-               format="%Y%j")
+  f_min_date <- function(f, date_from, date_to){
+    ifelse(
+      stringr::str_detect(f, "[0-9]{7}"),
+      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j"),
+      as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
+    )
   }
   
+  f_max_date <- function(f, date_from, date_to){
+    ifelse(
+      stringr::str_detect(f, "[0-9]{7}"),
+      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j"),
+      as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
+    )
+  }
   
-  if(!is.null(date_from)){
-    files <- files[f_to_date(files) >= as.POSIXct(date_from)]
-  }
-  if(!is.null(date_to)){
-    files <- files[f_to_date(files) <= as.POSIXct(date_to)]
-  }
+  files <- files[is.null(date_from) | (f_max_date(files) >= as.POSIXct(date_from))]
+  files <- files[is.null(date_to) | (f_min_date(files) <= as.POSIXct(date_to))]
   
   read.csv.fire <-function(f){
     tryCatch({
+      # One file: 1.7 sec
+      # 10 files: ~20sec
       read.csv(f, stringsAsFactors = F) %>%
         mutate_at(c("satellite","version","acq_time","acq_date","daynight","confidence"), as.character) %>%
         mutate(file=f,
@@ -203,7 +211,10 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
     })
   }
   
-  fires <- do.call("bind_rows",pbapply::pblapply(files[!is.na(files)], read.csv.fire))
+  fires <- do.call("bind_rows",
+                   pbmcapply::pbmclapply(files[!is.na(files)],
+                                         read.csv.fire,
+                                         mc.cores = parallel::detectCores()-1))
   fires
 }
 
