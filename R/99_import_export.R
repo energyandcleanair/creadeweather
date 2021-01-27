@@ -5,6 +5,11 @@
 #'     pull tibble as_tibble rowwise any_vars all_vars vars collect
 NULL
 
+#' Pseudo-function to import \strong{tibble}'s common functions. 
+#'
+#' @importFrom tibble tibble
+NULL
+
 
 #' Pseudo-function to import and reexport \strong{magrittr}'s pipe. 
 #'

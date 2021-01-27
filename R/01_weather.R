@@ -19,7 +19,7 @@ collect_weather <- function(meas,
                             years_force_refresh=NULL,
                             add_pbl=T,
                             add_sunshine=T,
-                            add_frp=F, #Fire radiative potential (will compute trajectories)
+                            add_fire=F,
                             filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -48,7 +48,6 @@ collect_weather <- function(meas,
   if(add_pbl){
     print("Getting Planet Boundary Layer")
     weather <- cfs.add_pbl(weather, years)  
-    #weather <- ncar.add_pbl(weather, years)  
   }
   
   # Add sunshine
@@ -58,7 +57,7 @@ collect_weather <- function(meas,
   }
   
   # Add fire radiative power
-  if(add_frp){
+  if(add_fire){
     print("Getting Fire Radiative Power (will compute trajectories if required)")
     weather <- frp.add_frp(weather)  
   }

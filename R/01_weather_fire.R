@@ -1,5 +1,258 @@
+# Attaching fire information
+# 2 x 2  options
+# Using active fires points vs fire radiative power raster
+# Using a buffer around geometry vs a buffer around trajectories (more time consuming)
 
-frp.cache.filename <- function(location_id, country, met_type, height, duration_hour, date){
+
+#' Add fire related information to weather data
+#'
+#' @param weather the dataframe to add fire information to
+#' @param activefire_or_raster should we use FIRMS active fire data or M*D14A1 maximum frp. "activefire" or "raster"
+#' @param mode should we consider a simple buffer around geometry, a wind oriented buffer, or calculate trajectories.
+#' attach_mode can be "circular", "oriented" or "trajectory" (oriented not working yet)
+#' @param buffer_km buffer around geometry or trajectories. Default 200km for `circular` and `oriented`, 20km for `trajectory`
+#' @param met_type met_type used for hysplit (if mode=="trajectory")
+#' @param height height used for hysplit (if mode=="trajectory")
+#' @param duration_hour duration in hours used for hysplit (if mode=="trajectory")
+
+#'
+#' @return
+#' @export
+#'
+#' @examples
+frp.add_frp <- function(weather,
+                        activefire_or_raster="activefire",
+                        mode="circular",
+                        met_type="reanalysis",
+                        height=500, 
+                        duration_hour=72,
+                        buffer_km=switch(mode,"circular"=200, "oriented"=200, "trajectory"=20)){
+  
+  
+  # Get trajectories - One row per day
+  cols <- setdiff(c(names(weather), "date", "wd_copy"),"weather")
+  w <- tibble(weather) %>%
+    tidyr::unnest(weather) %>%
+    mutate("wd_copy"=wd) %>% # We keep wd_copy in case mode = oriented
+    tidyr::nest(meas=!cols)
+  
+  
+  if(mode=="trajectory"){
+    wt <- w %>%
+      rename(location_id=station_id) %>%
+      mutate(trajs=purrr::pmap(., frp.trajs_at_date, met_type=met_type, height=height, duration_hour=duration_hour)) %>%
+      mutate(extent=purrr::map(trajs, frp.traj_extent, buffer_km=buffer_km))  
+  }else if(mode=="oriented"){
+    wt <- w %>%
+      rename(location_id=station_id) %>%
+      mutate(extent=frp.oriented_extent(geometry,buffer_km=buffer_km, wd=wd_copy))
+  }else if(mode=="circular"){
+    wt <- w %>%
+      distinct(station_id, geometry) %>%
+      mutate(extent=frp.circular_extent(geometry,buffer_km=buffer_km)) %>%
+      left_join(w)
+  }
+  
+  if(activefire_or_raster=="activefire"){
+    # Download active fires
+    frp.active.download(date_from=min(w$date),
+                        date_to=max(w$date))
+    
+    
+    # Add
+    wtf <- frp.active.attach(wt)
+    
+    # Adding frp to weather data
+    result <- weather %>%
+      left_join(wtf %>%
+                  tidyr::nest(frp=-c(station_id))) %>%
+      rowwise() %>%
+      mutate(weather=list(weather %>% left_join(frp))) %>%
+      select(-c(frp))
+    
+    return(result)
+    
+    
+  }else if(activefire_or_raster=="raster"){
+  
+    # We're building one geotiff file per date per region
+    # MODIS::MODISoptions(
+    #   localArcPath=Sys.getenv("DIR_MODIS"),
+    #   outDirPath=file.path(Sys.getenv("DIR_MODIS"),"processed"),
+    #   dlmethod="wget",
+    #   quiet=F)
+    
+    # 
+    # frp.rasters <- wt %>%
+    #   group_by(country, location_id) %>% 
+    #   summarise(extent=frp.union_extents(trajs_extent),
+    #             date_from=min(date)-lubridate::hours(duration_hour),
+    #             date_to=max(date)) %>%
+    #   mutate(geotiffs=purrr::pmap(., frp.geotiffs)) %>%
+    #   dplyr::select(country, location_id, geotiffs) %>%
+    #   tidyr::unnest(geotiffs)
+    # 
+    # 
+    # # Calculate mean frp along trajectories
+    # wtf <- wt %>%
+    #   mutate(frp=purrr::pmap_dbl(., frp.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
+    # 
+    # wtfd <- wtf %>%
+    #   dplyr::select(country, location_id, date, frp) %>%
+    #   dplyr::group_by(country, location_id) %>%
+    #   tidyr::nest(frp=c(date,frp))
+    # 
+    # # Adding frp to weather data
+    # result <- weather %>%
+    #   left_join(wtfd) %>%
+    #   rowwise() %>%
+    #   mutate(weather=list(weather %>% left_join(frp)))
+    return(weather)
+  }
+}
+
+
+# Using Active Fires points (FIRMS)
+frp.active.get_firms_folder <- function(){
+  suppressWarnings(readRenviron(".Renviron"))
+  suppressWarnings(readRenviron(".env"))
+  
+  d <- Sys.getenv("DIR_FIRMS")
+  if(d==""){
+    stop("DIR_FIRMS environment variable not defined")
+  }
+  return(d)
+}
+
+frp.active.get_firms_subfolder <- function(region="Global"){
+  d <- frp.active.get_firms_folder()
+  return(file.path(d, "suomi-npp-viirs-c2", region))
+}
+
+frp.active.download <- function(date_from=NULL, date_to=NULL, region="Global"){
+  d <- file.path(frp.active.get_firms_folder(),
+                 "suomi-npp-viirs-c2",
+                 "Global")
+  dir.create(d, showWarnings = F, recursive = T)
+  
+  date_from <- max(lubridate::date(date_from), lubridate::date("2020-01-01"))
+  # Data not available in repository before that
+  # Have been downloaded manually prior 2020
+  # https://firms.modaps.eosdis.nasa.gov/download/
+  
+  files.all <- paste0("SUOMI_VIIRS_C2_",
+                       region,
+                       "_VNP14IMGTDL_NRT_",
+                       as.POSIXct(seq(lubridate::date(date_from),
+                                      lubridate::date(date_to),
+                                      by="day")) %>% strftime("%Y%j"),
+                       ".txt")
+  
+  # Even though wget can manage already downloaded files,
+  # this is faster and less verbose in console
+  files.existing <- list.files(d, "*.txt")
+  file.todownload <- setdiff(files.all, files.existing)
+  
+  modis_key <- Sys.getenv("MODIS_KEY")
+  for(f in file.todownload){
+    cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
+                  modis_key,
+                  "\" -P ",
+                  d)
+    system(cmd)
+  }
+}
+
+
+frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", extent=NULL){
+  
+  d <- frp.active.get_firms_subfolder(region=region)
+  
+  files_nrt <- list.files(d,paste0("SUOMI_VIIRS_C2_",region,"_VNP14IMGTDL_NRT_(\\d*).txt"), full.names = T) #TODO Further filtering
+  files_archive <- list.files(d,"fire_.*.csv", full.names = T)
+  files <- c(files_nrt, files_archive)
+  
+  f_to_date <- function(f){
+    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f),
+               format="%Y%j")
+  }
+  
+  
+  if(!is.null(date_from)){
+    files <- files[f_to_date(files) >= as.POSIXct(date_from)]
+  }
+  if(!is.null(date_to)){
+    files <- files[f_to_date(files) <= as.POSIXct(date_to)]
+  }
+  
+  read.csv.fire <-function(f){
+    tryCatch({
+      read.csv(f, stringsAsFactors = F) %>%
+        mutate_at(c("satellite","version","acq_time","acq_date","daynight","confidence"), as.character) %>%
+        mutate(file=f,
+               date=lubridate::date(acq_date)) %>%
+        sf::st_as_sf(coords=c("longitude","latitude")) %>%
+        sf::st_set_crs(4326) %>%
+        dplyr::filter(!is.na(acq_date)) %>%
+        dplyr::filter(is.null(extent) | sf::st_intersects(geometry, extent, sparse = FALSE))
+        
+    }, error=function(c){
+      warning(paste("Failed reading file", f))
+      message(c)
+      return(NULL)
+    })
+  }
+  
+  fires <- do.call("bind_rows",pbapply::pblapply(files[!is.na(files)], read.csv.fire))
+  fires
+}
+
+
+frp.active.attach <- function(wt, duration_hour=72){
+  
+  f.sf <- frp.active.read(date_from=min(wt$date),
+                       date_to=max(wt$date),
+                       extent=do.call(sf::st_union,unique(wt$extent)))
+  
+  if(nrow(f.sf)==0){
+    return(wt %>% mutate(fires=NULL))
+  }
+  
+  
+  regions <- wt %>% distinct(station_id, extent)
+  
+  
+  # We summarize before joining, less flexible but faster
+  f.regions <- regions %>% sf::st_as_sf() %>%
+    sf::st_join(f.sf, join=sf::st_contains) %>%
+    tibble() %>%
+    group_by(station_id, date.fire=date) %>%
+    summarise(frp=sum(frp, na.rm=T),
+              fire_count=dplyr::n())
+  
+  wt$date_from <- wt$date - lubridate::hours(x=duration_hour)
+  
+  wtf <- wt %>% fuzzyjoin::fuzzy_left_join(
+    f.regions,
+    by = c(
+      "station_id" = "station_id",
+      "date_from" = "date.fire",
+      "date" = "date.fire"
+    ),
+    match_fun = list(`==`, `<`, `>=`)
+  ) %>%
+    rename(station_id=station_id.x) %>%
+    dplyr::select(-c(station_id.y)) %>%
+    group_by(station_id, date) %>%
+    summarise(fire_frp=sum(frp, na.rm=T),
+              fire_count=sum(fire_count, na.rm=T))
+  
+  return(wtf)
+}
+
+
+# Using Raster ------------------------------------------------------------
+frp.trajs.cache_filename <- function(location_id, country, met_type, height, duration_hour, date){
   paste(tolower(country),
         tolower(location_id),
         gsub("\\.","",tolower(met_type)),
@@ -81,7 +334,67 @@ frp.traj_extent <- function(traj, buffer_km){
       sf::st_transform(crs=3857) %>%
       sf::st_buffer(buffer_km*1000) %>%
       sf::st_bbox() %>%
-      sf::st_as_sfc()  
+      sf::st_as_sfc() %>%
+      sf::st_transform(crs=4326)
+  }, error=function(c){
+    return(NA)
+  })
+}
+
+frp.circular_extent <- function(geometry, buffer_km){
+  tryCatch({
+    sf::st_sfc(geometry, crs=4326) %>%
+      sf::st_transform(crs=3857) %>%
+      sf::st_buffer(buffer_km*1000) %>%
+      sf::st_transform(crs=4326)
+      # sf::st_bbox() %>%
+      # sf::st_as_sfc()  
+  }, error=function(c){
+    return(NA)
+  })
+}
+
+#' Title
+#'
+#' @param geometry 
+#' @param buffer_km 
+#' @param wd The angle, measured in a clockwise direction, between true north and the direction from which
+#' the wind is blowing (wd from ISD). Calm winds if wd==0
+#'
+#' @return
+#' @export
+#'
+#' @examples
+frp.oriented_extent <- function(geometry, buffer_km, wd){
+  
+  st_wedge <- function(x, y, r, wd, width_deg=90, buffer_km, n=20){
+    if(wd==0){
+      # Calm winds. We do a full circle, but reduce its buffer
+      # so that area covered is the same
+      n=n*360/width_deg
+      buffer_km = buffer_km * sqrt(width_deg/360)
+      width_deg=360
+    }
+    
+    theta = seq(wd+180-width_deg/2, wd+180+width_deg/2, length=n) * pi/180  
+    xarc = x + buffer_km*1000*sin(theta)
+    yarc = y + buffer_km*1000*cos(theta)
+    xc = c(x, xarc, x)
+    yc = c(y, yarc, y)
+    sf::st_polygon(list(cbind(xc,yc)))
+  }
+  
+  tryCatch({
+    sf::st_sfc(geometry, crs=4326) %>%
+      sf::st_transform(crs=3857) %>%
+      st_wedge(x=sf::st_coordinates(.)[1],
+               y=sf::st_coordinates(.)[2],
+               wd=wd,
+               buffer_km=buffer_km 
+               ) %>%
+      sf::st_sfc() %>%
+      sf::st_set_crs(3857) %>%
+      sf::st_transform(crs=4326)
   }, error=function(c){
     return(NA)
   })
@@ -140,16 +453,10 @@ frp.frp_at_traj <- function(trajs, country, location_id, ..., frp.rasters, buffe
   })
   
 }
-# 
-# frp.geotiffs.old <- function(date_from, date_to, extent, ...){
-#   extent.sf <- sf::st_as_sf(sf::st_sfc(extent), crs=3857)
-#   begin=format(date_from,"%Y%j")
-#   end=format(date_to,"%Y%j")
-#   rasters <- MODIS::runGdal(job="MOD14A1.day", product="MOD14A1", extent=extent.sf,
-#                             begin=begin, end=end, SDSstring="0010",
-#                             forceDownload=F)[[1]]
-#   frp.utils.date_rasters(rasters)
-# }
+
+
+
+
 
 frp.geotiffs <- function(date_from, date_to, extent, ...){
   
@@ -195,50 +502,4 @@ frp.geotiffs <- function(date_from, date_to, extent, ...){
   frp.utils.date_rasters(rasters)
 }
 
-frp.add_frp <- function(weather, met_type="reanalysis", height=500, duration_hour=72, buffer_km=20){
-  
 
-  # Get trajectories - One row per day
-  cols <- setdiff(c(names(weather), "date"),"weather")
-  w <- tibble(weather) %>%
-    tidyr::unnest(weather) %>%
-    tidyr::nest(meas=!cols)
-  
-  wt <- w %>%
-    rename(location_id=station_id) %>%
-    mutate(trajs=purrr::pmap(., frp.trajs_at_date, met_type=met_type, height=height, duration_hour=duration_hour)) %>%
-    mutate(trajs_extent=purrr::map(trajs, frp.traj_extent, buffer_km=buffer_km))
-  
-  # We're building one geotiff file per date per region
-  # MODIS::MODISoptions(
-  #   localArcPath=Sys.getenv("DIR_MODIS"),
-  #   outDirPath=file.path(Sys.getenv("DIR_MODIS"),"processed"),
-  #   dlmethod="wget",
-  #   quiet=F)
-  
-  frp.rasters <- wt %>%
-    group_by(country, location_id) %>% 
-    summarise(extent=frp.union_extents(trajs_extent),
-              date_from=min(date)-lubridate::hours(duration_hour),
-              date_to=max(date)) %>%
-    mutate(geotiffs=purrr::pmap(., frp.geotiffs)) %>%
-    dplyr::select(country, location_id, geotiffs) %>%
-    tidyr::unnest(geotiffs)
-  
-  # Calculate mean frp along trajectories
-  wtf <- wt %>%
-    mutate(frp=purrr::pmap_dbl(., frp.frp_at_traj, frp.rasters=frp.rasters, buffer_km=buffer_km))
-  
-  wtfd <- wtf %>%
-    dplyr::select(country, location_id, date, frp) %>%
-    dplyr::group_by(country, location_id) %>%
-    tidyr::nest(frp=c(date,frp))
-  
-  # Adding frp to weather data
-  result <- weather %>%
-    left_join(wtfd) %>%
-    rowwise() %>%
-    mutate(weather=list(weather %>% left_join(frp)))
-  
-  return(result)
-}

@@ -30,10 +30,11 @@ deweather <- function(
  add_gadm1=F,
  add_gadm2=F,
  years_force_refresh=NULL,
+ training_start_trend="2015-01-01",
  training_start_anomaly="2016-12-01",
  training_end_anomaly="2019-11-30",
  lag=1,
- fire_mode=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
+ add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
  add_pbl=T #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  ){
   
@@ -43,9 +44,6 @@ deweather <- function(
   #----------------------
   # 0. Set parameters
   #----------------------
-  # training_start <- "2016-12-01"
-  # training_end_anomaly <- "2019-11-30"
-  training_start_trend <- "2015-01-01"
   training_end_trend <- "2099-01-01"
   
   time_vars_output <- tibble(
@@ -113,7 +111,7 @@ deweather <- function(
                                   years_force_refresh=years_force_refresh,
                                   add_pbl=add_pbl,
                                   add_sunshine=F,
-                                  add_frp=fire_mode,
+                                  add_fire=add_fire,
                                   n_per_station=4
   )
 
@@ -142,8 +140,8 @@ deweather <- function(
     weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
   }
   
-  if(fire_mode){
-    weather_vars <- c(weather_vars, "frp")
+  if(add_fire){
+    weather_vars <- c(weather_vars, "fire_frp")
   }
   
   weather_vars <- c(list(weather_vars))
