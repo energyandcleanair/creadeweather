@@ -211,10 +211,11 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
       d <- data.table::fread(f,
                              stringsAsFactors = F,
                              colClasses = c("acq_time"="character",
-                                            "version"="character"))
+                                            "version"="character"))[,c("latitude","longitude","acq_date","frp")]
       d.coords <- cbind(d$longitude, d$latitude)
-      df <- sp::SpatialPointsDataFrame(d.coords, d, proj4string=sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+      df <- sp::SpatialPointsDataFrame(d.coords, d, proj4string=sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))[c("acq_date","frp")]
       sp::proj4string(extent.sp) <- sp::proj4string(df)
+  
       df[!is.na(sp::over(df, extent.sp)),] %>%
         sf::st_as_sf() # To allow bind_rows (vs rbind)
     }, error=function(c){
@@ -237,12 +238,14 @@ frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
   
   
   extent.sp <- sf::as_Spatial(wt$extent[!sf::st_is_empty(wt$extent)])
+  extent.sp.union <- rgeos::gUnaryUnion(extent.sp)
 
-  # Read and only keep fires within extent
+  # Read and only keep fires within extent to save memory
   print("Reading fire files")
   f.sf <- frp.active.read(date_from=min(wt$date),
                           date_to=max(wt$date),
-                          extent.sp=extent.sp)
+                          extent.sp=extent.sp.union)
+  print("Done")
   
   if(nrow(f.sf)==0){
     return(wt %>% mutate(fires=NULL))
