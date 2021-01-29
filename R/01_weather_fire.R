@@ -30,10 +30,11 @@ frp.add_frp <- function(weather,
   
   
   # Get trajectories - One row per day
-  cols <- setdiff(c(names(weather), "date", "wd_copy"),"weather")
+  cols <- setdiff(c(names(weather), "date", "wd_copy", "ws_copy"),"weather")
   w <- tibble(weather) %>%
     tidyr::unnest(weather) %>%
-    mutate("wd_copy"=wd) %>% # We keep wd_copy in case mode = oriented
+    # We keep wind information in case mode=='oriented'
+    mutate(wd_copy=wd,ws_copy=ws) %>%
     tidyr::nest(meas=!cols)
   
   
@@ -49,7 +50,10 @@ frp.add_frp <- function(weather,
     print("Calculating extents")
     wt <- w %>%
       rowwise() %>%
-      mutate(extent=frp.oriented_extent(geometry,buffer_km=buffer_km, wd=wd_copy))
+      mutate(extent=frp.oriented_extent(geometry,
+                                        duration_hour=duration_hour,
+                                        ws=ws_copy,
+                                        wd=wd_copy))
     one_extent_per_date <- T
   }else if(mode=="circular"){
     wt <- w %>%
@@ -77,7 +81,7 @@ frp.add_frp <- function(weather,
                   tidyr::nest(frp=-c(station_id))) %>%
       rowwise() %>%
       mutate(weather=list(weather %>% left_join(frp))) %>%
-      select(-c(frp))
+      dplyr::select(-c(frp))
     
     return(result)
     
@@ -221,7 +225,7 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   }
   
   fires <- do.call("bind_rows",
-                   pbmcapply::pbmclapply(files[!is.na(files)],
+                   pbmcapply::pbmclapply(sort(files[!is.na(files)]), # Sort to read fire_global* first
                                          read.csv.fire,
                                          mc.cores = parallel::detectCores()-1))
   fires
@@ -414,7 +418,9 @@ frp.circular_extent <- function(geometry, buffer_km){
   })
 }
 
-#' Title
+#' Generate a "pie slice" of with a certain angle, coming
+#' from wind direction. Using wind_speed * duration to determine
+#' radius of the pie slice.
 #'
 #' @param geometry 
 #' @param buffer_km 
@@ -425,32 +431,42 @@ frp.circular_extent <- function(geometry, buffer_km){
 #' @export
 #'
 #' @examples
-frp.oriented_extent <- function(geometry, buffer_km, wd){
+frp.oriented_extent <- function(geometry, duration_hour, ws, wd, width_deg=90,
+                                default_buffer_km=200){
   
-  st_wedge <- function(x, y, r, wd, width_deg=90, buffer_km, n=20){
+  st_wedge <- function(x, y, r, wd, width_deg, distance_km, n=20){
     if(wd==0){
       # Calm winds. We do a full circle, but reduce its buffer
       # so that area covered is the same
       n=n*360/width_deg
-      buffer_km = buffer_km * sqrt(width_deg/360)
+      distance_km = distance_km * sqrt(width_deg/360)
       width_deg=360
     }
     
     theta = seq(wd+180-width_deg/2, wd+180+width_deg/2, length=n) * pi/180  
-    xarc = x + buffer_km*1000*sin(theta)
-    yarc = y + buffer_km*1000*cos(theta)
+    xarc = x + distance_km*1000*sin(theta)
+    yarc = y + distance_km*1000*cos(theta)
     xc = c(x, xarc, x)
     yc = c(y, yarc, y)
     sf::st_polygon(list(cbind(xc,yc)))
   }
   
   tryCatch({
+    # ws in m per second * 10
+    distance_km <- ws * 3600/1000 * duration_hour / 10
+    if(is.na(distance_km)){
+      # Probably missing wind speed
+      distance_km <- default_buffer_km
+    }
+    
     sf::st_sfc(geometry, crs=4326) %>%
       sf::st_transform(crs=3857) %>%
       st_wedge(x=sf::st_coordinates(.)[1],
                y=sf::st_coordinates(.)[2],
                wd=wd,
-               buffer_km=buffer_km 
+               # ws is in meters per second * 10)
+               distance_km = distance_km,
+               width_deg=width_deg
       ) %>%
       sf::st_sfc() %>%
       sf::st_set_crs(3857) %>%
