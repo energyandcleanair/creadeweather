@@ -76,7 +76,8 @@ frp.add_frp <- function(weather,
                   dplyr::select(station_id, date, fire_frp, fire_count) %>%
                   tidyr::nest(frp=-c(station_id))) %>%
       rowwise() %>%
-      mutate(weather=list(weather %>% left_join(frp)))
+      mutate(weather=list(weather %>% left_join(frp))) %>%
+      select(-c(frp))
     
     return(result)
     

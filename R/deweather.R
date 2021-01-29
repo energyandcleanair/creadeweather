@@ -35,6 +35,7 @@ deweather <- function(
  training_end_anomaly="2019-11-30",
  lag=1,
  add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
+ fire_mode="circular",
  add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
  save_weather_filename=NULL
  ){
@@ -113,6 +114,7 @@ deweather <- function(
                                   add_pbl=add_pbl,
                                   add_sunshine=F,
                                   add_fire=add_fire,
+                                  fire_mode=fire_mode,
                                   n_per_station=4
   )
 

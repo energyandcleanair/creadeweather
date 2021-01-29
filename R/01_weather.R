@@ -20,6 +20,7 @@ collect_weather <- function(meas,
                             add_pbl=T,
                             add_sunshine=T,
                             add_fire=F,
+                            fire_mode="oriented",
                             filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -62,7 +63,7 @@ collect_weather <- function(meas,
   # Add fire radiative power
   if(add_fire){
     print("Getting Fire Radiative Power (will compute trajectories if required)")
-    weather <- frp.add_frp(weather)  
+    weather <- frp.add_frp(weather, mode=fire_mode)  
   }
   
   # Join weather with measurements
