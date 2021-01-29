@@ -30,11 +30,7 @@ cfs.processed_dates <- function(){
   return(dates)
 }
  
-cfs.processable_dates <- function(years){
-  l <- lapply(years,
-         function(y){seq(min(lubridate::today() - lubridate::days(1),lubridate::date(paste0(y,"-01-01"))),
-                         min(lubridate::today() - lubridate::days(2), lubridate::date(paste0(y,"-12-31"))),
-                         by="d")})
+cfs.processable_dates <- function(dates){
 
   unavailable <- lubridate::date(
     c(
@@ -58,10 +54,7 @@ cfs.processable_dates <- function(years){
       "2020-02-28"
       ))
 
-  tibble::tibble(l) %>%
-    tidyr::unnest(l) %>%
-    filter(!l %in% unavailable) %>%
-    dplyr::pull()
+  dates[!dates %in% unavailable]
 }
  
 
@@ -158,10 +151,10 @@ cfs.timezone_sf <- function(){
   sf::read_sf(fp)
 }
 
-cfs.refresh_files <- function(years){
+cfs.refresh_files <- function(dates){
 
   processed <- cfs.processed_dates()
-  processable <- cfs.processable_dates(years)
+  processable <- cfs.processable_dates(dates)
   to_process <-  processable[!processable %in% processed]
 
   cache_rs=NULL
@@ -220,9 +213,15 @@ cfs.date_to_filepaths <- function(d, dir_pbl, vars=c("pbl_min","pbl_max","pbl_me
             paste0(gsub("-","",d),gsub("pbl","",vars),".nc")))
 }
 
-cfs.add_pbl <- function(weather, years, vars=c("pbl_min","pbl_max")){
+cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
   
-  cfs.refresh_files(years)
+  dates <- weather %>%
+    as.data.frame() %>%
+    tidyr::unnest(weather) %>%
+    distinct(date) %>%
+    pull()
+  
+  cfs.refresh_files(dates)
   
   stations_sf <- st_as_sf(weather %>% ungroup() %>%
                             dplyr::select(station_id, geometry) %>%

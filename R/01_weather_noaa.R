@@ -54,11 +54,12 @@ noaa.valid_years_cached <- function(code, years, cache_folder){
 }
 
 
-noaa.get_noaa_at_code <- function(code, years, years_force_refresh=NULL, cache_folder){
+noaa.get_noaa_at_code <- function(code, year_from, year_to, years_force_refresh=NULL, cache_folder){
   
   # Get NOAA data, first trying to use cached files for complete years
   tryCatch({
     # Reading cache files
+    years <- seq(year_from, year_to)
     years_available <- noaa.available_years(code)
     years <- intersect(years, years_available)
     years_try_cache <- setdiff(years, years_force_refresh)
@@ -148,7 +149,7 @@ noaa.get_folder <- function(){
 }
 
 
-noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_refresh=c(2020)){
+noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   
   print("Adding weather from NOAA")
   cache_folder <- noaa.get_folder()
@@ -156,14 +157,19 @@ noaa.add_weather <- function(meas_w_stations, years=c(2015:2020), years_force_re
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
-    dplyr::distinct(station_id, usaf, wban)
+    dplyr::distinct(station_id, usaf, wban, year_from, year_to)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
   
   stations_weather$weather <- tryCatch({
-    pbapply::pblapply(stations_weather$code, noaa.get_noaa_at_code,
-                      years=years, years_force_refresh=years_force_refresh, cache_folder=cache_folder)  
+    pbapply::pbmapply(noaa.get_noaa_at_code,
+                      code=stations_weather$code,
+                      year_from=stations_weather$year_from,
+                      year_to=stations_weather$year_to,
+                      years_force_refresh=list(years_force_refresh),
+                      cache_folder=cache_folder,
+                      SIMPLIFY=F)  
   }, error=function(err){
     warning(err)
     return(NA)

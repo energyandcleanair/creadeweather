@@ -30,8 +30,11 @@ collect_weather <- function(meas,
 
   # Find unique AQ stations
   stations <- meas %>%
-    dplyr::ungroup() %>%
-    dplyr::select(country, station_id, geometry, timezone) %>%
+    dplyr::rowwise() %>%
+    dplyr::filter(nrow(meas)>0) %>%
+    dplyr::mutate(year_from=lubridate::year(min(meas$date, na.rm=T)),
+                  year_to=lubridate::year(max(meas$date, na.rm=T))) %>%
+    dplyr::select(country, station_id, geometry, timezone, year_from, year_to) %>%
     dplyr::distinct(country, station_id, timezone, .keep_all = T)
 
   # Find weather stations nearby
@@ -39,7 +42,7 @@ collect_weather <- function(meas,
     noaa.add_close_stations(stations, n_per_station = n_per_station))
 
   # Get weather at these stations
-  weather <- noaa.add_weather(stations_w_noaa, years=years,
+  weather <- noaa.add_weather(stations_w_noaa,
                                      years_force_refresh = years_force_refresh) %>%
     dplyr::ungroup() %>%
     dplyr::filter(!is.null(weather))
@@ -47,7 +50,7 @@ collect_weather <- function(meas,
   # Add Planet Boundary Layer from NCAR
   if(add_pbl){
     print("Getting Planet Boundary Layer")
-    weather <- cfs.add_pbl(weather, years)  
+    weather <- cfs.add_pbl(weather)  
   }
   
   # Add sunshine

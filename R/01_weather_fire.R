@@ -73,10 +73,10 @@ frp.add_frp <- function(weather,
     # Adding frp to weather data
     result <- weather %>%
       left_join(wtf %>%
+                  dplyr::select(station_id, date, fire_frp, fire_count) %>%
                   tidyr::nest(frp=-c(station_id))) %>%
       rowwise() %>%
-      mutate(weather=list(weather %>% left_join(frp))) %>%
-      select(-c(frp))
+      mutate(weather=list(weather %>% left_join(frp)))
     
     return(result)
     
@@ -229,9 +229,12 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
 
 frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
   
+  
+  
   extent.sp <- sf::as_Spatial(wt$extent[!sf::st_is_empty(wt$extent)])
 
   # Read and only keep fires within extent
+  print("Reading fire files")
   f.sf <- frp.active.read(date_from=min(wt$date),
                           date_to=max(wt$date),
                           extent.sp=extent.sp)
