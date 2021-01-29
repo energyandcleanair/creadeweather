@@ -22,7 +22,7 @@
 #' @examples
 frp.add_frp <- function(weather,
                         activefire_or_raster="activefire",
-                        mode="circular",
+                        mode="oriented",
                         met_type="reanalysis",
                         height=500, 
                         duration_hour=72,
@@ -38,19 +38,25 @@ frp.add_frp <- function(weather,
   
   
   if(mode=="trajectory"){
+    print("Calculating tras")
     wt <- w %>%
       rename(location_id=station_id) %>%
       mutate(trajs=purrr::pmap(., frp.trajs_at_date, met_type=met_type, height=height, duration_hour=duration_hour)) %>%
       mutate(extent=purrr::map(trajs, frp.traj_extent, buffer_km=buffer_km))  
+    one_extent_per_date <- T
   }else if(mode=="oriented"){
+    #TODO Still quite slow
+    print("Calculating extents")
     wt <- w %>%
-      rename(location_id=station_id) %>%
+      rowwise() %>%
       mutate(extent=frp.oriented_extent(geometry,buffer_km=buffer_km, wd=wd_copy))
+    one_extent_per_date <- T
   }else if(mode=="circular"){
     wt <- w %>%
       distinct(station_id, geometry) %>%
       mutate(extent=frp.circular_extent(geometry,buffer_km=buffer_km)) %>%
       left_join(w)
+    one_extent_per_date <- F
   }
   
   if(activefire_or_raster=="activefire"){
@@ -60,7 +66,9 @@ frp.add_frp <- function(weather,
     
     
     # Add
-    wtf <- frp.active.attach(wt)
+    wtf <- frp.active.attach(wt,
+                             one_extent_per_date=one_extent_per_date,
+                             duration_hour=duration_hour)
     
     # Adding frp to weather data
     result <- weather %>%
@@ -74,7 +82,7 @@ frp.add_frp <- function(weather,
     
     
   }else if(activefire_or_raster=="raster"){
-  
+    
     # We're building one geotiff file per date per region
     # MODIS::MODISoptions(
     #   localArcPath=Sys.getenv("DIR_MODIS"),
@@ -141,12 +149,12 @@ frp.active.download <- function(date_from=NULL, date_to=NULL, region="Global"){
   # https://firms.modaps.eosdis.nasa.gov/download/
   
   files.all <- paste0("SUOMI_VIIRS_C2_",
-                       region,
-                       "_VNP14IMGTDL_NRT_",
-                       as.POSIXct(seq(lubridate::date(date_from),
-                                      lubridate::date(date_to),
-                                      by="day")) %>% strftime("%Y%j"),
-                       ".txt")
+                      region,
+                      "_VNP14IMGTDL_NRT_",
+                      as.POSIXct(seq(lubridate::date(date_from),
+                                     lubridate::date(date_to),
+                                     by="day")) %>% strftime("%Y%j"),
+                      ".txt")
   
   # Even though wget can manage already downloaded files,
   # this is faster and less verbose in console
@@ -164,7 +172,7 @@ frp.active.download <- function(date_from=NULL, date_to=NULL, region="Global"){
 }
 
 
-frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", extent=NULL){
+frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", extent.sp=NULL){
   
   d <- frp.active.get_firms_subfolder(region=region)
   
@@ -193,17 +201,17 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   
   read.csv.fire <-function(f){
     tryCatch({
-      # One file: 1.7 sec
-      # 10 files: ~20sec
-      read.csv(f, stringsAsFactors = F) %>%
-        mutate_at(c("satellite","version","acq_time","acq_date","daynight","confidence"), as.character) %>%
-        mutate(file=f,
-               date=lubridate::date(acq_date)) %>%
-        sf::st_as_sf(coords=c("longitude","latitude")) %>%
-        sf::st_set_crs(4326) %>%
-        dplyr::filter(!is.na(acq_date)) %>%
-        dplyr::filter(is.null(extent) | sf::st_intersects(geometry, extent, sparse = FALSE))
-        
+      # sp::over so much faster than sf (~5x)
+      # fread vs read.csv also saves a lot of time
+      d <- data.table::fread(f,
+                             stringsAsFactors = F,
+                             colClasses = c("acq_time"="character",
+                                            "version"="character"))
+      d.coords <- cbind(d$longitude, d$latitude)
+      df <- sp::SpatialPointsDataFrame(d.coords, d, proj4string=sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+      sp::proj4string(extent.sp) <- sp::proj4string(df)
+      df[!is.na(sp::over(df, extent.sp)),] %>%
+        sf::st_as_sf() # To allow bind_rows (vs rbind)
     }, error=function(c){
       warning(paste("Failed reading file", f))
       message(c)
@@ -219,44 +227,81 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
 }
 
 
-frp.active.attach <- function(wt, duration_hour=72){
+frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
   
+  extent.sp <- sf::as_Spatial(wt$extent[!sf::st_is_empty(wt$extent)])
+
+  # Read and only keep fires within extent
   f.sf <- frp.active.read(date_from=min(wt$date),
-                       date_to=max(wt$date),
-                       extent=do.call(sf::st_union,unique(wt$extent)))
+                          date_to=max(wt$date),
+                          extent.sp=extent.sp)
   
   if(nrow(f.sf)==0){
     return(wt %>% mutate(fires=NULL))
   }
   
-  
-  regions <- wt %>% distinct(station_id, extent)
-  
-  
-  # We summarize before joining, less flexible but faster
-  f.regions <- regions %>% sf::st_as_sf() %>%
-    sf::st_join(f.sf, join=sf::st_contains) %>%
-    tibble() %>%
-    group_by(station_id, date.fire=date) %>%
-    summarise(frp=sum(frp, na.rm=T),
-              fire_count=dplyr::n())
-  
-  wt$date_from <- wt$date - lubridate::hours(x=duration_hour)
-  
-  wtf <- wt %>% fuzzyjoin::fuzzy_left_join(
-    f.regions,
-    by = c(
-      "station_id" = "station_id",
-      "date_from" = "date.fire",
-      "date" = "date.fire"
-    ),
-    match_fun = list(`==`, `<`, `>=`)
-  ) %>%
-    rename(station_id=station_id.x) %>%
-    dplyr::select(-c(station_id.y)) %>%
-    group_by(station_id, date) %>%
-    summarise(fire_frp=sum(frp, na.rm=T),
-              fire_count=sum(fire_count, na.rm=T))
+  if(one_extent_per_date){
+    # Much slower, but required
+    # We do one summary per row
+    regions <- wt %>% distinct(station_id, date, extent)
+    
+    relevant_fires_summary <- function(date, extent, duration_hour, f.sf){
+      extent.sf <- sf::st_sfc(extent)
+      sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
+      
+      suppressMessages(f.sf %>%
+                         filter(acq_date <= date, acq_date>=lubridate::date(date) - lubridate::hours(duration_hour)) %>%
+                         filter(nrow(.)>0 & sf::st_intersects(., extent.sf, sparse = F)) %>%
+                         as.data.frame() %>%
+                         group_by() %>%
+                         summarise(fire_frp=sum(frp, na.rm=T),
+                                   fire_count=dplyr::n()))
+    }
+    
+    print("Attaching fires to stations and dates")
+    regions$fires <- pbmcapply::pbmcmapply(relevant_fires_summary,
+                                           date=regions$date,
+                                           extent=regions$extent,
+                                           duration_hour=duration_hour,
+                                           f.sf=list(f.sf),
+                                           SIMPLIFY=F,
+                                           mc.cores = parallel::detectCores()-1)
+    
+    
+    wtf <- wt %>% left_join(regions %>%
+                              tidyr::unnest(fires)) %>%
+      select(-c(extent))
+    
+  }else{
+    regions <- wt %>% distinct(station_id, extent)
+    
+    
+    # We summarize before joining, less flexible but faster
+    f.regions <- regions %>% sf::st_as_sf() %>%
+      sf::st_join(f.sf, join=sf::st_contains) %>%
+      tibble() %>%
+      group_by(station_id, date.fire=acq_date) %>%
+      summarise(frp=sum(frp, na.rm=T),
+                fire_count=dplyr::n())
+    
+    wt$date_from <- wt$date - lubridate::hours(x=duration_hour)
+    
+    wtf <- wt %>% fuzzyjoin::fuzzy_left_join(
+      f.regions,
+      by = c(
+        "station_id" = "station_id",
+        "date_from" = "date.fire",
+        "date" = "date.fire"
+      ),
+      match_fun = list(`==`, `<`, `>=`)
+    ) %>%
+      rename(station_id=station_id.x) %>%
+      dplyr::select(-c(station_id.y)) %>%
+      group_by(station_id, date) %>%
+      summarise(fire_frp=sum(frp, na.rm=T),
+                fire_count=sum(fire_count, na.rm=T))
+    
+  }
   
   return(wtf)
 }
@@ -325,7 +370,7 @@ frp.trajs_at_date <- function(date, location_id, geometry, country, met_type, he
     
     if(!file.exists(filepath)){
       trajs <- frp.hysplit.trajs_at_date(date, geometry=geometry, met_type=met_type,
-                                      duration_hour=duration_hour, height=height)
+                                         duration_hour=duration_hour, height=height)
       if(!is.na(trajs)){
         saveRDS(trajs, filepath)
       }
@@ -358,8 +403,8 @@ frp.circular_extent <- function(geometry, buffer_km){
       sf::st_transform(crs=3857) %>%
       sf::st_buffer(buffer_km*1000) %>%
       sf::st_transform(crs=4326)
-      # sf::st_bbox() %>%
-      # sf::st_as_sfc()  
+    # sf::st_bbox() %>%
+    # sf::st_as_sfc()  
   }, error=function(c){
     return(NA)
   })
@@ -402,7 +447,7 @@ frp.oriented_extent <- function(geometry, buffer_km, wd){
                y=sf::st_coordinates(.)[2],
                wd=wd,
                buffer_km=buffer_km 
-               ) %>%
+      ) %>%
       sf::st_sfc() %>%
       sf::st_set_crs(3857) %>%
       sf::st_transform(crs=4326)
@@ -473,44 +518,42 @@ frp.geotiffs <- function(date_from, date_to, extent, ...){
   
   
   r <- MODIStsp::MODIStsp(
-           gui = FALSE,
-           start_date = format(lubridate::date(date_from)-lubridate::days(8), "%Y.%m.%d"), #Files are every 8 days. MODISstp doesn't find any file if inbetween
-           end_date   = format(date_to,"%Y.%m.%d"),
-           out_folder = file.path(Sys.getenv("DIR_MODIS"),"modisstp","processed"),
-           out_folder_mod = file.path(Sys.getenv("DIR_MODIS"),"modisstp"),
-           spatmeth = "tiles",
-           # Tiles for India and Pakistan
-           start_x = 23,
-           end_x = 26,
-           start_y = 5,
-           end_y = 8,
-           selcat = "Land Cover Characteristics - Thermal Anomalies and Fire",
-           selprod = "ThermalAn_Fire_Daily_1Km (M*D14A1)",
-           prod_version = "6",
-           sensor = "Both",
-           bandsel = "MaxFRP",
-           download_server = "http",
-           user = Sys.getenv("EARTHDATA_USR"),
-           password = Sys.getenv("EARTHDATA_PWD"),
-           downloader = "http",
-           download_range = "Full",
-           out_projsel = "Used Defined",
-           output_proj = "3857",
-           out_res_sel = "Native",
-           out_res = NULL,
-           resampling = "max",
-           reprocess = F,
-           delete_hdf = F,
-           nodata_change = F,
-           scale_val = F,
-           out_format = "GTiff",
-           ts_format = "R RasterStack",
-           compress = "LZW",
-           n_retries = 10,
-           verbose = TRUE)
+    gui = FALSE,
+    start_date = format(lubridate::date(date_from)-lubridate::days(8), "%Y.%m.%d"), #Files are every 8 days. MODISstp doesn't find any file if inbetween
+    end_date   = format(date_to,"%Y.%m.%d"),
+    out_folder = file.path(Sys.getenv("DIR_MODIS"),"modisstp","processed"),
+    out_folder_mod = file.path(Sys.getenv("DIR_MODIS"),"modisstp"),
+    spatmeth = "tiles",
+    # Tiles for India and Pakistan
+    start_x = 23,
+    end_x = 26,
+    start_y = 5,
+    end_y = 8,
+    selcat = "Land Cover Characteristics - Thermal Anomalies and Fire",
+    selprod = "ThermalAn_Fire_Daily_1Km (M*D14A1)",
+    prod_version = "6",
+    sensor = "Both",
+    bandsel = "MaxFRP",
+    download_server = "http",
+    user = Sys.getenv("EARTHDATA_USR"),
+    password = Sys.getenv("EARTHDATA_PWD"),
+    downloader = "http",
+    download_range = "Full",
+    out_projsel = "Used Defined",
+    output_proj = "3857",
+    out_res_sel = "Native",
+    out_res = NULL,
+    resampling = "max",
+    reprocess = F,
+    delete_hdf = F,
+    nodata_change = F,
+    scale_val = F,
+    out_format = "GTiff",
+    ts_format = "R RasterStack",
+    compress = "LZW",
+    n_retries = 10,
+    verbose = TRUE)
   
   
   frp.utils.date_rasters(rasters)
 }
-
-

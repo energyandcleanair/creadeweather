@@ -13,6 +13,8 @@ Imports:
     purrr,
     readr,
     sf,
+    sp,
+    data.table,
     raster,
     pbapply,
     bit64,
