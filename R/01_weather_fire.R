@@ -181,24 +181,25 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   
   d <- frp.active.get_firms_subfolder(region=region)
   
-  files_nrt <- list.files(d,paste0("SUOMI_VIIRS_C2_",region,"_VNP14IMGTDL_NRT_(\\d*).txt"), full.names = T) #TODO Further filtering
-  files_archive <- list.files(d,"fire_.*.csv", full.names = T)
+  files_nrt <- list.files(d, paste0("SUOMI_VIIRS_C2_",region,"_VNP14IMGTDL_NRT_(\\d*).txt"), full.names = T) #TODO Further filtering
+  files_archive <- list.files(d, "fire_.*[0-9]{7}.txt", full.names = T)
   files <- c(files_nrt, files_archive)
   
   f_min_date <- function(f, date_from, date_to){
-    ifelse(
-      stringr::str_detect(f, "[0-9]{7}"),
-      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j"),
-      as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
-    )
+    # ifelse(
+      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+      # Yearly files have been manually spread into smaller daily ones
+      # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
+    # )
   }
   
   f_max_date <- function(f, date_from, date_to){
-    ifelse(
-      stringr::str_detect(f, "[0-9]{7}"),
-      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j"),
-      as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
-    )
+    # ifelse(
+      # stringr::str_detect(f, "[0-9]{7}"),
+      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+      # Yearly files have been manually spread into smaller daily ones
+      # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
+    # )
   }
   
   files <- files[is.null(date_from) | (f_max_date(files) >= as.POSIXct(date_from))]
@@ -579,4 +580,27 @@ frp.geotiffs <- function(date_from, date_to, extent, ...){
   
   
   frp.utils.date_rasters(rasters)
+}
+
+
+#' Archive active fire files were downloaded one year by one year
+#' which creates memory issues. We split them in more digestible ones.
+#' Should only be run once, manually on downloaded files.
+#'
+#' @return
+#' @export
+#'
+#' @examples
+frp.split_yearly_activefire_by_date <- function(f){
+  
+  d <- data.table::fread(f)
+  dates <- unique(d$acq_date)
+  
+  write_date <- function(date, d, f){
+    f_date <- file.path(dirname(f),
+                        gsub("[0-9]{4}", strftime(date, "%Y%j"),
+                             gsub("csv", "txt", basename(f))))
+    write.csv(d[d$acq_date==date], f_date)
+  }
+  pblapply(dates, write_date, d=d, f=f)
 }
