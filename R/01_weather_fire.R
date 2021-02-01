@@ -39,34 +39,57 @@ frp.add_frp <- function(weather,
   
   
   if(mode=="trajectory"){
-    print("Calculating tras")
+    print("Calculating trajs")
     wt <- w %>%
-      rename(location_id=station_id) %>%
-      mutate(trajs=purrr::pmap(., frp.trajs_at_date, met_type=met_type, height=height, duration_hour=duration_hour)) %>%
-      mutate(extent=purrr::map(trajs, frp.traj_extent, buffer_km=buffer_km))  
+      group_by(station_id, geometry) %>%
+      summarise(trajs=list(frp.trajs_at_dates(date, unique(station_id), unique(geometry)[[1]],
+                                              met_type=met_type,
+                                              height=height,
+                                              duration_hour=duration_hour))) %>%
+      tidyr::unnest(trajs) %>%
+      mutate(date_meas=lubridate::date(traj_dt_i)) %>%
+      mutate(date_fire=lubridate::date(traj_dt)) %>%
+      tidyr::nest(trajs=-c(station_id, date_meas, date_fire)) %>%
+      rowwise() %>%
+      mutate(extent=frp.traj_extent(trajs=trajs, buffer_km=buffer_km))
+    
     one_extent_per_date <- T
   }else if(mode=="oriented"){
     #TODO Still quite slow
     print("Calculating extents")
     wt <- w %>%
       rowwise() %>%
+      rename(date_meas=date) %>%
       mutate(extent=frp.oriented_extent(geometry,
                                         duration_hour=duration_hour,
                                         ws=ws_copy,
-                                        wd=wd_copy))
+                                        wd=wd_copy)) %>%
+      rowwise() %>%
+      mutate(date_fire=list(seq(lubridate::date(date_meas) - lubridate::hours(duration_hour),
+                                lubridate::date(date_meas),
+                                by="day"))) %>%
+      tidyr::unnest(date_fire)
+    
     one_extent_per_date <- T
   }else if(mode=="circular"){
     wt <- w %>%
       distinct(station_id, geometry) %>%
       mutate(extent=frp.circular_extent(geometry,buffer_km=buffer_km)) %>%
-      left_join(w)
+      left_join(w) %>%
+      rename(date_meas=date) %>%
+      rowwise() %>%
+      mutate(date_fire=list(seq(lubridate::date(date_meas) - lubridate::hours(duration_hour),
+                           lubridate::date(date_meas),
+                           by="day"))) %>%
+      tidyr::unnest(date_fire)
+
     one_extent_per_date <- F
   }
   
   if(activefire_or_raster=="activefire"){
     # Download active fires
-    frp.active.download(date_from=min(w$date),
-                        date_to=max(w$date))
+    frp.active.download(date_from=min(wt$date_fire),
+                        date_to=max(wt$date_fire))
     
     
     # Add
@@ -188,18 +211,18 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   
   f_min_date <- function(f, date_from, date_to){
     # ifelse(
-      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
-      # Yearly files have been manually spread into smaller daily ones
-      # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
+    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+    # Yearly files have been manually spread into smaller daily ones
+    # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-01-01", f), format="%Y-%m-%d")
     # )
   }
   
   f_max_date <- function(f, date_from, date_to){
     # ifelse(
-      # stringr::str_detect(f, "[0-9]{7}"),
-      as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
-      # Yearly files have been manually spread into smaller daily ones
-      # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
+    # stringr::str_detect(f, "[0-9]{7}"),
+    as.POSIXct(gsub(".*([0-9]{7})\\.(txt|csv)","\\1", f), format="%Y%j")
+    # Yearly files have been manually spread into smaller daily ones
+    # as.POSIXct(gsub(".*([0-9]{4})\\.(txt|csv)","\\1-12-31", f), format="%Y-%m-%d")
     # )
   }
   
@@ -217,7 +240,7 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
       d.coords <- cbind(d$longitude, d$latitude)
       df <- sp::SpatialPointsDataFrame(d.coords, d, proj4string=sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))[c("acq_date","frp")]
       sp::proj4string(extent.sp) <- sp::proj4string(df)
-  
+      
       df[!is.na(sp::over(df, extent.sp)),] %>%
         sf::st_as_sf() # To allow bind_rows (vs rbind)
     }, error=function(c){
@@ -235,8 +258,6 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
 }
 
 frp.active.relevant_fires_summary <- function(date, extent, duration_hour, f.sf){
-  print(date)
-  print(extent)
   extent.sf <- sf::st_sfc(extent)
   sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
   
@@ -256,8 +277,8 @@ frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
   
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
-  f.sf <- frp.active.read(date_from=min(wt$date),
-                          date_to=max(wt$date),
+  f.sf <- frp.active.read(date_from=min(wt$date_fire),
+                          date_to=max(wt$date_fire),
                           extent.sp=extent.sp)
   print("Done")
   
@@ -270,23 +291,29 @@ frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
     # Much slower, but required
     # We do one summary per row
     print("DEBUG1")
-    regions <- wt %>% distinct(station_id, date, extent)
+    regions <- wt %>% distinct(station_id, date_meas, date_fire, extent)
     
     
     
     print("Attaching fires to stations and dates")
     regions$fires <- pbapply::pbmapply(frp.active.relevant_fires_summary,
-                                           date=regions$date,
-                                           extent=regions$extent,
-                                           duration_hour=duration_hour,
-                                           f.sf=list(f.sf),
-                                           SIMPLIFY=F)
-                                           #mc.cores = 1) # Too memory intensive otherwise > killed
+                                       date=regions$date_fire,
+                                       extent=regions$extent,
+                                       duration_hour=duration_hour,
+                                       f.sf=list(f.sf),
+                                       SIMPLIFY=F)
+    #mc.cores = 1) # Too memory intensive otherwise -> killed ?
     
     
     wtf <- wt %>% left_join(regions %>%
-                              tidyr::unnest(fires)) %>%
-      select(-c(extent))
+                              tidyr::unnest(fires) %>%
+                              select(-c(extent))) %>%
+      select(-c(extent)) %>%
+      group_by(station_id, date=date_meas) %>%
+      # If you want to give more weight to 
+      # Close fires, that'd be here probably
+      summarise(fire_frp=sum(fire_frp),
+                fire_count=sum(fire_count))
     
     print("Done")
     
@@ -299,24 +326,17 @@ frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
     f.regions <- regions %>% sf::st_as_sf() %>%
       sf::st_join(f.sf, join=sf::st_contains) %>%
       tibble() %>%
-      group_by(station_id, date.fire=acq_date) %>%
+      group_by(station_id, date_fire=acq_date) %>%
       summarise(frp=sum(frp, na.rm=T),
                 fire_count=dplyr::n())
     
-    wt$date_from <- wt$date - lubridate::hours(x=duration_hour)
+    # wt$date_from <- wt$date_meas - lubridate::hours(x=duration_hour)
     
-    wtf <- wt %>% fuzzyjoin::fuzzy_left_join(
-      f.regions,
-      by = c(
-        "station_id" = "station_id",
-        "date_from" = "date.fire",
-        "date" = "date.fire"
-      ),
-      match_fun = list(`==`, `<`, `>=`)
+    wtf <- wt %>% dplyr::left_join(
+      f.regions %>% mutate(date_fire=lubridate::date(date_fire)),
+      by = c("station_id", "date_fire")
     ) %>%
-      rename(station_id=station_id.x) %>%
-      dplyr::select(-c(station_id.y)) %>%
-      group_by(station_id, date) %>%
+      group_by(station_id, date_meas) %>%
       summarise(fire_frp=sum(frp, na.rm=T),
                 fire_count=sum(fire_count, na.rm=T))
     
@@ -382,7 +402,7 @@ frp.hysplit.trajs_at_dates <- function(dates, geometry, height, duration_hour, m
 # Trajectories ------------------------------------------------------------
 frp.cache.filename <- function(location_id, country, met_type, height, duration_hour, date){
   paste(location_id, met_type, height, duration_hour, strftime(date, "%Y%m%d"),"RDS",
-         sep=".")
+        sep=".")
 }
 
 
@@ -398,23 +418,25 @@ frp.trajs_at_dates <- function(dates, location_id, geometry, country, met_type, 
     filepaths.missing <- filepaths[!file.exists(filepaths)]
     dates.missing <- dates[!file.exists(filepaths)]
     
-    trajs.existing <- do.call("bind_rows",
-                               lapply(filepaths.existing, readRDS))
+    trajs <- do.call("bind_rows",
+                     lapply(filepaths.existing, readRDS))
     
-    trajs.missing <- frp.hysplit.trajs_at_date(dates, geometry=geometry, met_type=met_type,
-                                         duration_hour=duration_hour, height=height)
-    
-    trajs.missing.days <- split(trajs.missing, lubridate::date(trajs.missing$traj_dt_i))
-    lapply(names(trajs.missing.days),
-           function(date){
-             t <- trajs.missing.days[[date]]
-             f <- file.path(cache_folder,
-                           frp.cache.filename(location_id, country, met_type, height, duration_hour, date))
-             saveRDS(t,f)
-           })
-    
-    trajs <- bind_rows(trajs.existing,
-                       trajs.missing)
+    if(length(dates.missing)>0){
+      trajs.missing <- frp.hysplit.trajs_at_dates(dates.missing, geometry=geometry, met_type=met_type,
+                                                  duration_hour=duration_hour, height=height)
+      
+      trajs.missing.days <- split(trajs.missing, lubridate::date(trajs.missing$traj_dt_i))
+      lapply(names(trajs.missing.days),
+             function(date){
+               t <- trajs.missing.days[[date]]
+               f <- file.path(cache_folder,
+                              frp.cache.filename(location_id, country, met_type, height, duration_hour, date))
+               saveRDS(t,f)
+             })
+      
+      trajs <- bind_rows(trajs,
+                         trajs.missing)
+    }
     
     return(trajs)
   }, error=function(c){
@@ -423,9 +445,9 @@ frp.trajs_at_dates <- function(dates, location_id, geometry, country, met_type, 
   
 }
 
-frp.traj_extent <- function(traj, buffer_km){
+frp.traj_extent <- function(trajs, buffer_km){
   tryCatch({
-    sf::st_as_sf(traj, coords=c("lon","lat"), crs=4326) %>%
+    suppressMessages(sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
       group_by(run) %>%
       summarize() %>%
       sf::st_cast("LINESTRING") %>%
@@ -433,7 +455,9 @@ frp.traj_extent <- function(traj, buffer_km){
       sf::st_buffer(buffer_km*1000) %>%
       # sf::st_bbox() %>%
       # sf::st_as_sfc() %>%
-      sf::st_transform(crs=4326)
+      sf::st_transform(crs=4326) %>%
+      sf::st_union())
+      
   }, error=function(c){
     return(NA)
   })
