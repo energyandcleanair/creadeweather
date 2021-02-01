@@ -33,9 +33,9 @@ collect_weather <- function(meas,
   stations <- meas %>%
     dplyr::rowwise() %>%
     dplyr::filter(nrow(meas)>0) %>%
-    dplyr::mutate(year_from=lubridate::year(min(meas$date, na.rm=T)),
-                  year_to=lubridate::year(max(meas$date, na.rm=T))) %>%
-    dplyr::select(country, station_id, geometry, timezone, year_from, year_to) %>%
+    dplyr::mutate(date_from=min(meas$date, na.rm=T),
+                  date_to=max(meas$date, na.rm=T)) %>%
+    dplyr::select(country, station_id, geometry, timezone, date_from, date_to) %>%
     dplyr::distinct(country, station_id, timezone, .keep_all = T)
 
   # Find weather stations nearby

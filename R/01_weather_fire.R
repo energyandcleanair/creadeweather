@@ -23,10 +23,10 @@
 frp.add_frp <- function(weather,
                         activefire_or_raster="activefire",
                         mode="oriented",
-                        met_type="reanalysis",
+                        met_type="gdas1",
                         height=500, 
                         duration_hour=72,
-                        buffer_km=switch(mode,"circular"=200, "oriented"=200, "trajectory"=20)){
+                        buffer_km=switch(mode,"circular"=200, "oriented"=200, "trajectory"=100)){
   
   
   # Get trajectories - One row per day
@@ -152,27 +152,28 @@ frp.active.download <- function(date_from=NULL, date_to=NULL, region="Global"){
   # Data not available in repository before that
   # Have been downloaded manually prior 2020
   # https://firms.modaps.eosdis.nasa.gov/download/
-  
-  files.all <- paste0("SUOMI_VIIRS_C2_",
-                      region,
-                      "_VNP14IMGTDL_NRT_",
-                      as.POSIXct(seq(lubridate::date(date_from),
-                                     lubridate::date(date_to),
-                                     by="day")) %>% strftime("%Y%j"),
-                      ".txt")
-  
-  # Even though wget can manage already downloaded files,
-  # this is faster and less verbose in console
-  files.existing <- list.files(d, "*.txt")
-  file.todownload <- setdiff(files.all, files.existing)
-  
-  modis_key <- Sys.getenv("MODIS_KEY")
-  for(f in file.todownload){
-    cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
-                  modis_key,
-                  "\" -P ",
-                  d)
-    system(cmd)
+  if(date_to >= date_from){
+    files.all <- paste0("SUOMI_VIIRS_C2_",
+                        region,
+                        "_VNP14IMGTDL_NRT_",
+                        as.POSIXct(seq(lubridate::date(date_from),
+                                       lubridate::date(date_to),
+                                       by="day")) %>% strftime("%Y%j"),
+                        ".txt")
+    
+    # Even though wget can manage already downloaded files,
+    # this is faster and less verbose in console
+    files.existing <- list.files(d, "*.txt")
+    file.todownload <- setdiff(files.all, files.existing)
+    
+    modis_key <- Sys.getenv("MODIS_KEY")
+    for(f in file.todownload){
+      cmd <- paste0("wget -e robots=off -nc -np -R .html,.tmp -nH --cut-dirs=5 \"https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/", region, "/", f,"\" --header \"Authorization: Bearer ",
+                    modis_key,
+                    "\" -P ",
+                    d)
+      system(cmd)
+    }
   }
 }
 
@@ -233,58 +234,64 @@ frp.active.read <- function(date_from=NULL, date_to=NULL, region="Global", exten
   fires
 }
 
+frp.active.relevant_fires_summary <- function(date, extent, duration_hour, f.sf){
+  print(date)
+  print(extent)
+  extent.sf <- sf::st_sfc(extent)
+  sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
+  
+  suppressMessages(f.sf %>%
+                     filter(acq_date <= date, acq_date>=lubridate::date(date) - lubridate::hours(duration_hour)) %>%
+                     filter(nrow(.)>0 & sf::st_intersects(., extent.sf, sparse = F)) %>%
+                     as.data.frame() %>%
+                     group_by() %>%
+                     summarise(fire_frp=sum(frp, na.rm=T),
+                               fire_count=dplyr::n()))
+}
 
 frp.active.attach <- function(wt, one_extent_per_date=T, duration_hour=72){
   
-  
-  
   extent.sp <- sf::as_Spatial(wt$extent[!sf::st_is_empty(wt$extent)])
-  extent.sp.union <- rgeos::gUnaryUnion(extent.sp)
-
+  # extent.sp.union <- rgeos::gUnaryUnion(extent.sp)
+  
   # Read and only keep fires within extent to save memory
   print("Reading fire files")
   f.sf <- frp.active.read(date_from=min(wt$date),
                           date_to=max(wt$date),
-                          extent.sp=extent.sp.union)
+                          extent.sp=extent.sp)
   print("Done")
   
   if(nrow(f.sf)==0){
+    print("DEBUG0")
     return(wt %>% mutate(fires=NULL))
   }
   
   if(one_extent_per_date){
     # Much slower, but required
     # We do one summary per row
+    print("DEBUG1")
     regions <- wt %>% distinct(station_id, date, extent)
     
-    relevant_fires_summary <- function(date, extent, duration_hour, f.sf){
-      extent.sf <- sf::st_sfc(extent)
-      sf::st_crs(extent.sf) <- sf::st_crs(f.sf)
-      
-      suppressMessages(f.sf %>%
-                         filter(acq_date <= date, acq_date>=lubridate::date(date) - lubridate::hours(duration_hour)) %>%
-                         filter(nrow(.)>0 & sf::st_intersects(., extent.sf, sparse = F)) %>%
-                         as.data.frame() %>%
-                         group_by() %>%
-                         summarise(fire_frp=sum(frp, na.rm=T),
-                                   fire_count=dplyr::n()))
-    }
+    
     
     print("Attaching fires to stations and dates")
-    regions$fires <- pbmcapply::pbmcmapply(relevant_fires_summary,
+    regions$fires <- pbapply::pbmapply(frp.active.relevant_fires_summary,
                                            date=regions$date,
                                            extent=regions$extent,
                                            duration_hour=duration_hour,
                                            f.sf=list(f.sf),
-                                           SIMPLIFY=F,
-                                           mc.cores = parallel::detectCores()-1)
+                                           SIMPLIFY=F)
+                                           #mc.cores = 1) # Too memory intensive otherwise > killed
     
     
     wtf <- wt %>% left_join(regions %>%
                               tidyr::unnest(fires)) %>%
       select(-c(extent))
     
+    print("Done")
+    
   }else{
+    print("DEBUG3")
     regions <- wt %>% distinct(station_id, extent)
     
     
@@ -331,7 +338,7 @@ frp.trajs.cache_filename <- function(location_id, country, met_type, height, dur
         sep=".")
 }
 
-frp.hysplit.trajs_at_date <- function(date, geometry, height, duration_hour, met_type){
+frp.hysplit.trajs_at_dates <- function(dates, geometry, height, duration_hour, met_type){
   
   dir_hysplit_met <- Sys.getenv("DIR_HYSPLIT_MET", here::here(utils.get_cache_folder("weather")))
   dir_hysplit_output <-utils.get_cache_folder("trajs/output")
@@ -344,7 +351,7 @@ frp.hysplit.trajs_at_date <- function(date, geometry, height, duration_hour, met
       lat = lat,
       height = height,
       duration = duration_hour,
-      days = lubridate::date(date),
+      days = lubridate::date(dates),
       daily_hours = c(0, 6, 12, 18),
       direction = "backward",
       met_type = met_type,
@@ -373,22 +380,42 @@ frp.hysplit.trajs_at_date <- function(date, geometry, height, duration_hour, met
 
 
 # Trajectories ------------------------------------------------------------
+frp.cache.filename <- function(location_id, country, met_type, height, duration_hour, date){
+  paste(location_id, met_type, height, duration_hour, strftime(date, "%Y%m%d"),"RDS",
+         sep=".")
+}
 
-frp.trajs_at_date <- function(date, location_id, geometry, country, met_type, height, duration_hour, ...){
+
+frp.trajs_at_dates <- function(dates, location_id, geometry, country, met_type, height, duration_hour, ...){
+  
   tryCatch({
-    cache_folder <- utils.get_cache_folder("trajs")
-    filename <- frp.cache.filename(location_id, country, met_type, height, duration_hour, date)
-    filepath <- file.path(cache_folder, filename)
     
-    if(!file.exists(filepath)){
-      trajs <- frp.hysplit.trajs_at_date(date, geometry=geometry, met_type=met_type,
+    cache_folder <- utils.get_cache_folder("trajs")
+    filenames <- frp.cache.filename(location_id, country, met_type, height, duration_hour, dates)
+    filepaths <- file.path(cache_folder, filenames)
+    
+    filepaths.existing <- filepaths[file.exists(filepaths)]
+    filepaths.missing <- filepaths[!file.exists(filepaths)]
+    dates.missing <- dates[!file.exists(filepaths)]
+    
+    trajs.existing <- do.call("bind_rows",
+                               lapply(filepaths.existing, readRDS))
+    
+    trajs.missing <- frp.hysplit.trajs_at_date(dates, geometry=geometry, met_type=met_type,
                                          duration_hour=duration_hour, height=height)
-      if(!is.na(trajs)){
-        saveRDS(trajs, filepath)
-      }
-    }else{
-      trajs <- readRDS(filepath)
-    }
+    
+    trajs.missing.days <- split(trajs.missing, lubridate::date(trajs.missing$traj_dt_i))
+    lapply(names(trajs.missing.days),
+           function(date){
+             t <- trajs.missing.days[[date]]
+             f <- file.path(cache_folder,
+                           frp.cache.filename(location_id, country, met_type, height, duration_hour, date))
+             saveRDS(t,f)
+           })
+    
+    trajs <- bind_rows(trajs.existing,
+                       trajs.missing)
+    
     return(trajs)
   }, error=function(c){
     return(NA)
@@ -399,10 +426,13 @@ frp.trajs_at_date <- function(date, location_id, geometry, country, met_type, he
 frp.traj_extent <- function(traj, buffer_km){
   tryCatch({
     sf::st_as_sf(traj, coords=c("lon","lat"), crs=4326) %>%
+      group_by(run) %>%
+      summarize() %>%
+      sf::st_cast("LINESTRING") %>%
       sf::st_transform(crs=3857) %>%
       sf::st_buffer(buffer_km*1000) %>%
-      sf::st_bbox() %>%
-      sf::st_as_sfc() %>%
+      # sf::st_bbox() %>%
+      # sf::st_as_sfc() %>%
       sf::st_transform(crs=4326)
   }, error=function(c){
     return(NA)
@@ -436,7 +466,8 @@ frp.circular_extent <- function(geometry, buffer_km){
 #'
 #' @examples
 frp.oriented_extent <- function(geometry, duration_hour, ws, wd, width_deg=90,
-                                default_buffer_km=200){
+                                default_buffer_km=200,
+                                max_buffer_km=800){
   
   st_wedge <- function(x, y, r, wd, width_deg, distance_km, n=20){
     if(wd==0){
@@ -457,7 +488,7 @@ frp.oriented_extent <- function(geometry, duration_hour, ws, wd, width_deg=90,
   
   tryCatch({
     # ws in m per second * 10
-    distance_km <- ws * 3600/1000 * duration_hour / 10
+    distance_km <- min(ws * 3600/1000 * duration_hour / 10, max_buffer_km)
     if(is.na(distance_km)){
       # Probably missing wind speed
       distance_km <- default_buffer_km
@@ -600,7 +631,7 @@ frp.split_yearly_activefire_by_date <- function(f){
     f_date <- file.path(dirname(f),
                         gsub("[0-9]{4}", strftime(date, "%Y%j"),
                              gsub("csv", "txt", basename(f))))
-    write.csv(d[d$acq_date==date], f_date)
+    write.csv(d[d$acq_date==date], f_date, row.names=FALSE)
   }
   pblapply(dates, write_date, d=d, f=f)
 }

@@ -157,7 +157,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
-    dplyr::distinct(station_id, usaf, wban, year_from, year_to)
+    dplyr::distinct(station_id, usaf, wban, date_from, date_to)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
@@ -165,8 +165,8 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   stations_weather$weather <- tryCatch({
     pbapply::pbmapply(noaa.get_noaa_at_code,
                       code=stations_weather$code,
-                      year_from=stations_weather$year_from,
-                      year_to=stations_weather$year_to,
+                      year_from=lubridate::year(stations_weather$date_from),
+                      year_to=lubridate::year(stations_weather$date_to),
                       years_force_refresh=list(years_force_refresh),
                       cache_folder=cache_folder,
                       SIMPLIFY=F)  
@@ -192,7 +192,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
     dplyr::left_join(
       stations_weather %>%
         as.data.frame() %>%
-        dplyr::select(station_id, weather) %>%
+        dplyr::select(station_id, weather, date_from, date_to) %>%
         dplyr::rowwise() %>%
         dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
         ungroup() %>%
@@ -200,6 +200,8 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
         summarise(weather=list(bind_rows(weather) %>%
                  dplyr::mutate(date=to_date(date)) %>%
                  dplyr::filter(!is.na(date)) %>%
+                 dplyr::filter(date>=date_from) %>%
+                 dplyr::filter(date<=date_to) %>%
                  dplyr::group_by(date) %>%
                  dplyr::summarize(
                    air_temp_min=min(air_temp_min, na.rm=T),
@@ -219,7 +221,8 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
             )
         ),
       by="station_id"
-      )
+      ) %>%
+    dplyr::select(-c(date_from, date_to))
   print("Done [Adding weather from NOAA]")
   return(meas_w_stations)
 }
