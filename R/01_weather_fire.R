@@ -41,7 +41,7 @@ frp.add_frp <- function(weather,
   if(mode=="trajectory"){
     print("Calculating trajs")
     wt <- w %>%
-      group_by(station_id, geometry) %>%
+      group_by(station_id) %>%
       summarise(trajs=list(frp.trajs_at_dates(date, unique(station_id), unique(geometry)[[1]],
                                               met_type=met_type,
                                               height=height,
@@ -366,20 +366,26 @@ frp.hysplit.trajs_at_dates <- function(dates, geometry, height, duration_hour, m
   lon <- sf::st_coordinates(geometry)[1]
   
   tryCatch({
-    trajs <- splitr::hysplit_trajectory(
-      lon = lon,
-      lat = lat,
-      height = height,
-      duration = duration_hour,
-      days = lubridate::date(dates),
-      daily_hours = c(0, 6, 12, 18),
-      direction = "backward",
-      met_type = met_type,
-      extended_met = F,
-      met_dir = dir_hysplit_met,
-      exec_dir = dir_hysplit_output,
-      clean_up = T
-    )
+    # Probably slower to do date by date,
+    # But facing unknown issue when too many dates at a time
+    # Probably if one fails, all fail
+    trajs <- do.call("bind_rows",
+                     lapply(dates,
+                            function(date){
+                              splitr::hysplit_trajectory(
+                                lon = lon,
+                                lat = lat,
+                                height = height,
+                                duration = duration_hour,
+                                days = lubridate::date(date),
+                                daily_hours = c(0, 6, 12, 18),
+                                direction = "backward",
+                                met_type = met_type,
+                                extended_met = F,
+                                met_dir = dir_hysplit_met,
+                                exec_dir = dir_hysplit_output,
+                                clean_up = T
+                              )}))
     
     # Update fields to be compatible with OpenAIR
     trajs$hour.inc <- trajs$hour_along
@@ -409,8 +415,8 @@ frp.cache.filename <- function(location_id, country, met_type, height, duration_
 frp.trajs_at_dates <- function(dates, location_id, geometry, country, met_type, height, duration_hour, ...){
   
   tryCatch({
-    
     cache_folder <- utils.get_cache_folder("trajs")
+    print(paste0("Calculating trajs for ", location_id,". Storing in ", cache_folder))
     filenames <- frp.cache.filename(location_id, country, met_type, height, duration_hour, dates)
     filepaths <- file.path(cache_folder, filenames)
     
@@ -449,7 +455,7 @@ frp.traj_extent <- function(trajs, buffer_km){
   tryCatch({
     suppressMessages(sf::st_as_sf(trajs, coords=c("lon","lat"), crs=4326) %>%
       group_by(run) %>%
-      summarize() %>%
+      summarise() %>%
       sf::st_cast("LINESTRING") %>%
       sf::st_transform(crs=3857) %>%
       sf::st_buffer(buffer_km*1000) %>%

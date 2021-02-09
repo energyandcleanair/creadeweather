@@ -40,7 +40,7 @@ deweather <- function(
  save_weather_filename=NULL
  ){
   
-  try(dotenv::load_dot_env(file = ".env"))
+  suppressWarnings(try(dotenv::load_dot_env(file = ".env")))
   try(readRenviron(".Renviron"))
   
   #----------------------
