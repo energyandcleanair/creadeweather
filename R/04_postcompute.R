@@ -8,35 +8,42 @@
 #' @export
 #'
 #' @examples
-post_compute <- function(results_nested, output, ...){
+post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
   
   results_anomaly_abs <- NULL
   results_anomaly_rel <- NULL
   results_anomaly_rel_cf <- NULL
   results_counterfactual <- NULL
+  results_anomaly_offsetted <- NULL
+  results_counterfactual_nofire <- NULL
+  
   results_anomaly_yday_abs <- NULL
   results_anomaly_yday_rel <- NULL
   results_anomaly_yday_rel_cf <- NULL
-  results_anomaly_offsetted <- NULL
   results_anomaly_yday_offsetted <- NULL
+  results_counterfactual_nofire_yday <- NULL
+  
   results_trend <- NULL
   
   if("anomaly" %in% output){
     
+    results_anomaly_raw <- results_nested %>%
+      dplyr::filter(output=='anomaly') %>%
+      tidyr::unnest(cols=c(result)) %>%
+      rowwise()
+    
     # Anomaly in absolute terms
-    results_anomaly_abs <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))  
-    results_anomaly_abs <- results_anomaly_abs  %>% rowwise()  %>%
+    results_anomaly_abs <- results_anomaly_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       filter(set=='testing') %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)  
     
     # Anomaly in relative terms (vs average)
-    results_anomaly_rel <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_rel <- results_anomaly_rel  %>% rowwise()  %>%
+    results_anomaly_rel <- results_anomaly_raw %>%
       dplyr::mutate(
         #  we use average during training period (i.e. 2017-2019) as reference
         average=predicted %>%
@@ -54,11 +61,10 @@ post_compute <- function(results_nested, output, ...){
         unit="-"
       ) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Anomaly in relative terms (vs counterfactual)
-    results_anomaly_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_rel_cf <- results_anomaly_rel_cf  %>% rowwise()  %>%
+    results_anomaly_rel_cf <- results_anomaly_raw %>%
       dplyr::mutate(
         #  we use average during training period (i.e. 2017-2019) as reference
         average=predicted %>%
@@ -76,11 +82,10 @@ post_compute <- function(results_nested, output, ...){
         unit="-"
       ) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Anomaly offsetted
-    results_anomaly_offsetted <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_offsetted <- results_anomaly_offsetted  %>% rowwise()  %>%
+    results_anomaly_offsetted <- results_anomaly_raw %>%
       dplyr::mutate(
         # offset is basically the mean of values during training period (i.e. 2017-2019)
         offset=predicted %>%
@@ -97,11 +102,10 @@ post_compute <- function(results_nested, output, ...){
         output="anomaly_offsetted"
       ) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Counterfactual
-    results_counterfactual <- results_nested %>% dplyr::filter(output=='anomaly') %>% tidyr::unnest(cols=c(result))
-    results_counterfactual <- results_counterfactual  %>% rowwise()  %>%
+    results_counterfactual <- results_anomaly_raw  %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       mutate(value=predicted)),
                     process_deweather=stringr::str_replace(process_deweather,
@@ -110,15 +114,32 @@ post_compute <- function(results_nested, output, ...){
                     output="counterfactual"
       ) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)  
     
+    # Counterfactual no fire
+    if(add_fire){
+      results_counterfactual_nofire <- results_anomaly_raw %>%
+        dplyr::mutate(normalised=list(predicted %>%
+                                        mutate(value=predicted_nofire)),
+                      process_deweather=stringr::str_replace(process_deweather,
+                                                             "\"output\":\"anomaly\"",
+                                                             "\"output\":\"counterfactual_nofire\""),
+                      output="counterfactual_nofire"
+        ) %>%
+        dplyr::rename(location_id=station_id) %>%
+        dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
+    }
   }
   
   if("anomaly_yday" %in% output){
     
+    results_anomaly_yday_raw <- results_nested %>%
+      dplyr::filter(output=='anomaly_yday') %>%
+      tidyr::unnest(cols=c(result)) %>%
+      rowwise()
+    
     # Anomaly in absolute terms
-    results_anomaly_yday_abs <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))  
-    results_anomaly_yday_abs <- results_anomaly_yday_abs  %>% rowwise()  %>%
+    results_anomaly_yday_abs <- results_anomaly_yday_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       filter(set=='testing') %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
@@ -128,8 +149,7 @@ post_compute <- function(results_nested, output, ...){
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
     # Anomaly in relative terms
-    results_anomaly_yday_rel <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_yday_rel <- results_anomaly_yday_rel  %>% rowwise()  %>%
+    results_anomaly_yday_rel <- results_anomaly_yday_raw %>%
       dplyr::mutate(
         #  we use average during training period (i.e. 2017-2019) as reference
         average=predicted %>%
@@ -150,8 +170,7 @@ post_compute <- function(results_nested, output, ...){
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly in relative terms (vs counterfactual)
-    results_anomaly_yday_rel_cf <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_yday_rel_cf <- results_anomaly_yday_rel_cf  %>% rowwise()  %>%
+    results_anomaly_yday_rel_cf <- results_anomaly_yday_raw  %>%
       dplyr::mutate(
         #  we use average during training period (i.e. 2017-2019) as reference
         average=predicted %>%
@@ -172,8 +191,7 @@ post_compute <- function(results_nested, output, ...){
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly offsetted
-    results_anomaly_yday_offsetted <- results_nested %>% dplyr::filter(output=='anomaly_yday') %>% tidyr::unnest(cols=c(result))
-    results_anomaly_yday_offsetted <- results_anomaly_yday_offsetted  %>% rowwise()  %>%
+    results_anomaly_yday_offsetted <- results_anomaly_yday_raw %>%
       dplyr::mutate(
         # offset is basically the mean of values during training period (i.e. 2017-2019)
         offset=list(predicted %>%
@@ -194,6 +212,20 @@ post_compute <- function(results_nested, output, ...){
       ) %>%
       dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
+    
+    # Counterfactual no fire
+    if(add_fire){
+      results_counterfactual_nofire_yday <- results_anomaly_yday_raw %>%
+        dplyr::mutate(normalised=list(predicted %>%
+                                        mutate(value=predicted_nofire)),
+                      process_deweather=stringr::str_replace(process_deweather,
+                                                             "\"output\":\"anomaly_yday\"",
+                                                             "\"output\":\"counterfactual_nofire_yday\""),
+                      output="counterfactual_nofire_yday"
+        ) %>%
+        dplyr::rename(location_id=station_id) %>%
+        dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
+    }
   }
   
   if("trend" %in% output){
@@ -201,7 +233,7 @@ post_compute <- function(results_nested, output, ...){
     results_trend <- results_trend  %>% rowwise()  %>%
       dplyr::mutate(normalised=list(trend)) %>%
       dplyr::rename(location_id=station_id) %>%
-      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
+      dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
   }
   
   results <- dplyr::bind_rows(
@@ -211,11 +243,17 @@ post_compute <- function(results_nested, output, ...){
     results_anomaly_rel_cf,
     results_anomaly_offsetted,
     results_counterfactual,
+    results_counterfactual_nofire,
     results_anomaly_yday_abs,
     results_anomaly_yday_rel,
     results_anomaly_yday_rel_cf,
-    results_anomaly_yday_offsetted
+    results_anomaly_yday_offsetted,
+    results_counterfactual_nofire_yday
   )  
+  
+  if(!keep_model & ("model" %in% names(results))){
+    results <- results %>% dplyr::select(-c(model))
+  }
   
   return(results)
 }

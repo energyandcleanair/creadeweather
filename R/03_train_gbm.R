@@ -22,8 +22,8 @@ train_model_gbm <- function(data,
                             samples,
                             interaction.depth=1,
                             learning.rate=0.1,
-                            link=NULL,
-                            link_trend=NULL,
+                            link="linear",
+                            training.fraction=1,
                             ...){
   
   if(is.null(training_date_cut)){
@@ -32,8 +32,18 @@ train_model_gbm <- function(data,
   
   n_cores <- as.integer(future::availableCores()-1)
   
-  link <- if(is.null(link) || is.na(link)) NULL else link
-  link_trend <- if(is.null(link_trend) || is.na(link_trend)) NULL else link_trend
+  
+  if(!link %in% c('linear','log')){
+    stop("link can only be 'linear' or 'log'")
+  }
+  
+  if(link=="linear"){
+    do_link <- function(x){x}
+    do_unlink <- function(x){x}
+  }else if(link=="log"){
+    do_link <- function(x){log(x)}
+    do_unlink <- function(x){exp(x)}
+  }
     
   # Using deweather to prepare data re time vars
   # Correspondance between our time variables and deweather ones
@@ -53,14 +63,6 @@ train_model_gbm <- function(data,
     time_vars <- c(unlist(time_vars_corr[time_vars], use.names=F), setdiff(time_vars,names(time_vars_corr)))
   }
   
-  if(!is.null(link) && (link!='log')){
-    stop("link can only be NULL or 'log'")
-  }
-  
-  if(!is.null(link_trend) && (link_trend!='log')){
-    stop("link_trend can only be NULL or 'log'")
-  }
-  
   if("geometry" %in% names(data)){
     data <- data %>% dplyr::select(-c(geometry)) 
   }
@@ -68,6 +70,14 @@ train_model_gbm <- function(data,
   data_prepared <- data %>%
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
+  
+  # Reshuffle just in case GBM doesn't do it
+  if(training.fraction<1){
+    set.seed(42)
+    rows <- sample(nrow(data_prepared))
+    data_prepared <- data_prepared[rows, ]
+  }
+  
  
   data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
   data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
@@ -82,6 +92,7 @@ train_model_gbm <- function(data,
       cv.folds = 3,
       shrinkage=learning.rate,
       interaction.depth=interaction.depth,
+      train.fraction = training.fraction,
       n.cores = n_cores,
       n.trees = trees, #So far, it seems only up to 300 trees are used
       verbose = FALSE,
@@ -100,13 +111,7 @@ train_model_gbm <- function(data,
     dplyr::filter_at("value", all_vars(!is.na(.)))
   
   # Add "link" transformation if required
-  if(!is.null(link) && link=='log'){
-    data_prepared$value <- log(data_prepared$value)
-    
-  }
-  if(!is.null(link_trend) && link=='log' && ('trend' %in% time_vars)){
-    data_prepared$trend <- log(data_prepared$trend)
-  }
+  data_prepared$value <- do_link(data_prepared$value)
   
   #----------------
   # Fit model
@@ -117,14 +122,20 @@ train_model_gbm <- function(data,
   # Predict
   #----------------
   data_prepared$predicted <- predict(model, data_prepared)
+  data_prepared <- data_prepared %>% arrange(date)
   
-  if(!is.null(link) && (link=='log')){
-    data_prepared$value <- exp(data_prepared$value)
-    data_prepared$predicted <- exp(data_prepared$predicted)
+  add_nofire <- any(stringr::str_detect(weather_vars, "fire"))
+  if(add_nofire){
+    data_prepared_nofire <- data_prepared
+    data_prepared_nofire[, grep("fire", names(data_prepared))] <- 0
+    data_prepared$predicted_nofire <- predict(model, data_prepared_nofire)
   }
   
-  if(!is.null(link_trend) && link=='log' && ('trend' %in% time_vars)){
-    data_prepared$trend <- exp(data_prepared$trend)
+  data_prepared$value <- do_unlink(data_prepared$value)
+  data_prepared$predicted <- do_unlink(data_prepared$predicted)
+  
+  if(add_nofire){
+    data_prepared$predicted_nofire <- do_unlink(data_prepared$predicted_nofire)
   }
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
@@ -139,12 +150,21 @@ train_model_gbm <- function(data,
   model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
   model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
 
+  # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
+  model$rmse_valid <- sqrt(min(do_unlink(model$valid.error)))
+  model$rmse_cv <- sqrt(min(do_unlink(model$cv.error)))
+  
   # save space
   model_light <- model
   model_light$trees<- NULL
   
+  cols <- c("date", "set", "value", "predicted")
+  if(add_nofire){
+    cols <- c(cols, "predicted_nofire")
+  }
+    
   res <- tibble(model=list(model_light),
-                predicted=list(data_prepared %>% dplyr::select(date, set, value, predicted))
+                predicted=list(data_prepared %>% dplyr::select_at(cols))
   )
    
   if(normalise){
@@ -169,8 +189,7 @@ train_model_gbm <- function(data,
     if("trend" %in% time_vars){
       trend_trend <- gbm::plot.gbm(model, "trend", continuous.resolution = nrow(dates)*2, return.grid = T) %>%
         rowwise() %>%
-        mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
-        mutate(trend=ifelse(!is.null(link_trend) && (link=='log'),exp(trend),trend)) %>%
+        mutate(y=do_unlink(y)) %>%
         mutate(date=lubridate::date(lubridate::date_decimal(trend))) %>%
         dplyr::select(date,trend=y) %>%
         dplyr::group_by(date) %>%
@@ -182,7 +201,7 @@ train_model_gbm <- function(data,
     if("jday" %in% time_vars){
       trend_jday <- gbm::plot.gbm(model, "jday",continuous.resolution = 366, return.grid = T) %>%
         rowwise() %>%
-        mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
+        mutate(y=do_unlink(y)) %>%
         mutate(jday=round(jday)) %>% 
         dplyr::group_by(jday) %>%
         dplyr::summarize(y=mean(y, na.rm=T)) %>%
@@ -194,7 +213,7 @@ train_model_gbm <- function(data,
     if("month" %in% time_vars){
       trend_month <- gbm::plot.gbm(model, "month", return.grid = T) %>%
         rowwise() %>%
-        mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
+        mutate(y=do_unlink(y)) %>%
         dplyr::select(month_joiner=month, month=y)
       trend_month$month_joiner <- c(jan=1,feb=2,mar=3,apr=4,may=5,jun=6,jul=7,
                              aug=8,sep=9,oct=10,nov=11,dec=12)[tolower(trend_month$month_joiner)]
@@ -205,7 +224,7 @@ train_model_gbm <- function(data,
     if("weekday" %in% time_vars){
       trend_weekday <- gbm::plot.gbm(model, "weekday", return.grid = T) %>%
         rowwise() %>%
-        mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
+        mutate(y=do_unlink(y)) %>%
         dplyr::select(wday_joiner=weekday, weekday=y)
       trend_weekday$wday_joiner <- c(monday=1,tuesday=2,wednesday=3,thursday=4,friday=5,
                                      saturday=6,sunday=7)[tolower(trend_weekday$wday_joiner)]
@@ -216,7 +235,7 @@ train_model_gbm <- function(data,
     if("season" %in% time_vars){
       trend_season <- gbm::plot.gbm(model, "season", return.grid = T) %>%
         rowwise() %>%
-        mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
+        mutate(y=do_unlink(y)) %>%
         dplyr::select(season_joiner=season, season=y)
       
       dates <- dates %>% left_join(trend_season)

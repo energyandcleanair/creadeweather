@@ -21,7 +21,8 @@ collect_weather <- function(meas,
                             add_sunshine=T,
                             add_fire=F,
                             fire_mode="oriented",
-                            filename=NULL){
+                            filename=NULL,
+                            save_trajs_filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
     stop("Measurements should be nested in meas column")
@@ -63,7 +64,9 @@ collect_weather <- function(meas,
   # Add fire radiative power
   if(add_fire){
     print("Getting Fire Radiative Power (will compute trajectories if required)")
-    weather <- frp.add_frp(weather, mode=fire_mode)  
+    weather <- frp.add_frp(weather,
+                           mode=fire_mode,
+                           save_trajs_filename=save_trajs_filename)  
   }
   
   # Join weather with measurements

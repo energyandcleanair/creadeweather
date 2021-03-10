@@ -210,7 +210,7 @@ utils.attach_city <- function(locs, cities, method="location", ...){
 #'
 #' @examples
 utils.get_dir_data <- function(){
-  suppressWarnings(try(dotenv::load_dot_env()))
+  suppressWarnings(try(dotenv::load_dot_env(), silent = T))
   
   dir_data <- Sys.getenv("DIR_DATA")
   if(dir_data==""){

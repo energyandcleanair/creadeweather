@@ -19,14 +19,12 @@ train_model_svr <- function(data,
                                   normalise,
                                   samples,
                                   link=NULL,
-                                  link_trend=NULL,
                                   ...){
   
   n_cores <- as.integer(future::availableCores()-1)
   
   link <- if(is.null(link) || is.na(link)) NULL else link
-  link_trend <- if(is.null(link_trend) || is.na(link_trend)) NULL else link_trend
-    
+
   # Using deweather to prepare data re time vars
   # Correspondance between our time variables and deweather ones
   # our=deweather
@@ -49,9 +47,6 @@ train_model_svr <- function(data,
     stop("link can only be NULL or 'log'")
   }
   
-  if(!is.null(link_trend) && (link_trend!='log')){
-    stop("link_trend can only be NULL or 'log'")
-  }
   
   data_prepared <- data %>%
     mutate(date=as.POSIXct(date)) %>%
@@ -83,9 +78,7 @@ train_model_svr <- function(data,
   if(!is.null(link) && link=='log'){
     data_prepared$value <- log(data_prepared$value)
   }
-  if(!is.null(link_trend) && link=='log' && ('trend' %in% time_vars)){
-    data_prepared$trend <- log(data_prepared$trend)
-  }
+
   
   #----------------
   # Fit model
@@ -104,9 +97,6 @@ train_model_svr <- function(data,
     data_prepared$predicted <- exp(data_prepared$predicted)
   }
   
-  if(!is.null(link_trend) && link=='log' && ('trend' %in% time_vars)){
-    data_prepared$trend <- exp(data_prepared$trend)
-  }
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
@@ -151,7 +141,6 @@ train_model_svr <- function(data,
       trend_trend <- plot.gbm(model, "trend", continuous.resolution = nrow(dates)*2, return.grid = T) %>%
         rowwise() %>%
         mutate(y=ifelse(!is.null(link) && (link=='log'),exp(y),y)) %>%
-        mutate(trend=ifelse(!is.null(link_trend) && (link=='log'),exp(trend),trend)) %>%
         mutate(date=lubridate::date(lubridate::date_decimal(trend))) %>%
         dplyr::select(date,trend=y) %>%
         dplyr::group_by(date) %>%

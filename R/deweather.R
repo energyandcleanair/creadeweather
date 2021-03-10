@@ -16,29 +16,35 @@
 #' @export
 #'
 deweather <- function(
- meas=NULL,
- poll=NULL,
- source=NULL,
- country=NULL,
- location_id=NULL,
- location_type=NULL,
- process_id=NULL,
- city=NULL,
- output=c("anomaly"), #c("trend","anomaly")
- aggregate_level="city",
- upload_results=T,
- add_gadm1=F,
- add_gadm2=F,
- years_force_refresh=NULL,
- training_start_trend="2015-01-01",
- training_start_anomaly="2016-12-01",
- training_end_anomaly="2019-11-30",
- lag=1,
- add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
- fire_mode="circular",
- add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
- save_weather_filename=NULL
- ){
+  meas=NULL,
+  poll=NULL,
+  source=NULL,
+  country=NULL,
+  location_id=NULL,
+  location_type=NULL,
+  process_id=NULL,
+  city=NULL,
+  output=c("anomaly"), #c("trend","anomaly")
+  aggregate_level="city",
+  upload_results=T,
+  add_gadm1=F,
+  add_gadm2=F,
+  years_force_refresh=NULL,
+  training_start_trend="2015-01-01",
+  training_start_anomaly="2016-12-01",
+  training_end_anomaly="2019-11-30",
+  lag=1,
+  training.fraction=1,
+  link="log", # 'log' or 'linear'
+  # Fire options
+  add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
+  fire_mode="circular",
+  add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
+  save_weather_filename=NULL,
+  read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
+  save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
+  keep_model=F
+){
   
   suppressWarnings(try(dotenv::load_dot_env(file = ".env")))
   try(readRenviron(".Renviron"))
@@ -102,30 +108,36 @@ deweather <- function(
     dplyr::left_join(meas_geom, by=c("station_id"="location_id")) %>%
     dplyr::mutate(geometry=suppressWarnings(sf::st_centroid(geometry))) %>%
     sf::st_as_sf(sf_column_name="geometry", crs = 4326)
-
+  
   #----------------------
   # 1. Add weather
   #----------------------
   print("1. Adding weather")
-  meas_weather <- creadeweather::collect_weather(meas_sf,
-                                  years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),
-                                            lubridate::year(lubridate::today())),
-                                  years_force_refresh=years_force_refresh,
-                                  add_pbl=add_pbl,
-                                  add_sunshine=F,
-                                  add_fire=add_fire,
-                                  fire_mode=fire_mode,
-                                  n_per_station=4
-  )
-
+  if(!is.null(read_weather_filename) && file.exists(read_weather_filename)){
+    meas_weather <- readRDS(read_weather_filename)
+  }else{
+    meas_weather <- creadeweather::collect_weather(meas_sf,
+                                                   years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),
+                                                             lubridate::year(lubridate::today())),
+                                                   years_force_refresh=years_force_refresh,
+                                                   add_pbl=add_pbl,
+                                                   add_sunshine=F,
+                                                   add_fire=add_fire,
+                                                   fire_mode=fire_mode,
+                                                   save_trajs_filename=save_trajs_filename,
+                                                   n_per_station=4
+    )
+    if(!is.null(save_weather_filename)){
+      saveRDS(meas_weather, save_weather_filename)
+    }
+  }
+  
+  
   #----------------------
   # 2. Clean data
   #----------------------
   print("2. Cleaning data")
   data <- prep_data(meas_weather=meas_weather)
-  if(!is.null(save_weather_filename)){
-    saveRDS(data, save_weather_filename)
-  }
   
   #----------------------
   # 3. Train models
@@ -139,9 +151,8 @@ deweather <- function(
   interaction.depth <- c(2)
   learning.rate <- c(0.01)
   engine <- "gbm"
-  link <- "log"
   weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')
-  
+
   if(add_pbl){
     weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
   }
@@ -151,9 +162,17 @@ deweather <- function(
   }
   
   weather_vars <- c(list(weather_vars))
-    
+  
   configs <-  tibble() %>%
-    tidyr::expand(trees, lag, weather_vars, time_vars_output, engine, link, learning.rate, interaction.depth) %>%
+    tidyr::expand(trees,
+                  lag,
+                  training.fraction,
+                  weather_vars,
+                  time_vars_output,
+                  engine,
+                  link,
+                  learning.rate,
+                  interaction.depth) %>%
     rowwise() %>%
     mutate(process_deweather=
              gsub("'","\"",paste0("{",
@@ -161,6 +180,7 @@ deweather <- function(
                                   "'trees':'",trees,"',",
                                   "'learning.rate':'",learning.rate,"',",
                                   "'interaction.depth':'",interaction.depth,"',",
+                                  "'training.fraction':'",training.fraction,"',",
                                   "'lag':'",lag,"',",
                                   "'training_start':'",training_start,"',",
                                   "'training_end':'",training_end,"',",
@@ -186,6 +206,7 @@ deweather <- function(
         learning.rate=learning.rate,
         lag=lag,
         link=link,
+        training.fraction=training.fraction,
         normalise=normalise,
         detect_breaks=detect_breaks,
         training_date_cut=training_end)
@@ -206,8 +227,10 @@ deweather <- function(
   print("4. Post-computing")
   
   results <- creadeweather::post_compute(results_nested=results_nested,
-                                        output=output)
- 
+                                         output=output,
+                                         add_fire=add_fire,
+                                         keep_model=keep_model)
+  
   
   if(add_gadm1 | add_gadm2){
     locs <- rcrea::locations(level="city", source=source, with_meta = T) %>%

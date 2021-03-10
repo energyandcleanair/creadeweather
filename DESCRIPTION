@@ -60,7 +60,8 @@ Remotes:
     rich-iannone/splitr,
     MatMatt/MODIS@develop,
     hubert-thieriot/MODIStsp,
-    energyandcleanair/rcrea
+    energyandcleanair/rcrea,
+    energyandcleanair/creatrajs
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
