@@ -55,18 +55,17 @@ frp.add_frp <- function(weather,
     
     print("Calculating trajs")
     wt <- w %>% rename(location_id=station_id)
-    wt$trajs <- pbmcapply::pbmcmapply(
-      creatrajs::trajs.get,
-      dates=wt$date,
-      location_id=wt$location_id,
-      geometry=wt$geometry,
-      met_type=met_type,
-      heights=wt$height_trajectory,
-      duration_hour=duration_hour,
-      cache_folder=utils.get_cache_folder('trajs'),
-      SIMPLIFY=F,
-      mc.cores = max(parallel::detectCores() -2, 1)
+    wt$trajs <- creatrajs::trajs.get(
+        dates=wt$date,
+        location_id=wt$location_id,
+        geometry=wt$geometry,
+        met_type=met_type,
+        heights=wt$height_trajectory,
+        duration_hour=duration_hour,
+        cache_folder=utils.get_cache_folder('trajs'),
+        parallel=F # Doesn't work yet
     )
+    names(wt$trajs) <- NULL
     print("Done")
     
     if(!is.null(save_trajs_filename)){

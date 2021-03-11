@@ -36,6 +36,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     results_anomaly_abs <- results_anomaly_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       filter(set=='testing') %>%
+                                      mutate(observed=value) %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
@@ -52,8 +53,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
+                          mutate(observed=value) %>%
                           mutate(value=(value-predicted) / average) %>%
-                          select(date, value)),
+                          select(date, value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_vs_average\""),
@@ -73,8 +75,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
+                          mutate(observed=value) %>%
                           mutate(value=(value-predicted) / predicted) %>%
-                          select(date, value)),
+                          select(date, value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_vs_counterfactual\""),
@@ -94,8 +97,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
+                          mutate(observed=value) %>%
                           mutate(value=value-predicted+offset) %>%
-                          select(date, value)),
+                          select(date, value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly\"",
                                                "\"output\":\"anomaly_offsetted\""),
@@ -107,6 +111,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     # Counterfactual
     results_counterfactual <- results_anomaly_raw  %>%
       dplyr::mutate(normalised=list(predicted %>%
+                                      mutate(observed=value) %>%
                                       mutate(value=predicted)),
                     process_deweather=stringr::str_replace(process_deweather,
                                                            "\"output\":\"anomaly\"",
@@ -120,6 +125,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     if(add_fire){
       results_counterfactual_nofire <- results_anomaly_raw %>%
         dplyr::mutate(normalised=list(predicted %>%
+                                        mutate(observed=value) %>%
                                         mutate(value=predicted_nofire)),
                       process_deweather=stringr::str_replace(process_deweather,
                                                              "\"output\":\"anomaly\"",
@@ -142,6 +148,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     results_anomaly_yday_abs <- results_anomaly_yday_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
                                       filter(set=='testing') %>%
+                                      mutate(observed=value) %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
@@ -158,8 +165,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
+                          mutate(observed=value) %>%
                           mutate(value=(value-predicted) / average) %>%
-                          select(date, value)),
+                          select(date, value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly_yday\"",
                                                "\"output\":\"anomaly_yday_vs_average\""),
@@ -179,8 +187,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           mean(na.rm=T),
         normalised=list(predicted %>%
                           filter(set=='testing') %>%
+                          mutate(observed=value) %>%
                           mutate(value=(value-predicted) / predicted) %>%
-                          select(date, value)),
+                          select(date, value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly_yday\"",
                                                "\"output\":\"anomaly_yday_vs_counterfactual\""),
@@ -217,6 +226,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     if(add_fire){
       results_counterfactual_nofire_yday <- results_anomaly_yday_raw %>%
         dplyr::mutate(normalised=list(predicted %>%
+                                        mutate(observed=value) %>%
                                         mutate(value=predicted_nofire)),
                       process_deweather=stringr::str_replace(process_deweather,
                                                              "\"output\":\"anomaly_yday\"",
