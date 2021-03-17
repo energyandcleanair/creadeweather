@@ -212,8 +212,9 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
                           filter(set=='testing') %>%
                           mutate(yday=lubridate::yday(date)) %>%
                           merge(offset) %>%
+                          mutate(observed=value) %>%
                           mutate(value=value-predicted+offset) %>%
-                          select(date,value)),
+                          select(date,value, observed)),
         process_deweather=stringr::str_replace(process_deweather,
                                                "\"output\":\"anomaly_yday\"",
                                                "\"output\":\"anomaly_yday_offsetted\""),

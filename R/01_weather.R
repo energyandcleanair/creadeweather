@@ -22,6 +22,8 @@ collect_weather <- function(meas,
                             add_fire=F,
                             fire_mode="oriented",
                             filename=NULL,
+                            fire_duration_hour=72,
+                            fire_buffer_km=NULL,
                             save_trajs_filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -66,6 +68,8 @@ collect_weather <- function(meas,
     print("Getting Fire Radiative Power (will compute trajectories if required)")
     weather <- frp.add_frp(weather,
                            mode=fire_mode,
+                           duration_hour=fire_duration_hour,
+                           buffer_km=fire_buffer_km,
                            save_trajs_filename=save_trajs_filename)  
   }
   

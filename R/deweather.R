@@ -39,6 +39,8 @@ deweather <- function(
   # Fire options
   add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
   fire_mode="circular",
+  fire_duration_hour=72, # For trajectories only
+  fire_buffer_km=10,
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
@@ -46,7 +48,7 @@ deweather <- function(
   keep_model=F
 ){
   
-  suppressWarnings(try(dotenv::load_dot_env(file = ".env")))
+  suppressWarnings(try(dotenv::load_dot_env(file = ".env"), silent = T))
   try(readRenviron(".Renviron"))
   
   #----------------------
@@ -124,6 +126,8 @@ deweather <- function(
                                                    add_sunshine=F,
                                                    add_fire=add_fire,
                                                    fire_mode=fire_mode,
+                                                   fire_duration_hour=fire_duration_hour,
+                                                   fire_buffer_km=fire_buffer_km,
                                                    save_trajs_filename=save_trajs_filename,
                                                    n_per_station=4
     )

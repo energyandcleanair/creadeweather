@@ -2,7 +2,7 @@
 #'
 #' @importFrom dplyr select rename mutate mutate_at filter filter_at arrange distinct
 #'     summarise summarize do group_by group_by_at ungroup do left_join inner_join everything bind_rows 
-#'     pull tibble as_tibble rowwise any_vars all_vars vars collect full_join
+#'     pull tibble as_tibble rowwise any_vars all_vars vars collect full_join summarise_at
 NULL
 
 #' Pseudo-function to import \strong{tibble}'s common functions. 

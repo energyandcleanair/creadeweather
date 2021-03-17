@@ -112,7 +112,8 @@ noaa.get_noaa_at_code <- function(code, year_from, year_to, years_force_refresh=
     if(nrow(result)==0){return(NULL)}
     
     # Aggregate per day
-    result <- result %>%
+    # Note: Certain dates have no data at all and hence raise warnings
+    suppressWarnings(result <- result %>%
       dplyr::group_by(date=lubridate::date(date)) %>%
       dplyr::summarize(
         air_temp_min=min(air_temp, na.rm=T),
@@ -128,7 +129,9 @@ noaa.get_noaa_at_code <- function(code, year_from, year_to, years_force_refresh=
         RH=mean(RH, na.rm=T),
         RH_min=min(RH, na.rm=T),
         RH_max=max(RH, na.rm=T)
-      )
+      ) %>%
+      # Replace infinite with NA
+      mutate_at(vars(-date), ~ifelse(is.infinite(.x), NA, .x)))
     
     result
   }, error=function(err){
@@ -188,7 +191,9 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   if(nrow(stations_weather %>% rowwise() %>% filter(!is.null(weather)))==0){
     stop("Failed to find weather data")
   }
-  meas_w_stations <- meas_w_stations %>%
+  
+  # Note: Certain dates have no data at all and hence raise warnings
+  meas_w_stations <- suppressWarnings(meas_w_stations %>%
     dplyr::left_join(
       stations_weather %>%
         as.data.frame() %>%
@@ -222,7 +227,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
         ),
       by="station_id"
       ) %>%
-    dplyr::select(-c(date_from, date_to))
+    dplyr::select(-c(date_from, date_to)))
   print("Done [Adding weather from NOAA]")
   return(meas_w_stations)
 }

@@ -27,9 +27,13 @@ frp.add_frp <- function(weather,
                         height_default=500, 
                         duration_hour=72,
                         delay_hour=24,
-                        buffer_km=switch(mode,"circular"=200, "oriented"=200, "trajectory"=10),
+                        buffer_km=NULL,
                         save_trajs_filename=NULL){
   
+  
+  if(is.null(buffer_km)){
+    buffer_km <- switch(mode,"circular"=200, "oriented"=200, "trajectory"=10)
+  }
   
   cols <- setdiff(c(names(weather), "date", "height_trajectory", "wd_copy", "ws_copy"),"weather")
   
@@ -62,8 +66,9 @@ frp.add_frp <- function(weather,
         met_type=met_type,
         heights=wt$height_trajectory,
         duration_hour=duration_hour,
+        timezone=wt$timezone,
         cache_folder=utils.get_cache_folder('trajs'),
-        parallel=F # Doesn't work yet
+        parallel=F # Doesn't fully work yet
     )
     names(wt$trajs) <- NULL
     print("Done")
