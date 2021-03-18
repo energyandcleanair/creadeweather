@@ -1,6 +1,19 @@
 #' Training a model using standard gmb and comparing observed vs predicted as anomaly
 #'
 #'
+#' The data is divided in three sets.
+#' A training period that is data fed to GBM
+#' (e.g. three years before the period we want deweathered data from when using 
+#' anomaly approach)
+#' 
+#' This training period is itself divided into:
+#'  - training GBM per se (`training.fraction`)
+#'  - validation by GBM (1-`training.fraction`)
+#'
+#' 
+#' A prediction period which is the period for which we want to get deweathered data
+#' (when using anomaly approach)
+#'
 #' @param station_id 
 #' @param data 
 #' @param pollutant 
@@ -23,7 +36,7 @@ train_model_gbm <- function(data,
                             interaction.depth=1,
                             learning.rate=0.1,
                             link="linear",
-                            training.fraction=1,
+                            training.fraction=0.9,
                             ...){
   
   if(is.null(training_date_cut)){
@@ -31,7 +44,6 @@ train_model_gbm <- function(data,
   }
   
   n_cores <- as.integer(future::availableCores()-1)
-  
   
   if(!link %in% c('linear','log')){
     stop("link can only be 'linear' or 'log'")
@@ -67,22 +79,26 @@ train_model_gbm <- function(data,
     data <- data %>% dplyr::select(-c(geometry)) 
   }
   
+
+  # Prepare data ------------------------------------------------------------
+
   data_prepared <- data %>%
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
   
-  # Reshuffle just in case GBM doesn't do it
+  # Reshuffle as it seems GBM doesn't do it
+  # Very important
   if(training.fraction<1){
     set.seed(42)
     rows <- sample(nrow(data_prepared))
     data_prepared <- data_prepared[rows, ]
   }
-  
  
-  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
+  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
   data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
   
-  # Creating model
+  # Train model -------------------------------------------------------------
+  
   model_gbm  <- function(training_data, formula){
     print("Training gbm")
     gbm.fit <- gbm::gbm(
@@ -113,14 +129,12 @@ train_model_gbm <- function(data,
   # Add "link" transformation if required
   data_prepared$value <- do_link(data_prepared$value)
   
-  #----------------
-  # Fit model
-  #----------------
+  # Fit
   model <- model_gbm(data_prepared %>% dplyr::filter(set=="training" & !is.na(value) & !is.infinite(value)), formula) 
   
-  #----------------
-  # Predict
-  #----------------
+
+  # Predict results ---------------------------------------------------------
+  
   data_prepared$predicted <- predict(model, data_prepared)
   data_prepared <- data_prepared %>% arrange(date)
   
@@ -140,25 +154,40 @@ train_model_gbm <- function(data,
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
-  data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value) & !is.infinite(value))
-  model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
-  model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
-  model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
+  
+
+  # Add performance metrics ----------------------------------------------------
+  
+  # We only keep 'useful' information to save space
+  # Can take several MB per model otherwise
+  model_light <- model[c("train.error",
+                         "valid.error",
+                         "trees",
+                         "shrinkage",
+                         "train.fraction",
+                         "cv.folds")]
+  
+  # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
+  model$rmse_valid <- sqrt(min(do_unlink(model$valid.error)))
+  model$rmse_cv <- sqrt(min(do_unlink(model$cv.error)))
+  
+  # model contains train.error and valid.error
+  # however, our dataset also contains
+  data_predict <- data_prepared %>% filter(set=="prediction") %>% filter(!is.na(value) & !is.infinite(value))
+  model$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
+  model$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
+  model$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
 
   data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
   model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
   model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
   model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
 
-  # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
-  model$rmse_valid <- sqrt(min(do_unlink(model$valid.error)))
-  model$rmse_cv <- sqrt(min(do_unlink(model$cv.error)))
   
-  # save space
-  model_light <- model
-  model_light$trees<- NULL
+  model_light$importance <- summary(model, plotit = F)
   
   cols <- c("date", "set", "value", "predicted")
+  
   if(add_nofire){
     cols <- c(cols, "predicted_nofire")
   }
@@ -171,6 +200,9 @@ train_model_gbm <- function(data,
     warning("Normalised not managed yet for gbm engine. Use deweather instead if normalisation is your goal")
   }
   
+
+  # Extract influence of time vars (e.g. trend) -----------------------------
+
   if(length(time_vars)>0){
     
     dates <- tibble(date=lubridate::date(unique(data_prepared %>% filter(set=='training') %>% pull(date)))) %>%
@@ -240,12 +272,11 @@ train_model_gbm <- function(data,
       
       dates <- dates %>% left_join(trend_season)
     }
-    # trend <- tibble(dates) %>% dplyr::select_at(c(time_vars,"date"))
+    
     trend <- tibble(
       date=dates$date,
       value= dates %>% dplyr::select(time_vars) %>% rowMeans(na.rm=TRUE))
 
-    # trend$value <- trend$value
     res$trend <- list(tibble(trend))
   }
   
