@@ -35,7 +35,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     # Anomaly in absolute terms
     results_anomaly_abs <- results_anomaly_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
-                                      filter(set=='testing') %>%
+                                      filter(set=='prediction') %>%
                                       mutate(observed=value) %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
@@ -52,7 +52,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-                          filter(set=='testing') %>%
+                          filter(set=='prediction') %>%
                           mutate(observed=value) %>%
                           mutate(value=(value-predicted) / average) %>%
                           select(date, value, observed)),
@@ -74,7 +74,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-                          filter(set=='testing') %>%
+                          filter(set=='prediction') %>%
                           mutate(observed=value) %>%
                           mutate(value=(value-predicted) / predicted) %>%
                           select(date, value, observed)),
@@ -96,7 +96,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-                          filter(set=='testing') %>%
+                          filter(set=='prediction') %>%
                           mutate(observed=value) %>%
                           mutate(value=value-predicted+offset) %>%
                           select(date, value, observed)),
@@ -147,7 +147,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
     # Anomaly in absolute terms
     results_anomaly_yday_abs <- results_anomaly_yday_raw %>%
       dplyr::mutate(normalised=list(predicted %>%
-                                      filter(set=='testing') %>%
+                                      filter(set=='prediction') %>%
                                       mutate(observed=value) %>%
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
@@ -164,7 +164,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-                          filter(set=='testing') %>%
+                          filter(set=='prediction') %>%
                           mutate(observed=value) %>%
                           mutate(value=(value-predicted) / average) %>%
                           select(date, value, observed)),
@@ -186,7 +186,7 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
           pull(value) %>%
           mean(na.rm=T),
         normalised=list(predicted %>%
-                          filter(set=='testing') %>%
+                          filter(set=='prediction') %>%
                           mutate(observed=value) %>%
                           mutate(value=(value-predicted) / predicted) %>%
                           select(date, value, observed)),
@@ -209,7 +209,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
                       group_by(yday) %>%
                       summarise(offset=mean(value, na.rm=T))),
         normalised=list(predicted %>% 
-                          filter(set=='testing') %>%
                           mutate(yday=lubridate::yday(date)) %>%
                           merge(offset) %>%
                           mutate(observed=value) %>%

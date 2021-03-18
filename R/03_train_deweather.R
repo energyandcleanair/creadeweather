@@ -45,8 +45,8 @@ train_model_deweather <- function(data,
     
     data_prepared$set = ifelse(caTools::sample.split(data_prepared$value,SplitRatio=0.8),
                                  "training",
-                                 "testing")
-    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
+                                 "prediction")
+    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
     vars <- c(time_vars, weather_vars)
     
     if("weekday" %in% time_vars){
@@ -62,10 +62,10 @@ train_model_deweather <- function(data,
              n.core = n_cores)
     
     data_prepared$predicted <- predict(model$model, data_prepared, n.trees=model$model$n.trees)
-    data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
-    model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
-    model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
-    model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
+    data_predict <- data_prepared %>% filter(set=="prediction") %>% filter(!is.na(value))
+    model$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
+    model$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
+    model$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
     
     data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value))
     model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)

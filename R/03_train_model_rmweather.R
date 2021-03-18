@@ -40,7 +40,7 @@ train_model_rmweather <- function(data,
       mutate(date=as.POSIXct(date)) %>%
       rmw_prepare_data(na.rm = TRUE)
     
-    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
+    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
     
     variables <- c(time_vars, weather_vars)
     
@@ -53,10 +53,10 @@ train_model_rmweather <- function(data,
     )
     
     data_prepared$predicted <- rmw_predict(model, data_prepared)
-    data_test <- data_prepared %>% filter(set=="testing")
-    model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
-    model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
-    model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
+    data_predict <- data_prepared %>% filter(set=="prediction")
+    model$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
+    model$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
+    model$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
     
     data_training <- data_prepared %>% filter(set=="training")
     model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)

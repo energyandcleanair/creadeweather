@@ -34,7 +34,7 @@ deweather <- function(
   training_start_anomaly="2016-12-01",
   training_end_anomaly="2019-11-30",
   lag=1,
-  training.fraction=1,
+  training.fraction=0.9,
   link="log", # 'log' or 'linear'
   # Fire options
   add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT

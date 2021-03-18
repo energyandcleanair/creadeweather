@@ -52,7 +52,7 @@ train_model_svr <- function(data,
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
  
-  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "testing"
+  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
   data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
   
   # Creating model
@@ -100,10 +100,10 @@ train_model_svr <- function(data,
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
-  data_test <- data_prepared %>% filter(set=="testing") %>% filter(!is.na(value))
-  model$rmse_test <- Metrics::rmse(data_test$value, data_test$predicted)
-  model$mae_test <- Metrics::mae(data_test$value, data_test$predicted)
-  model$rsquared_test <- 1 - sum((data_test$predicted - data_test$value)^2) / sum((data_test$value - mean(data_test$value))^2)
+  data_predict <- data_prepared %>% filter(set=="prediction") %>% filter(!is.na(value))
+  model$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
+  model$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
+  model$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
 
   data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value))
   model$rmse_training <- rmse(data_training$value, data_training$predicted)
