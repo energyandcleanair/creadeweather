@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-post_compute <- function(results_nested, output, add_fire, keep_model=F, ...){
+post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
   
   results_anomaly_abs <- NULL
   results_anomaly_rel <- NULL
