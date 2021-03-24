@@ -132,17 +132,28 @@ train_model_gbm <- function(data,
   # Fit
   model <- model_gbm(data_prepared %>% dplyr::filter(set=="training" & !is.na(value) & !is.infinite(value)), formula) 
   
+  # Optimal number of trees
+  # Two options: OOB or CV
+  # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
+  # Plus we won't have OOB tree number if train.fraction=1
+  n.trees.opt <- gbm::gbm.perf(model, method="cv", plot.it = F)
+  print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
+  # n.trees.opt <- gbm::gbm.perf(model, method="OOB")
 
   # Predict results ---------------------------------------------------------
+  data_prepared$predicted <- gbm::predict.gbm(model,
+                                              data_prepared,
+                                              n.trees=n.trees.opt)
   
-  data_prepared$predicted <- predict(model, data_prepared)
-  data_prepared <- data_prepared %>% arrange(date)
-  
+  # If fire was part of weather variables
+  # We create a no_fire counterfactual
   add_nofire <- any(stringr::str_detect(weather_vars, "fire"))
   if(add_nofire){
     data_prepared_nofire <- data_prepared
     data_prepared_nofire[, grep("fire", names(data_prepared))] <- 0
-    data_prepared$predicted_nofire <- predict(model, data_prepared_nofire)
+    data_prepared$predicted_nofire <- predict(model,
+                                              data_prepared_nofire,
+                                              n.trees=n.trees.opt)
   }
   
   data_prepared$value <- do_unlink(data_prepared$value)
@@ -154,52 +165,57 @@ train_model_gbm <- function(data,
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
-  
 
   # Add performance metrics ----------------------------------------------------
   
   # We only keep 'useful' information to save space
   # Can take several MB per model otherwise
-  model_light <- model[c("train.error",
+  model_light <- model[c("cv.error",
+                         "train.error",
                          "valid.error",
-                         "trees",
                          "shrinkage",
                          "train.fraction",
                          "cv.folds")]
   
+  model_light$cv.error <- model_light$cv.error[n.trees.opt]
+  model_light$train.error <- model_light$train.error[n.trees.opt]
+  model_light$valid.error <- model_light$valid.error[n.trees.opt]
+  
   # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
-  model$rmse_valid <- sqrt(min(do_unlink(model$valid.error)))
-  model$rmse_cv <- sqrt(min(do_unlink(model$cv.error)))
+  model_light$cv.rmse <- sqrt(min(do_unlink(model$cv.error)))
+  model_light$train.rmse <- sqrt(min(do_unlink(model$train.error)))
+  model_light$valid.rmse <- sqrt(min(do_unlink(model$valid.error)))
   
-  # model contains train.error and valid.error
-  # however, our dataset also contains
+
+  # Metrics on predicting period
+  # Not that if values highly deviated (e.g. because of COVID)
+  # then it is normal to have large errors. This is precisely why we're using it
   data_predict <- data_prepared %>% filter(set=="prediction") %>% filter(!is.na(value) & !is.infinite(value))
-  model$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
-  model$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
-  model$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
-
-  data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
-  model$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
-  model$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
-  model$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
-
+  model_light$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
+  model_light$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
+  model_light$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
   
+  # Metrics on whole training
+  data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
+  model_light$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
+  model_light$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
+  model_light$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
+
+  # Variable importance
   model_light$importance <- summary(model, plotit = F)
   
   cols <- c("date", "set", "value", "predicted")
-  
   if(add_nofire){
     cols <- c(cols, "predicted_nofire")
   }
     
   res <- tibble(model=list(model_light),
-                predicted=list(data_prepared %>% dplyr::select_at(cols))
+                predicted=list(data_prepared %>% dplyr::select_at(cols) %>% arrange(date))
   )
    
   if(normalise){
     warning("Normalised not managed yet for gbm engine. Use deweather instead if normalisation is your goal")
   }
-  
 
   # Extract influence of time vars (e.g. trend) -----------------------------
 
@@ -219,6 +235,9 @@ train_model_gbm <- function(data,
       
     
     if("trend" %in% time_vars){
+      # Rather than resimulating with average weather conditions,
+      # we take partial dependency as the deweathered trend
+      # TODO: Check it gives similar results
       trend_trend <- gbm::plot.gbm(model, "trend", continuous.resolution = nrow(dates)*2, return.grid = T) %>%
         rowwise() %>%
         mutate(y=do_unlink(y)) %>%
