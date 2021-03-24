@@ -1,5 +1,7 @@
 #' Deweathering function
 #'
+#' @param meas Observation measurements. If NULL, the function will use rcrea::measurements
+#' and the parameters below (`poll`, `source`, `country`, `location_id`, and `city`) to retrieve measurements.
 #' @param poll 
 #' @param source 
 #' @param country 
@@ -11,6 +13,24 @@
 #' @param add_gadm1 T/F Whether to aggregate to GADM1 levels after computation
 #' @param add_gadm2 T/F Whether to aggregate to GADM2 levels after computation
 #' @param years_force_refresh Force refreshing (i.e. not using cache) of weather data of that year(s)
+
+#' @param location_type 
+#' @param process_id 
+#' @param training_start_trend 
+#' @param training_start_anomaly 
+#' @param training_end_anomaly 
+#' @param lag 
+#' @param training.fraction 
+#' @param link 
+#' @param add_fire 
+#' @param fire_mode 
+#' @param fire_duration_hour 
+#' @param fire_buffer_km 
+#' @param add_pbl 
+#' @param save_weather_filename 
+#' @param read_weather_filename 
+#' @param save_trajs_filename 
+#' @param keep_model 
 #'
 #' @return
 #' @export
@@ -30,12 +50,13 @@ deweather <- function(
   add_gadm1=F,
   add_gadm2=F,
   years_force_refresh=NULL,
+  engine="gbm",
   training_start_trend="2015-01-01",
   training_start_anomaly="2016-12-01",
   training_end_anomaly="2019-11-30",
   lag=1,
-  training.fraction=0.9,
-  link="log", # 'log' or 'linear'
+  training.fraction=1, #We rely on CV for optimal number of trees anyway
+  link="linear", # 'log' or 'linear'
   # Fire options
   add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
   fire_mode="circular",
@@ -45,7 +66,7 @@ deweather <- function(
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
   save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
-  keep_model=F
+  keep_model=T
 ){
   
   suppressWarnings(try(dotenv::load_dot_env(file = ".env"), silent = T))
@@ -54,7 +75,7 @@ deweather <- function(
   #----------------------
   # Set parameters
   #----------------------
-  training_end_trend <- "2099-01-01"
+  training_end_trend <- "2099-01-01" # With trend approach, we train over the whole period
   
   time_vars_output <- tibble(
     time_vars=c(list(c('yday')), list(c()), list(c('trend'))),
@@ -81,6 +102,8 @@ deweather <- function(
                                 process_id=process_id,
                                 with_metadata=T,
                                 with_geometry=T)
+  }else{
+    meas <- as.data.frame(meas)
   }
   
   # Sometimes, group_by with geometry doesn't work. We split in two steps
@@ -154,8 +177,7 @@ deweather <- function(
   samples <- 100
   interaction.depth <- c(2)
   learning.rate <- c(0.01)
-  engine <- "gbm"
-  weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'ceil_hgt', 'precip', 'RH_max')
+  weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'precip', 'RH_max')
 
   if(add_pbl){
     weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
