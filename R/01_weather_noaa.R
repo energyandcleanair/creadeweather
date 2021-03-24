@@ -160,6 +160,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   stations_weather <- meas_w_stations %>%
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
+    as.data.frame() %>%
     dplyr::distinct(station_id, usaf, wban, date_from, date_to)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
