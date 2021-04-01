@@ -23,7 +23,7 @@
 #' @param training.fraction 
 #' @param link 
 #' @param add_fire 
-#' @param fire_mode 
+#' @param fire_mode circular, oriented or trajectory
 #' @param fire_duration_hour 
 #' @param fire_buffer_km 
 #' @param add_pbl 
@@ -58,10 +58,13 @@ deweather <- function(
   training.fraction=1, #We rely on CV for optimal number of trees anyway
   link="linear", # 'log' or 'linear'
   # Fire options
-  add_fire=F, #BIOMASS BURNING, WORK IN DEVELOPMENT
+  #BIOMASS BURNING, WORK IN DEVELOPMENT
+  add_fire=F, #Whether to add it in the model, 
+  calc_fire=add_fire, #Whether to calculate fire numbers
   fire_mode="circular",
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
+  
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
@@ -71,6 +74,15 @@ deweather <- function(
   
   suppressWarnings(try(dotenv::load_dot_env(file = ".env"), silent = T))
   try(readRenviron(".Renviron"))
+  
+  #----------------------
+  # Input check
+  #----------------------
+  if(!calc_fire & add_fire){
+    warning('We need to calculate fire numbers in order to account for it. Setting calc_fire=T')
+    calc_fire=T
+  }
+  
   
   #----------------------
   # Set parameters
@@ -147,7 +159,7 @@ deweather <- function(
                                                    years_force_refresh=years_force_refresh,
                                                    add_pbl=add_pbl,
                                                    add_sunshine=F,
-                                                   add_fire=add_fire,
+                                                   add_fire=calc_fire, # We add fire to weather data. Doesn't mean we'll add it to the model (decided by @param add_fire)
                                                    fire_mode=fire_mode,
                                                    fire_duration_hour=fire_duration_hour,
                                                    fire_buffer_km=fire_buffer_km,

@@ -9,7 +9,7 @@
 #' @param weather the dataframe to add fire information to
 #' @param activefire_or_raster should we use FIRMS active fire data or M*D14A1 maximum frp. "activefire" or "raster"
 #' @param mode should we consider a simple buffer around geometry, a wind oriented buffer, or calculate trajectories.
-#' attach_mode can be "circular", "oriented" or "trajectory" (oriented not working yet)
+#' attach_mode can be "circular", "oriented" or "trajectory"
 #' @param buffer_km buffer around geometry or trajectories. Default 200km for `circular` and `oriented`, 10km for `trajectory`
 #' @param met_type met_type used for hysplit (if mode=="trajectory")
 #' @param height height used for hysplit (if mode=="trajectory")
