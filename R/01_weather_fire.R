@@ -66,6 +66,7 @@ frp.add_frp <- function(weather,
         met_type=met_type,
         heights=wt$height_trajectory,
         duration_hour=duration_hour,
+        hours=seq(0,23),
         timezone=wt$timezone,
         cache_folder=utils.get_cache_folder('trajs'),
         parallel=F # Doesn't fully work yet
