@@ -10,7 +10,7 @@ noaa.add_close_stations <- function(meas, n_per_station){
       rnoaa::isd_stations_search(
       lat=sf::st_coordinates(geometry)[,2],
       lon=sf::st_coordinates(geometry)[,1],
-      radius=100) %>%
+      radius=150) %>% #radius is in km
         dplyr::filter(end>=20200101) %>%
         dplyr::arrange(desc(end), distance) %>%
         dplyr::slice(1:n_per_station)

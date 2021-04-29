@@ -7,7 +7,8 @@
 #' @param add_pbl Adding planet boundary layer (not ready)
 #' @param add_sunshine Adding sunshine information
 #' @param filename If not null, results are saved under filename in the output folder
-#'
+#' @param trajs_height receptor height for trajectories in meter.
+#' If null, pbl average will be considered.
 #' @return
 #' @export
 #'
@@ -24,6 +25,7 @@ collect_weather <- function(meas,
                             filename=NULL,
                             fire_duration_hour=72,
                             fire_buffer_km=NULL,
+                            trajs_height=NULL,
                             save_trajs_filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -70,6 +72,7 @@ collect_weather <- function(meas,
                            mode=fire_mode,
                            duration_hour=fire_duration_hour,
                            buffer_km=fire_buffer_km,
+                           trajs_height=trajs_height,
                            save_trajs_filename=save_trajs_filename)  
   }
   

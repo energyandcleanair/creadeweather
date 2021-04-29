@@ -14,7 +14,8 @@
 #' @param met_type met_type used for hysplit (if mode=="trajectory")
 #' @param height height used for hysplit (if mode=="trajectory")
 #' @param duration_hour duration in hours used for hysplit (if mode=="trajectory")
-
+#' @param trajs_height receptor height for trajectories in meter.
+#' If null or NA, pbl average will be considered.
 #'
 #' @return
 #' @export
@@ -24,10 +25,11 @@ frp.add_frp <- function(weather,
                         # activefire_or_raster="activefire",
                         mode="oriented",
                         met_type="gdas1",
-                        height_default=500, 
                         duration_hour=72,
                         delay_hour=24,
                         buffer_km=NULL,
+                        trajs_height=NULL,
+                        trajs_height_default=500, 
                         save_trajs_filename=NULL){
   
   
@@ -35,7 +37,7 @@ frp.add_frp <- function(weather,
     buffer_km <- switch(mode,"circular"=200, "oriented"=200, "trajectory"=10)
   }
   
-  cols <- setdiff(c(names(weather), "date", "height_trajectory", "wd_copy", "ws_copy"),"weather")
+  cols <- setdiff(c(names(weather), "date", "trajs_height", "wd_copy", "ws_copy"),"weather")
   
   w <- tibble(weather) %>%
     tidyr::unnest(weather) %>%
@@ -44,8 +46,12 @@ frp.add_frp <- function(weather,
     rowwise() %>%
     mutate(wd_copy=wd,
            ws_copy=ws,
-           height_trajectory=ifelse("pbl_max" %in% names(.), pbl_max, height_default)) %>%
-    mutate(height_trajectory=tidyr::replace_na(height_trajectory, height_default)) %>%
+           trajs_height=ifelse(is.null(!!trajs_height) | is.na(!!trajs_height),
+                                  ifelse(all(c("pbl_min","pbl_max") %in% names(.)),
+                                         (pbl_min + pbl_max)/2,
+                                         trajs_height_default),
+                                  !!trajs_height)) %>%
+    mutate(trajs_height=tidyr::replace_na(trajs_height, trajs_height_default)) %>%
     tidyr::nest(meas=!cols)
   
   # Download active fires
@@ -64,12 +70,12 @@ frp.add_frp <- function(weather,
         location_id=wt$location_id,
         geometry=wt$geometry,
         met_type=met_type,
-        heights=wt$height_trajectory,
+        heights=wt$trajs_height,
         duration_hour=duration_hour,
         hours=seq(0,23),
         timezone=wt$timezone,
         cache_folder=utils.get_cache_folder('trajs'),
-        parallel=F # Doesn't fully work yet
+        parallel=T
     )
     names(wt$trajs) <- NULL
     print("Done")

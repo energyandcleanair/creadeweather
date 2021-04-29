@@ -27,6 +27,8 @@
 #' @param fire_duration_hour 
 #' @param fire_buffer_km 
 #' @param add_pbl 
+#' @param trajs_height receptor height for trajectories in meter.
+#' If null, pbl average will be considered.
 #' @param save_weather_filename 
 #' @param read_weather_filename 
 #' @param save_trajs_filename 
@@ -64,7 +66,7 @@ deweather <- function(
   fire_mode="circular",
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
-  
+  trajs_height=NULL,
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
@@ -163,6 +165,7 @@ deweather <- function(
                                                    fire_mode=fire_mode,
                                                    fire_duration_hour=fire_duration_hour,
                                                    fire_buffer_km=fire_buffer_km,
+                                                   trajs_height=trajs_height,
                                                    save_trajs_filename=save_trajs_filename,
                                                    n_per_station=4
     )
