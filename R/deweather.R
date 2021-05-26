@@ -23,7 +23,7 @@
 #' @param training.fraction 
 #' @param link 
 #' @param add_fire 
-#' @param fire_mode circular, oriented or trajectory
+#' @param fire_mode circular, oriented, trajectory or dispersion
 #' @param fire_duration_hour 
 #' @param fire_buffer_km 
 #' @param add_pbl 
@@ -63,6 +63,7 @@ deweather <- function(
   #BIOMASS BURNING, WORK IN DEVELOPMENT
   add_fire=F, #Whether to add it in the model, 
   calc_fire=add_fire, #Whether to calculate fire numbers
+  fire_source="viirs",
   fire_mode="circular",
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
@@ -162,6 +163,7 @@ deweather <- function(
                                                    add_pbl=add_pbl,
                                                    add_sunshine=F,
                                                    add_fire=calc_fire, # We add fire to weather data. Doesn't mean we'll add it to the model (decided by @param add_fire)
+                                                   fire_source=fire_source,
                                                    fire_mode=fire_mode,
                                                    fire_duration_hour=fire_duration_hour,
                                                    fire_buffer_km=fire_buffer_km,
@@ -199,7 +201,12 @@ deweather <- function(
   }
   
   if(add_fire){
-    weather_vars <- c(weather_vars, "fire_frp")
+    if(fire_source=="viirs"){
+      weather_vars <- c(weather_vars, "fire_frp")
+    }
+    if(fire_source=="gfas"){
+      weather_vars <- c(weather_vars, "pm25_emission")
+    }
   }
   
   weather_vars <- c(list(weather_vars))

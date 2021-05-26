@@ -21,6 +21,7 @@ collect_weather <- function(meas,
                             add_pbl=T,
                             add_sunshine=T,
                             add_fire=F,
+                            fire_source="viirs",
                             fire_mode="oriented",
                             filename=NULL,
                             fire_duration_hour=72,
@@ -68,7 +69,8 @@ collect_weather <- function(meas,
   # Add fire radiative power
   if(add_fire){
     print("Getting Fire Radiative Power (will compute trajectories if required)")
-    weather <- frp.add_frp(weather,
+    weather <- fire.add_fire(weather,
+                           source=fire_source,
                            mode=fire_mode,
                            duration_hour=fire_duration_hour,
                            buffer_km=fire_buffer_km,
