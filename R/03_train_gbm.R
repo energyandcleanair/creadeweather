@@ -147,10 +147,10 @@ train_model_gbm <- function(data,
   
   # If fire was part of weather variables
   # We create a no_fire counterfactual
-  add_nofire <- any(stringr::str_detect(weather_vars, "fire"))
+  add_nofire <- any(stringr::str_detect(weather_vars, "fire|pm25_emission"))
   if(add_nofire){
     data_prepared_nofire <- data_prepared
-    data_prepared_nofire[, grep("fire", names(data_prepared))] <- 0
+    data_prepared_nofire[, grep("fire|pm25_emission", names(data_prepared))] <- 0
     data_prepared$predicted_nofire <- predict(model,
                                               data_prepared_nofire,
                                               n.trees=n.trees.opt)
