@@ -58,8 +58,6 @@ Remotes:
     hubert-thieriot/worldmet,
     davidcarslaw/deweather,
     rich-iannone/splitr,
-    MatMatt/MODIS@develop,
-    hubert-thieriot/MODIStsp,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs
 Suggests: 
