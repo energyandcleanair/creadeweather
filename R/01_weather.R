@@ -6,7 +6,6 @@
 #' @param years_force_refresh ignoring cache files for these years
 #' @param add_pbl Adding planet boundary layer (not ready)
 #' @param add_sunshine Adding sunshine information
-#' @param filename If not null, results are saved under filename in the output folder
 #' @param trajs_height receptor height for trajectories in meter.
 #' If null, pbl average will be considered.
 #' @return
@@ -23,7 +22,6 @@ collect_weather <- function(meas,
                             add_fire=F,
                             fire_source="viirs",
                             fire_mode="oriented",
-                            filename=NULL,
                             fire_duration_hour=72,
                             fire_buffer_km=NULL,
                             trajs_height=NULL,
@@ -32,8 +30,6 @@ collect_weather <- function(meas,
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
     stop("Measurements should be nested in meas column")
   }
-
-  # cache_folder <- utils.get_cache_folder("weather")
 
   # Find unique AQ stations
   stations <- meas %>%
@@ -78,6 +74,12 @@ collect_weather <- function(meas,
                            save_trajs_filename=save_trajs_filename)  
   }
   
+  return(weather)
+}
+
+
+combine_meas_weather <- function(meas, weather){
+  
   # Join weather with measurements
   print("Attaching weather to measurements")
   if("geometry" %in% colnames(meas)){
@@ -99,11 +101,14 @@ collect_weather <- function(meas,
     )) %>%
     dplyr::rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))
- 
-  if(!is.null(filename)){
-    ouput_folder <- utils.get_output_folder()
-    saveRDS(meas_w_weather, file.path(output_folder, filename))
-  }
+  
   return(meas_w_weather)
+}
+
+read_weather <- function(filename){
+  readRDS(filename) %>%
+    # To accomodate for older versions that had one per date AND pollutant
+    distinct(location_id, date, .keep_all=T) %>%
+    select_at(setdiff(names(.), "value"))
 }
 

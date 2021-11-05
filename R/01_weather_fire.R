@@ -73,7 +73,7 @@ fire.add_fire <- function(weather,
         met_type=met_type,
         heights=wt$trajs_height,
         duration_hour=duration_hour,
-        hours=seq(0,23),
+        hours=seq(0,23,4), # To make it faster, we don't calculate trajectories every hour
         timezone=wt$timezone,
         cache_folder=utils.get_cache_folder('trajs'),
         parallel=F
