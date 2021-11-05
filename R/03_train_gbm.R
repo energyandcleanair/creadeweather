@@ -170,22 +170,18 @@ train_model_gbm <- function(data,
   
   # We only keep 'useful' information to save space
   # Can take several MB per model otherwise
-  model_light <- model[c("cv.error",
-                         "train.error",
-                         "valid.error",
-                         "shrinkage",
+  model_light <- model[c("shrinkage",
                          "train.fraction",
                          "cv.folds")]
   
-  model_light$cv.error <- model_light$cv.error[n.trees.opt]
-  model_light$train.error <- model_light$train.error[n.trees.opt]
-  model_light$valid.error <- model_light$valid.error[n.trees.opt]
+  # model_light$cv.error <- model_light$cv.error[n.trees.opt]
+  # model_light$train.error <- model_light$train.error[n.trees.opt]
+  # model_light$valid.error <- model_light$valid.error[n.trees.opt]
   
   # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
-  model_light$cv.rmse <- sqrt(min(do_unlink(model$cv.error)))
-  model_light$train.rmse <- sqrt(min(do_unlink(model$train.error)))
-  model_light$valid.rmse <- sqrt(min(do_unlink(model$valid.error)))
-  
+  model_light$rmse_crossvalid <- sqrt(do_unlink(model$cv.error[n.trees.opt]))
+  model_light$rmse_train <- sqrt(do_unlink(model$train.error[n.trees.opt]))
+  model_light$rmse_valid <- sqrt(do_unlink(model$valid.error[n.trees.opt]))
 
   # Metrics on predicting period
   # Not that if values highly deviated (e.g. because of COVID)
@@ -197,9 +193,9 @@ train_model_gbm <- function(data,
   
   # Metrics on whole training
   data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
-  model_light$rmse_training <- Metrics::rmse(data_training$value, data_training$predicted)
-  model_light$mae_training <- Metrics::mae(data_training$value, data_training$predicted)
-  model_light$rsquared_training <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
+  model_light$rmse_trainval<- Metrics::rmse(data_training$value, data_training$predicted)
+  model_light$mae_trainval <- Metrics::mae(data_training$value, data_training$predicted)
+  model_light$rsquared_trainval <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
 
   # Variable importance
   model_light$importance <- summary(model, plotit = F)

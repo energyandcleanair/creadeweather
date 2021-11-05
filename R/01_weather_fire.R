@@ -76,7 +76,7 @@ fire.add_fire <- function(weather,
         hours=seq(0,23,4), # To make it faster, we don't calculate trajectories every hour
         timezone=wt$timezone,
         cache_folder=utils.get_cache_folder('trajs'),
-        parallel=F
+        parallel=T
     )
     names(wt$trajs) <- NULL
     print("Done")
