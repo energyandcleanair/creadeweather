@@ -10,7 +10,7 @@ plot.tools.roll_plot_gathered <- function(raw){
     dplyr::mutate(date=lubridate::floor_date(date, unit = 'day')) %>%
     dplyr::group_by(date, type) %>%
     dplyr::summarise(value=mean(value, na.rm = T)) %>% dplyr::ungroup() %>%
-    dplyr::group_by(station_id, pollutant, rsq, rsq_test, mae, mae_test, mrae_test, mrae_test, type) %>%
+    dplyr::group_by(location_id, pollutant, rsq, rsq_test, mae, mae_test, mrae_test, mrae_test, type) %>%
     dplyr::arrange(date) %>%
     dplyr::mutate(value=zoo::rollapply(value, width=n_days,
                                        FUN=function(x) mean(x, na.rm=TRUE), align='right',fill=NA)) %>%
@@ -42,7 +42,7 @@ plot.predicted <- function(meas_weather, rolling_days, min_date=NULL){
 plot.infos <- function(output_data_row){
   
   infos_list <- list(
-    'Station id'=output_data_row$station_id,
+    'Station id'=output_data_row$location_id,
     'Region id'=output_data_row$gadm1_id,
     'Region name'=output_data_row$gadm1_name,
     'Pollutant'=output_data_row$pollutant,
@@ -90,7 +90,7 @@ plot.output_data_row <- function(output_data_row, rolling_days){
   ggpubr::annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(output_data_row$pollutant,
-                                  output_data_row$station_id,
+                                  output_data_row$location_id,
                                   output_data_row$gadm1_id,
                                   output_data_row$gadm1_name,
                                   paste0(rolling_days,' days average'),
@@ -102,9 +102,9 @@ plot.output_data <- function(output_data, rolling_days, filepath){
   
   # Arrange / Fill so that pages are homogenous
   filled_output <- output_data %>%
-    right_join(tidyr::crossing(output_data %>% distinct(station_id),
+    right_join(tidyr::crossing(output_data %>% distinct(location_id),
                                pollutant=unique(output_data$pollutant))) %>%
-    arrange(station_id, pollutant)
+    arrange(location_id, pollutant)
   
   figures <- list()
   for(i in seq(1,nrow(filled_output))){
@@ -122,7 +122,7 @@ plot.map_count <- function(data, folder, title, meas_col){
   # Plot number of measurements with weather
   map_count_data <- sf::st_as_sf(data) %>%
     dplyr::mutate_at(meas_col, nrow) %>%
-    dplyr::group_by(station_id, pollutant) %>% 
+    dplyr::group_by(location_id, pollutant) %>% 
     dplyr::mutate_at(meas_col, sum)
   
   map_count <- ggplot(map_count_data) + geom_sf(data=gadm1_sf, alpha=0.1) +
@@ -354,7 +354,7 @@ plot.rmweather.importance <- function(model){
 plot.rmweather.infos <- function(row){
   
   infos_list <- list(
-    'Station id'=row$station_id,
+    'Station id'=row$location_id,
     'Country'=row$country,
     'City'=row$city,
     'Region'=row$gadm1_name,
@@ -409,7 +409,7 @@ plot.rmweather.result_row <- function(row, rolling_days, max_nas=NULL, normalise
   ggpubr::annotate_figure(figure,
                   top=" ",
                   fig.lab = paste(row$pollutant,
-                                  row$station_id,
+                                  row$location_id,
                                   row$gadm1_id,
                                   paste0(rolling_days,' days average'),
                                   sep=" - ")
@@ -421,9 +421,9 @@ plot.rmweather.result_rows <- function(rows, rolling_days, filepath, max_nas=NUL
   
   # Arrange / Fill so that pages are homogenous
   rows_filled <- rows %>%
-    right_join(tidyr::crossing(rows %>% distinct(station_id),
+    right_join(tidyr::crossing(rows %>% distinct(location_id),
                                pollutant=unique(rows$pollutant))) %>%
-    arrange(station_id, pollutant)
+    arrange(location_id, pollutant)
   
   figures <- list()
   for(i in seq(1,nrow(rows_filled))){

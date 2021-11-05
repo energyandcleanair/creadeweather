@@ -1,6 +1,5 @@
 #' Training a model with deweather package
 #'
-#' @param station_id 
 #' @param data 
 #' @param pollutant 
 #' @param unit 

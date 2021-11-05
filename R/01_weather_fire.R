@@ -65,7 +65,7 @@ fire.add_fire <- function(weather,
   if(mode=="trajectory"){
     
     print("Calculating trajs")
-    wt <- w %>% rename(location_id=station_id)
+    wt <- w
     wt$trajs <- creatrajs::trajs.get(
         dates=wt$date,
         location_id=wt$location_id,
@@ -93,7 +93,7 @@ fire.add_fire <- function(weather,
     
   # }else if(mode=="dispersion"){
   #   print("Calculating dispersion")
-  #   wt <- w %>% rename(location_id=station_id)
+  #   wt <- w %>% rename(location_id=location_id)
   #   wt$dispersion <- creatrajs::dispersion.get(
   #     dates=wt$date,
   #     location_id=wt$location_id,
@@ -125,8 +125,7 @@ fire.add_fire <- function(weather,
     print("Calculating extents")
     wt <- w %>%
       rowwise() %>%
-      rename(date_meas=date,
-             location_id=station_id) %>%
+      rename(date_meas=date) %>%
       mutate(extent=creatrajs::trajs.oriented_extent(geometry,
                                         duration_hour=duration_hour,
                                         ws=ws_copy,
@@ -145,8 +144,7 @@ fire.add_fire <- function(weather,
     
     wt <- w %>%
       rowwise() %>%
-      rename(date_meas=date,
-             location_id=station_id) %>%
+      rename(date_meas=date) %>%
       mutate(extent=creatrajs::trajs.circular_extent(geometry,
                                                      buffer_km=buffer_km))
     print("Done")
@@ -160,8 +158,8 @@ fire.add_fire <- function(weather,
   result <- weather %>%
     left_join(wtf %>%
                 tidyr::unnest(fires) %>%
-                dplyr::select_at(c("station_id"="location_id", "date", fire_vars)) %>%
-                tidyr::nest(frp=-c(station_id))) %>%
+                dplyr::select_at(c("location_id"="location_id", "date", fire_vars)) %>%
+                tidyr::nest(frp=-c(location_id))) %>%
     rowwise() %>%
     mutate(weather=list(weather %>% left_join(frp))) %>%
     dplyr::select(-c(frp))

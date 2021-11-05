@@ -40,7 +40,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)  
     
     # Anomaly in relative terms (vs average)
@@ -62,7 +61,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
         output="anomaly_vs_average",
         unit="-"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Anomaly in relative terms (vs counterfactual)
@@ -84,7 +82,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
         output="anomaly_vs_counterfactual",
         unit="-"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Anomaly offsetted
@@ -105,7 +102,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                                "\"output\":\"anomaly_offsetted\""),
         output="anomaly_offsetted"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     
     # Counterfactual
@@ -118,7 +114,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                                            "\"output\":\"counterfactual\""),
                     output="counterfactual"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)  
     
     # Counterfactual no fire
@@ -132,7 +127,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                                              "\"output\":\"counterfactual_nofire\""),
                       output="counterfactual_nofire"
         ) %>%
-        dplyr::rename(location_id=station_id) %>%
         dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     }
   }
@@ -152,7 +146,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                       mutate(value=value-predicted)), # Not residuals but ANOMALY (i.e. -1 * residuals)
                     unit=paste('Δ', unit) # To force ploting on different charts on Dashboard
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
     # Anomaly in relative terms
@@ -174,7 +167,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
         output="anomaly_yday_vs_average",
         unit="-"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly in relative terms (vs counterfactual)
@@ -196,7 +188,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
         output="anomaly_yday_vs_counterfactual",
         unit="-"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)
     
     # Anomaly offsetted
@@ -219,7 +210,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                                "\"output\":\"anomaly_yday_offsetted\""),
         output="anomaly_yday_offsetted"
       ) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output)  
     
     # Counterfactual no fire
@@ -233,7 +223,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
                                                              "\"output\":\"counterfactual_nofire_yday\""),
                       output="counterfactual_nofire_yday"
         ) %>%
-        dplyr::rename(location_id=station_id) %>%
         dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
     }
   }
@@ -242,7 +231,6 @@ post_compute <- function(results_nested, output, add_fire, keep_model=T, ...){
     results_trend <- results_nested %>% dplyr::filter(output=='trend') %>% tidyr::unnest(cols=c(result))
     results_trend <- results_trend  %>% rowwise()  %>%
       dplyr::mutate(normalised=list(trend)) %>%
-      dplyr::rename(location_id=station_id) %>%
       dplyr::select(process_id, process_deweather, normalised, poll, unit, location_id, source, output, model)
   }
   

@@ -1,6 +1,5 @@
 #' Training a model with rmweather package
 #'
-#' @param station_id 
 #' @param data 
 #' @param pollutant 
 #' @param unit 

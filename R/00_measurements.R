@@ -65,13 +65,13 @@ get_measurements <- function(meas=NULL,
     meas <- meas %>%
       dplyr::group_by(location_id, poll, unit, source, process_id, country) %>%
       tidyr::nest() %>%
-      dplyr::rename(station_id=location_id, meas=data) %>%
+      dplyr::rename(meas=data) %>%
       dplyr::ungroup()
     
     # Transform to sf
     meas <- meas %>%
       dplyr::ungroup() %>%
-      dplyr::left_join(meas_geom, by=c("station_id"="location_id")) %>%
+      dplyr::left_join(meas_geom, by=c("location_id")) %>%
       dplyr::mutate(geometry=suppressWarnings(sf::st_centroid(geometry))) %>%
       sf::st_as_sf(sf_column_name="geometry", crs = 4326)
   }

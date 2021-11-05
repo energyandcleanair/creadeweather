@@ -7,14 +7,14 @@ test_that("deweathering", {
   dotenv::load_dot_env("../../.env")
   
   # A station in Brussels
-  station_id <- "sta-betn043"
+  location_id <- "sta-betn043"
   source <- "eea"
   polls <- rcrea::NO2
   
   results <- deweather(
     polls=polls,
     source=source,
-    station_id=station_id,
+    location_id=location_id,
     aggregate_level="station",
     output=c("anomaly","trend"),
     upload_results=F

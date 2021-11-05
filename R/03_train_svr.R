@@ -1,7 +1,6 @@
 #' Training a model using svr
 #'
 #'
-#' @param station_id 
 #' @param data 
 #' @param pollutant 
 #' @param unit 

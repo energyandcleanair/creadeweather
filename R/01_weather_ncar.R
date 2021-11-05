@@ -64,8 +64,8 @@ ncar.add_pbl <- function(weather, years){
   # ncar.refresh_files(years)
   
   stations_sf <- st_as_sf(weather %>% ungroup() %>%
-                            dplyr::select(station_id, geometry) %>%
-                            dplyr::distinct(station_id, .keep_all=T))
+                            dplyr::select(location_id, geometry) %>%
+                            dplyr::distinct(location_id, .keep_all=T))
   
   
   folder <- ncar.folder_pbl()
@@ -90,8 +90,8 @@ ncar.add_pbl <- function(weather, years){
                                                  sp = TRUE,
                                                  method='simple')) %>%
       dplyr::select(-c(coords.x1, coords.x2)) %>%
-      tidyr::gather("key","pbl",-station_id) %>%
-      group_by(station_id) %>%
+      tidyr::gather("key","pbl",-location_id) %>%
+      group_by(location_id) %>%
       dplyr::summarize(pbl_min=min(pbl, na.rm=T),
                 pbl_max=max(pbl, na.rm=T)) %>%
       dplyr::mutate(date=date_file)
@@ -108,9 +108,9 @@ ncar.add_pbl <- function(weather, years){
   
   # Join to weather data
   joined <- weather %>% dplyr::rowwise() %>% dplyr::filter(!is.null(weather)) %>%
-    dplyr::mutate(weather_station_id=station_id, weather=list(weather %>% left_join(
-      pbl_values %>% dplyr::filter(station_id==weather_station_id)
-    ))) %>% dplyr::select(-c(weather_station_id))
+    dplyr::mutate(weather_location_id=location_id, weather=list(weather %>% left_join(
+      pbl_values %>% dplyr::filter(location_id==weather_location_id)
+    ))) %>% dplyr::select(-c(weather_location_id))
   
   return(joined)
 }

@@ -109,7 +109,7 @@ utils.average_over_yearly_periods <- function(tbl, meas_col, years, doys){
 
 utils.add_city <- function(data){
   city_corr <- read.csv(file.path('data','00_init','input','eea_station_city.csv'))
-  data %>% left_join(city_corr %>% select(station_id, city))
+  data %>% left_join(city_corr %>% select(location_id, city))
 }
 
 

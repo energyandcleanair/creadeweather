@@ -37,8 +37,8 @@ collect_weather <- function(meas,
     dplyr::filter(nrow(meas)>0) %>%
     dplyr::mutate(date_from=min(meas$date, na.rm=T),
                   date_to=max(meas$date, na.rm=T)) %>%
-    dplyr::select(country, station_id, geometry, timezone, date_from, date_to) %>%
-    dplyr::distinct(country, station_id, timezone, .keep_all = T)
+    dplyr::select(country, location_id, geometry, timezone, date_from, date_to) %>%
+    dplyr::distinct(country, location_id, timezone, .keep_all = T)
 
   # Find weather stations nearby
   stations_w_noaa <- suppressMessages(
@@ -74,6 +74,12 @@ collect_weather <- function(meas,
                            save_trajs_filename=save_trajs_filename)  
   }
   
+  # Unnest
+  weather <- weather %>%
+    as.data.frame() %>%
+    select(-c(noaa_station)) %>%
+    tidyr::unnest(weather)
+  
   return(weather)
 }
 
@@ -88,9 +94,14 @@ combine_meas_weather <- function(meas, weather){
     meas <- tibble(meas)
   }
   
+  weather_nested <- weather %>%
+    group_by(location_id) %>%
+    tidyr::nest() %>%
+    rename(weather=data)
+  
   meas_w_weather <- tibble(meas) %>%
-    dplyr::left_join(weather %>% dplyr::select(station_id, weather) %>% as.data.frame(),
-                     by="station_id") %>%
+    dplyr::left_join(weather_nested,
+                     by="location_id") %>%
     dplyr::rowwise() %>%
     dplyr::filter(!is.null(weather)) %>%
     dplyr::filter(!is.null(meas)) %>%

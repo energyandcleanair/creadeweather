@@ -2,8 +2,8 @@
 sirad.add_sunshine <- function(meas_w_weather){
   
   stations_sf <- st_as_sf(meas_w_weather %>% ungroup() %>%
-                            dplyr::select(station_id, geometry) %>%
-                            dplyr::distinct(station_id, .keep_all=T))
+                            dplyr::select(location_id, geometry) %>%
+                            dplyr::distinct(location_id, .keep_all=T))
   
 
   # Get hourly solar radiation at each day and hour
@@ -15,7 +15,7 @@ sirad.add_sunshine <- function(meas_w_weather){
 
   sunshine_nested <- sunshine %>%
     tidyr::nest(sunshine=c(doy, sunshine)) %>%
-    dplyr::select(station_id, sunshine)
+    dplyr::select(location_id, sunshine)
 
   # Merge with previous weather data
   w_sunshine <- meas_w_weather %>%

@@ -225,8 +225,8 @@ cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
   cfs.refresh_files(dates)
   
   stations_sf <- st_as_sf(weather %>% ungroup() %>%
-                            dplyr::select(station_id, geometry) %>%
-                            dplyr::distinct(station_id, .keep_all=T))
+                            dplyr::select(location_id, geometry) %>%
+                            dplyr::distinct(location_id, .keep_all=T))
   
   
   dir_cfs <- cfs.folder_cfs()
@@ -236,9 +236,9 @@ cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
     as.data.frame() %>%
     rowwise() %>%
     mutate(date=list(unique((weather$date)))) %>%
-    dplyr::select(station_id, timezone, date, geometry) %>%
+    dplyr::select(location_id, timezone, date, geometry) %>%
     tidyr::unnest(date) %>%
-    distinct(station_id, timezone, date, geometry) %>%
+    distinct(location_id, timezone, date, geometry) %>%
     rowwise()
   
   # Collecting all positions to be read for each file
@@ -256,22 +256,22 @@ cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
     fps <- data %>% distinct(fp, date, variable) %>%
       filter(file.exists(fp))
     
-    gs <- sf::st_as_sf(data %>% distinct(station_id,geometry))
+    gs <- sf::st_as_sf(data %>% distinct(location_id,geometry))
     ts <- terra::rast(fps$fp)
     pbls <- terra::extract(ts, st_coordinates(gs))
     
     
     pbls.df <- data.frame(value=t(pbls))
-    names(pbls.df) <- gs$station_id
+    names(pbls.df) <- gs$location_id
     pbls.df$variable <- fps$variable
     pbls.df$date <- fps$date
   
     pbls.tojoin <- tibble(pbls.df) %>%
-      tidyr::pivot_longer(cols=-c(date, variable), names_to="station_id", values_to="value") %>%
+      tidyr::pivot_longer(cols=-c(date, variable), names_to="location_id", values_to="value") %>%
       tidyr::pivot_wider(names_from=variable, values_from=value)
     
     data %>%
-      distinct(station_id, date) %>%
+      distinct(location_id, date) %>%
       dplyr::left_join(pbls.tojoin)
   }
   
@@ -283,11 +283,11 @@ cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
   joined <- weather %>%
     dplyr::rowwise() %>%
     dplyr::filter(!is.null(weather)) %>%
-    dplyr::mutate(weather_station_id=station_id,
+    dplyr::mutate(weather_location_id=location_id,
                   weather=list(weather %>% left_join(
-                    pbl_values %>% dplyr::filter(station_id==weather_station_id) %>%
-                      select(-c(station_id))
-    ))) %>% dplyr::select(-c(weather_station_id))
+                    pbl_values %>% dplyr::filter(location_id==weather_location_id) %>%
+                      select(-c(location_id))
+    ))) %>% dplyr::select(-c(weather_location_id))
   
   return(joined)
 }

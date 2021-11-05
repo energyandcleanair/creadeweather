@@ -14,7 +14,7 @@
 #' A prediction period which is the period for which we want to get deweathered data
 #' (when using anomaly approach)
 #'
-#' @param station_id 
+#' @param location_id 
 #' @param data 
 #' @param pollutant 
 #' @param unit 

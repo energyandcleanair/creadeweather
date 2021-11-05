@@ -51,7 +51,7 @@ postcompute_results_rmweather <- function(result_folder,
   
   # saveRDS(result_impact, file=file.path(result_folder, 'result_impact.RDS'))
   saveRDS(result_impact %>% 
-            dplyr::select(station_id, pollutant, unit, country, geometry,
+            dplyr::select(location_id, pollutant, unit, country, geometry,
                           movement, avg_observed, avg_predicted,diff, diff_ratio, gpw),
           file=file.path(result_folder, 'result_impact_lite.RDS'))
   

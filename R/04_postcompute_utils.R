@@ -29,7 +29,7 @@ postcompute.before_after <- function(result_, years_before){
                               diff_normalised=after_normalised-before_normalised
   )
 
-  result_ <- result_ %>% dplyr::select(station_id, country, pollutant, unit, diff_observed, diff_normalised, ratio_observed, ratio_normalised) %>%
+  result_ <- result_ %>% dplyr::select(location_id, country, pollutant, unit, diff_observed, diff_normalised, ratio_observed, ratio_normalised) %>%
     tidyr::gather("type","value", c(diff_observed, diff_normalised, ratio_observed, ratio_normalised)) %>%
     tidyr::separate(type, c("var", "normalised"))
 
@@ -50,8 +50,8 @@ postcompute.add_metadata <- function(result_){
   
   join_dblocs <- ! all(c("country","geometry") %in% colnames(result_))
   if(join_dblocs){
-    locs <- creadb::locations(id=unique(result_$station_id))
-    result_ <- result_ %>% dplyr::ungroup() %>% dplyr::left_join(locs, by=c('station_id'='id'), all.x=T)
+    locs <- creadb::locations(id=unique(result_$location_id))
+    result_ <- result_ %>% dplyr::ungroup() %>% dplyr::left_join(locs, by=c('location_id'='id'), all.x=T)
   }
   
   result_ <- result_ %>% dplyr::ungroup() %>%

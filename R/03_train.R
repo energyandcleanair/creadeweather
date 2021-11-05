@@ -107,9 +107,9 @@ train_models <- function(meas_weather,
          "deweather"=train_model_deweather
   )
 
-  train_model_safe <- function(index, station_id, ...){
+  train_model_safe <- function(index, location_id, ...){
     tryCatch({
-      print(paste("Training model on location", station_id))
+      print(paste("Training model on location", location_id))
       res <- train_model(...)
       res$index <- index
       return(res)
@@ -125,7 +125,7 @@ train_models <- function(meas_weather,
   
   result <- pbapply::pbmapply(train_model_safe,
                      index=meas_weather_lag$index,
-                     station_id=meas_weather_lag$station_id,
+                     location_id=meas_weather_lag$location_id,
                      data=meas_weather_lag$meas_weather,
                      normalise=normalise,
                      training_date_cut=training_date_cut,

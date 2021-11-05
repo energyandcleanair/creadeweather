@@ -3,8 +3,8 @@
 noaa.add_close_stations <- function(meas, n_per_station){
 
   meas_stations <- meas %>% ungroup() %>%
-    dplyr::select(station_id, geometry) %>%
-    distinct(station_id, .keep_all=T) %>%
+    dplyr::select(location_id, geometry) %>%
+    distinct(location_id, .keep_all=T) %>%
     rowwise() %>%
     mutate(noaa_station=list(
       rnoaa::isd_stations_search(
@@ -161,7 +161,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
     dplyr::ungroup() %>%
     tidyr::unnest(cols=(noaa_station)) %>%
     as.data.frame() %>%
-    dplyr::distinct(station_id, usaf, wban, date_from, date_to)
+    dplyr::distinct(location_id, usaf, wban, date_from, date_to)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
@@ -198,11 +198,11 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
     dplyr::left_join(
       stations_weather %>%
         as.data.frame() %>%
-        dplyr::select(station_id, weather, date_from, date_to) %>%
+        dplyr::select(location_id, weather, date_from, date_to) %>%
         dplyr::rowwise() %>%
         dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
         ungroup() %>%
-        group_by(station_id) %>%
+        group_by(location_id) %>%
         summarise(weather=list(bind_rows(weather) %>%
                  dplyr::mutate(date=to_date(date)) %>%
                  dplyr::filter(!is.na(date)) %>%
@@ -226,7 +226,7 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
                  )
             )
         ),
-      by="station_id"
+      by="location_id"
       ) %>%
     dplyr::select(-c(date_from, date_to)))
   print("Done [Adding weather from NOAA]")
