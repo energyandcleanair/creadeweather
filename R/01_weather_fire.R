@@ -88,7 +88,11 @@ fire.add_fire <- function(weather,
     }
     
     print("Attaching fires to trajectories")
-    wtf <- attach_fn(wt, buffer_km=buffer_km)
+    wtf <- attach_fn(wt, buffer_km=buffer_km,
+                     parallel=T,
+                     mc.cores=max(round(parallel::detectCores()-2), 1)
+                    )
+                    
     print("Done")
     
   # }else if(mode=="dispersion"){

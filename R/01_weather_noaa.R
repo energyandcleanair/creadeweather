@@ -152,16 +152,19 @@ noaa.get_folder <- function(){
 }
 
 
-noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
+noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
   
   print("Adding weather from NOAA")
   cache_folder <- noaa.get_folder()
   
-  stations_weather <- meas_w_stations %>%
+  stations_weather <- stations_w_noaa %>%
     dplyr::ungroup() %>%
-    tidyr::unnest(cols=(noaa_station)) %>%
     as.data.frame() %>%
-    dplyr::distinct(location_id, usaf, wban, date_from, date_to)
+    rowwise() %>%
+    mutate(date_from=min(dates$date),
+           date_to=max(dates$date)) %>%
+    tidyr::unnest(cols=(noaa_station)) %>%
+    dplyr::distinct(location_id, usaf, wban, date_from, date_to, dates)
   
   stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
   print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
@@ -194,12 +197,14 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
   }
   
   # Note: Certain dates have no data at all and hence raise warnings
-  meas_w_stations <- suppressWarnings(meas_w_stations %>%
+  stations_weather <- suppressWarnings(stations_w_noaa %>%
     dplyr::left_join(
       stations_weather %>%
         as.data.frame() %>%
-        dplyr::select(location_id, weather, date_from, date_to) %>%
+        dplyr::select(location_id, weather, date_from, date_to, dates) %>%
         dplyr::rowwise() %>%
+        # Only keep required dates
+        mutate(weather=list(weather %>% inner_join(dates))) %>%
         dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
         ungroup() %>%
         group_by(location_id) %>%
@@ -227,10 +232,9 @@ noaa.add_weather <- function(meas_w_stations, years_force_refresh=c(2021)){
             )
         ),
       by="location_id"
-      ) %>%
-    dplyr::select(-c(date_from, date_to)))
+      ))
   print("Done [Adding weather from NOAA]")
-  return(meas_w_stations)
+  return(stations_weather)
 }
 
 

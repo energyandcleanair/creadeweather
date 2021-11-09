@@ -33,12 +33,17 @@ collect_weather <- function(meas,
 
   # Find unique AQ stations
   stations <- meas %>%
-    dplyr::rowwise() %>%
-    dplyr::filter(nrow(meas)>0) %>%
-    dplyr::mutate(date_from=min(meas$date, na.rm=T),
-                  date_to=max(meas$date, na.rm=T)) %>%
-    dplyr::select(country, location_id, geometry, timezone, date_from, date_to) %>%
-    dplyr::distinct(country, location_id, timezone, .keep_all = T)
+    as.data.frame() %>%
+    dplyr::select(country, location_id, geometry, meas) %>%
+    tidyr::unnest(meas) %>%
+    dplyr::distinct(country, location_id, timezone, geometry, date) %>%
+    dplyr::group_by(country, location_id, timezone, geometry) %>%
+    tidyr::nest() %>%
+    rename(dates=data) %>%
+    sf::st_as_sf() %>%
+    ungroup()
+  
+    
 
   # Find weather stations nearby
   stations_w_noaa <- suppressMessages(
@@ -46,7 +51,7 @@ collect_weather <- function(meas,
 
   # Get weather at these stations
   weather <- noaa.add_weather(stations_w_noaa,
-                                     years_force_refresh = years_force_refresh) %>%
+                              years_force_refresh = years_force_refresh) %>%
     dplyr::ungroup() %>%
     dplyr::filter(!is.null(weather))
   
