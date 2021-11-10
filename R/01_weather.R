@@ -82,7 +82,7 @@ collect_weather <- function(meas,
   # Unnest
   weather <- weather %>%
     as.data.frame() %>%
-    select(-c(noaa_station)) %>%
+    select(-c(noaa_station, dates)) %>%
     tidyr::unnest(weather)
   
   return(weather)
