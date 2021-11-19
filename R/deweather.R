@@ -24,6 +24,7 @@
 #' @param fire_mode circular, oriented, trajectory or dispersion
 #' @param fire_duration_hour 
 #' @param fire_buffer_km 
+#' @param fire_vars_pattern pattern for fire variable names used in model
 #' @param add_pbl 
 #' @param trajs_height receptor height for trajectories in meter.
 #' If null, pbl average will be considered.
@@ -53,21 +54,28 @@ deweather <- function(
   training_start_anomaly="2016-12-01",
   training_end_anomaly="2019-11-30",
   lag=1,
+  add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   training.fraction=1, #We rely on CV for optimal number of trees anyway
   link="linear", # 'log' or 'linear'
   # Fire options
-  #BIOMASS BURNING, WORK IN DEVELOPMENT
+  
+  #Biomass burning [WIP]
   add_fire=F, #Whether to add it in the model, 
   calc_fire=add_fire, #Whether to calculate fire numbers
   fire_source="viirs",
+  fire_vars_pattern="^fire_frp",
   fire_mode="circular",
+  fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
+  
+  # Trajectories
   trajs_height=NULL,
-  add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
+  save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
+  
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
-  save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
+  
   keep_model=T
 ){
   
@@ -130,6 +138,7 @@ deweather <- function(
                                fire_mode=fire_mode,
                                fire_duration_hour=fire_duration_hour,
                                fire_buffer_km=fire_buffer_km,
+                               fire_split_days=fire_split_days,
                                trajs_height=trajs_height,
                                save_trajs_filename=save_trajs_filename
     )
@@ -167,14 +176,14 @@ deweather <- function(
   
   if(add_fire){
     if(fire_source=="viirs"){
-      weather_vars <- c(weather_vars, "fire_frp")
+      weather_vars <- c(weather_vars, grep(fire_vars_pattern, names(weather), value=T))
     }
     if(fire_source=="gfas"){
       weather_vars <- c(weather_vars, "pm25_emission")
     }
   }
   
-  weather_vars <- c(list(weather_vars))
+  weather_vars <- c(list(unique(weather_vars)))
   
   configs <-  tibble() %>%
     tidyr::expand(trees,

@@ -24,6 +24,7 @@ collect_weather <- function(meas,
                             fire_mode="oriented",
                             fire_duration_hour=72,
                             fire_buffer_km=NULL,
+                            fire_split_days=F,
                             trajs_height=NULL,
                             save_trajs_filename=NULL){
     
@@ -76,6 +77,7 @@ collect_weather <- function(meas,
                            duration_hour=fire_duration_hour,
                            buffer_km=fire_buffer_km,
                            trajs_height=trajs_height,
+                           split_days=fire_split_days,
                            save_trajs_filename=save_trajs_filename)  
   }
   

@@ -211,8 +211,8 @@ noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
         summarise(weather=list(bind_rows(weather) %>%
                  dplyr::mutate(date=to_date(date)) %>%
                  dplyr::filter(!is.na(date)) %>%
-                 dplyr::filter(date>=date_from) %>%
-                 dplyr::filter(date<=date_to) %>%
+                 dplyr::filter(date>=unique(date_from)) %>%
+                 dplyr::filter(date<=unique(date_to)) %>%
                  dplyr::group_by(date) %>%
                  dplyr::summarize(
                    air_temp_min=min(air_temp_min, na.rm=T),

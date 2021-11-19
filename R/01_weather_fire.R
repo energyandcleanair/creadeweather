@@ -28,6 +28,7 @@ fire.add_fire <- function(weather,
                           duration_hour=72,
                           delay_hour=24,
                           buffer_km=NULL,
+                          split_days=F,
                           trajs_height=NULL,
                           trajs_height_default=50, 
                           save_trajs_filename=NULL){
@@ -39,10 +40,10 @@ fire.add_fire <- function(weather,
   
   if(source=="gfas"){
     attach_fn <- creatrajs::gfas.attach_to_trajs
-    fire_vars <- "pm25_emission"
+    fire_vars_pattern <- "pm25_emission"
   }else{
     attach_fn <- creatrajs::fire.attach_to_trajs
-    fire_vars <- c("fire_frp", "fire_count")
+    fire_vars_pattern <- c("^fire_.*")
   }
   
   cols <- setdiff(c(names(weather), "date", "trajs_height", "wd_copy", "ws_copy"),"weather")
@@ -90,7 +91,8 @@ fire.add_fire <- function(weather,
     print("Attaching fires to trajectories")
     wtf <- attach_fn(wt, buffer_km=buffer_km,
                      parallel=T,
-                     mc.cores=max(round(parallel::detectCores()-2), 1)
+                     mc.cores=max(round(parallel::detectCores()-2), 1),
+                     split_days=split_days
                     )
                     
     print("Done")
@@ -162,7 +164,8 @@ fire.add_fire <- function(weather,
   result <- weather %>%
     left_join(wtf %>%
                 tidyr::unnest(fires) %>%
-                dplyr::select_at(c("location_id"="location_id", "date", fire_vars)) %>%
+                dplyr::select_at(c("location_id"="location_id", "date",
+                                   grep(fire_vars_pattern, names(.), value=T))) %>%
                 tidyr::nest(frp=-c(location_id))) %>%
     rowwise() %>%
     mutate(weather=list(weather %>% left_join(frp))) %>%
