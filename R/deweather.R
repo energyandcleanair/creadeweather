@@ -63,7 +63,7 @@ deweather <- function(
   add_fire=F, #Whether to add it in the model, 
   calc_fire=add_fire, #Whether to calculate fire numbers
   fire_source="viirs",
-  fire_vars_pattern="^fire_frp",
+  fire_vars_pattern=ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission"),
   fire_mode="circular",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_duration_hour=72, # For trajectories only
