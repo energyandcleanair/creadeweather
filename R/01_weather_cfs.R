@@ -146,8 +146,16 @@ cfs.process_date <- function(date, cache_rs=NULL){
 
 cfs.timezone_sf <- function(){
   
-  fp <- file.path(Sys.getenv("DIR_DATA"),"boundaries","timezones","naturalearth",
-                  "ne_10m_time_zones.shp")
+  folder <- file.path(Sys.getenv("DIR_DATA"),"boundaries","timezones","naturalearth") 
+  fp <- file.path(folder, "ne_10m_time_zones.shp")
+  
+  if(!file.exists(fp)){
+    dir.create(folder, recursive = T, showWarnings = F)
+    fp_zip <- gsub("\\.shp","\\.zip", fp)
+    download.file("https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_time_zones.zip",
+                  fp_zip)
+    unzip(fp_zip, exdir=folder)
+  }
   
   sf::read_sf(fp)
 }
