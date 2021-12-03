@@ -179,7 +179,7 @@ deweather <- function(
       weather_vars <- c(weather_vars, grep(fire_vars_pattern, names(weather), value=T))
     }
     if(fire_source=="gfas"){
-      weather_vars <- c(weather_vars, "pm25_emission")
+      weather_vars <- c(weather_vars, grep("^pm25_emission", names(weather), value=T))
     }
   }
   

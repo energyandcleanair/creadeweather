@@ -35,12 +35,13 @@ collect_weather <- function(meas,
   # Find unique AQ stations
   stations <- meas %>%
     as.data.frame() %>%
-    dplyr::select(country, location_id, geometry, meas) %>%
+    dplyr::select(country, location_id, meas) %>%
     tidyr::unnest(meas) %>%
-    dplyr::distinct(country, location_id, timezone, geometry, date) %>%
-    dplyr::group_by(country, location_id, timezone, geometry) %>%
+    dplyr::distinct(country, location_id, timezone, date) %>%
+    dplyr::group_by(country, location_id, timezone) %>%
     tidyr::nest() %>%
     rename(dates=data) %>%
+    left_join(meas %>% ungroup() %>% distinct(location_id, geometry)) %>%
     sf::st_as_sf() %>%
     ungroup()
   
