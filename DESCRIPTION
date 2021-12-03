@@ -50,7 +50,8 @@ Imports:
     stringi,
     exactextractr,
     httr,
-    terra
+    terra,
+    ncdf4
 Depends:
     ggplot2,
     worldmet
