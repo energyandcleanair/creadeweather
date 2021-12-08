@@ -25,7 +25,9 @@ prep_data <- function(meas_weather){
     }
     
     # Replace NaNs with NA (gbm doesn't like NaNs)
-    tbl <- tbl %>% utils.replace_nan_with_na()
+    tbl <- tbl %>%
+      utils.replace_nan_with_na() %>%
+      filter(!is.na(date))
     
     return(tbl)
   }
