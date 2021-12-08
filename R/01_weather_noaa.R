@@ -161,8 +161,8 @@ noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
     dplyr::ungroup() %>%
     as.data.frame() %>%
     rowwise() %>%
-    mutate(date_from=min(dates$date),
-           date_to=max(dates$date)) %>%
+    mutate(date_from=min(dates$date, na.rm=T),
+           date_to=max(dates$date, na.rm=T)) %>%
     tidyr::unnest(cols=(noaa_station)) %>%
     dplyr::distinct(location_id, usaf, wban, date_from, date_to, dates)
   
