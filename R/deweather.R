@@ -70,6 +70,7 @@ deweather <- function(
   fire_buffer_km=10,
   
   # Trajectories
+  trajs_parallel=T,
   trajs_height=NULL,
   save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
   
@@ -139,6 +140,7 @@ deweather <- function(
                                fire_duration_hour=fire_duration_hour,
                                fire_buffer_km=fire_buffer_km,
                                fire_split_days=fire_split_days,
+                               trajs_parallel=trajs_parallel,
                                trajs_height=trajs_height,
                                save_trajs_filename=save_trajs_filename
     )
