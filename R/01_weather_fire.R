@@ -90,20 +90,19 @@ fire.add_fire <- function(weather,
     }
     
     print("Attaching fires to trajectories")
-    tryCatch({
-      wtf <- attach_fn(wt, buffer_km=buffer_km,
-                       parallel=trajs_parallel,
-                       mc.cores=max(round(parallel::detectCores()-2), 1),
-                       split_days=split_days
-      )  
+    wtf <- tryCatch({
+      attach_fn(wt,
+                buffer_km=buffer_km,
+                parallel=trajs_parallel,
+                mc.cores=max(round(parallel::detectCores()-2), 1),
+                split_days=split_days)  
     }, error=function(e){
       print("Failed to attach fires. Adding NAs instead")
-      wtf <- wt %>%
+      return(wt %>%
         rowwise() %>%
         mutate(fires=list(tibble(fire_frp=NA, fire_count=NA))) %>%
-        ungroup()
+        ungroup())
     })
-                    
     print("Done")
     
   # }else if(mode=="dispersion"){
