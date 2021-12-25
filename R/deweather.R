@@ -55,7 +55,7 @@ deweather <- function(
   training_end_anomaly="2019-11-30",
   lag=1,
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
-  training.fraction=1, #We rely on CV for optimal number of trees anyway
+  training.fraction=0.9, #Used for testing
   link="linear", # 'log' or 'linear'
   # Fire options
   
@@ -105,6 +105,7 @@ deweather <- function(
   ) %>%
     filter(output %in% !!output)
   
+  
   #----------------------
   # 0. Get measurements
   #----------------------
@@ -152,26 +153,12 @@ deweather <- function(
   #-----------------------------------------
   # 1bis. Combine weather and measurements
   #-----------------------------------------
-  meas_weather <- combine_meas_weather(meas, weather)
+  data <- combine_meas_weather(meas, weather)
   
-  #----------------------
-  # 2. Clean data
-  #----------------------
-  print("2. Cleaning data")
-  data <- prep_data(meas_weather=meas_weather)
-  
-  #----------------------
-  # 3. Train models
-  #----------------------
-  print("3. Training models")
-  normalise <- F
-  detect_breaks <- F
-  trees <- 10000
-  samples <- 100
-  interaction.depth <- c(2)
-  learning.rate <- c(0.01)
+  #-----------------------------------------
+  # 1ter. List weather variables
+  #-----------------------------------------
   weather_vars <- c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'precip', 'RH_max')
-
   if(add_pbl){
     weather_vars <- c(weather_vars,'pbl_min', 'pbl_max')
   }
@@ -185,13 +172,32 @@ deweather <- function(
     }
   }
   
-  weather_vars <- c(list(unique(weather_vars)))
+  #----------------------
+  # 2. Clean data
+  #----------------------
+  print("2. Cleaning data")
+  data <- prep_data(data=data,
+                    weather_vars=weather_vars,
+                    lag=lag)
+  
+  #----------------------
+  # 3. Train models
+  #----------------------
+  print("3. Training models")
+  normalise <- F
+  detect_breaks <- F
+  trees <- 10000
+  samples <- 100
+  interaction.depth <- c(2)
+  learning.rate <- c(0.01)
+
+  weather_vars_list <- c(list(unique(weather_vars)))
   
   configs <-  tibble() %>%
     tidyr::expand(trees,
                   lag,
                   training.fraction,
-                  weather_vars,
+                  weather_vars=weather_vars_list,
                   time_vars_output,
                   engine,
                   link,
@@ -221,7 +227,7 @@ deweather <- function(
     mutate(
       result=list(train_models(
         engine=engine,
-        meas_weather=tibble(data),
+        data=tibble(data),
         weather_vars=weather_vars,
         time_vars=time_vars,
         trees=trees,

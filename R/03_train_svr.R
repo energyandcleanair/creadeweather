@@ -10,7 +10,7 @@
 #' @export
 #'
 #' @examples
-train_model_svr <- function(data,
+train_svr <- function(data,
                                   training_date_cut,
                                   weather_vars,
                                   time_vars,

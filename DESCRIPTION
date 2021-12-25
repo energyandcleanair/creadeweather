@@ -51,7 +51,8 @@ Imports:
     exactextractr,
     httr,
     terra,
-    ncdf4
+    ncdf4,
+    caret
 Depends:
     ggplot2,
     worldmet

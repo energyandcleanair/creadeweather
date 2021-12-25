@@ -25,7 +25,7 @@
 #' @export
 #'
 #' @examples
-train_model_gbm <- function(data,
+train_gbm <- function(data,
                             training_date_cut,
                             weather_vars,
                             time_vars,
@@ -93,9 +93,21 @@ train_model_gbm <- function(data,
     rows <- sample(nrow(data_prepared))
     data_prepared <- data_prepared[rows, ]
   }
- 
-  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
-  data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
+  
+  # We separate into:
+  # Training: before date_cut, taking a training.fraction share
+  # Testing: before date_cut, taking a 1-training.fraction share
+  # Prediction: after date_cut (typically for anomaly estimation: observed-predicted)
+  i_before_data_cut <- which(data_prepared$date <= training_date_cut)
+  i_training <- sample(i_before_data_cut, training.fraction * length(i_before_data_cut))
+  i_testing <- setdiff(i_before_data_cut, i_training)
+  i_prediction <- which(data_prepared$date > training_date_cut)
+  
+  
+  data_prepared[i_training, 'set'] <- 'training'
+  data_prepared[i_testing, 'set'] <- 'testing'
+  data_prepared[i_prediction, 'set'] <- 'prediction'
+  
   
   # Train model -------------------------------------------------------------
   
@@ -108,9 +120,9 @@ train_model_gbm <- function(data,
       cv.folds = 3,
       shrinkage=learning.rate,
       interaction.depth=interaction.depth,
-      train.fraction = training.fraction,
+      train.fraction = 1, # We keep testing set separately
       n.cores = n_cores,
-      n.trees = trees, #So far, it seems only up to 300 trees are used
+      n.trees = trees, #This is actually the max number of trees. Will adjust after
       verbose = FALSE,
       keep.data = F
     )
@@ -132,14 +144,14 @@ train_model_gbm <- function(data,
   # Fit
   model <- model_gbm(data_prepared %>% dplyr::filter(set=="training" & !is.na(value) & !is.infinite(value)), formula) 
   
+  
   # Optimal number of trees
   # Two options: OOB or CV
   # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
-  # Plus we won't have OOB tree number if train.fraction=1
   n.trees.opt <- gbm::gbm.perf(model, method="cv", plot.it = F)
   print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
-  # n.trees.opt <- gbm::gbm.perf(model, method="OOB")
-
+  
+  
   # Predict results ---------------------------------------------------------
   data_prepared$predicted <- gbm::predict.gbm(model,
                                               data_prepared,
@@ -165,48 +177,47 @@ train_model_gbm <- function(data,
   
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
-
-  # Add performance metrics ----------------------------------------------------
+  #-------------------------------------
+  # Add model details and performance
+  #-------------------------------------
   
   # We only keep 'useful' information to save space
   # Can take several MB per model otherwise
   model_light <- model[c("shrinkage",
                          "train.fraction",
                          "cv.folds")]
-  
-  # model_light$cv.error <- model_light$cv.error[n.trees.opt]
-  # model_light$train.error <- model_light$train.error[n.trees.opt]
-  # model_light$valid.error <- model_light$valid.error[n.trees.opt]
-  
-  # Another way to get RMSE (see for instance http://uc-r.github.io/gbm_regression)
-  model_light$rmse_crossvalid <- sqrt(do_unlink(model$cv.error[n.trees.opt]))
-  model_light$rmse_train <- sqrt(do_unlink(model$train.error[n.trees.opt]))
-  model_light$rmse_valid <- sqrt(do_unlink(model$valid.error[n.trees.opt]))
 
-  # Metrics on predicting period
-  # Not that if values highly deviated (e.g. because of COVID)
-  # then it is normal to have large errors. This is precisely why we're using it
-  data_predict <- data_prepared %>% filter(set=="prediction") %>% filter(!is.na(value) & !is.infinite(value))
-  model_light$rmse_predict <- Metrics::rmse(data_predict$value, data_predict$predicted)
-  model_light$mae_predict <- Metrics::mae(data_predict$value, data_predict$predicted)
-  model_light$rsquared_predict <- 1 - sum((data_predict$predicted - data_predict$value)^2) / sum((data_predict$value - mean(data_predict$value))^2)
+  metrics <- lapply(split(data_prepared, data_prepared$set), function(d){
+    tibble(
+      set=unique(d$set),
+      rmse=Metrics::rmse(d$value, d$predicted),
+      rsquared=cor(d$value, d$predicted)^2
+    )
+  }) %>%
+    do.call(bind_rows, .) %>%
+    tidyr::pivot_wider(names_from=set, values_from=c(rmse, rsquared)) %>%
+    as.list()
   
-  # Metrics on whole training
-  data_training <- data_prepared %>% filter(set=="training") %>% filter(!is.na(value) & !is.infinite(value))
-  model_light$rmse_trainval<- Metrics::rmse(data_training$value, data_training$predicted)
-  model_light$mae_trainval <- Metrics::mae(data_training$value, data_training$predicted)
-  model_light$rsquared_trainval <- 1 - sum((data_training$predicted - data_training$value)^2) / sum((data_training$value - mean(data_training$value))^2)
-
+  model_light <- model_light %>%
+    modifyList(metrics)
+  
+  
   # Variable importance
   model_light$importance <- summary(model, plotit = F)
   
+  
+  #----------------------------------------
+  # Add fire and trend stuff if required
+  #----------------------------------------
   cols <- c("date", "set", "value", "predicted")
   if(add_nofire){
     cols <- c(cols, "predicted_nofire")
   }
     
   res <- tibble(model=list(model_light),
-                predicted=list(data_prepared %>% dplyr::select_at(cols) %>% arrange(date))
+                predicted=list(data_prepared %>%
+                                 dplyr::select_at(cols) %>%
+                                 arrange(date))
   )
    
   if(normalise){
@@ -214,7 +225,6 @@ train_model_gbm <- function(data,
   }
 
   # Extract influence of time vars (e.g. trend) -----------------------------
-
   if(length(time_vars)>0){
     
     dates <- tibble(date=lubridate::date(unique(data_prepared %>% filter(set=='training') %>% pull(date)))) %>%

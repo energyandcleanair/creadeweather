@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-train_model_deweather <- function(data,
+train_deweather <- function(data,
                                   training_date_cut,
                                   weather_vars,
                                   time_vars,
