@@ -57,7 +57,8 @@ deweather <- function(
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   training.fraction=0.9, #Used for testing
   link="linear", # 'log' or 'linear'
-  # Fire options
+  cv_folds=3,
+  
   
   #Biomass burning [WIP]
   add_fire=F, #Whether to add it in the model, 
@@ -202,7 +203,8 @@ deweather <- function(
                   engine,
                   link,
                   learning.rate,
-                  interaction.depth) %>%
+                  interaction.depth,
+                  cv_folds=cv_folds) %>%
     rowwise() %>%
     mutate(process_deweather=
              gsub("'","\"",paste0("{",
@@ -237,6 +239,7 @@ deweather <- function(
         lag=lag,
         link=link,
         training.fraction=training.fraction,
+        cv_folds=cv_folds,
         normalise=normalise,
         detect_breaks=detect_breaks,
         training_date_cut=training_end)

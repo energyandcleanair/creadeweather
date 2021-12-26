@@ -26,18 +26,19 @@
 #'
 #' @examples
 train_gbm <- function(data,
-                            training_date_cut,
-                            weather_vars,
-                            time_vars,
-                            trees,
-                            normalise,
-                            detect_breaks,
-                            samples,
-                            interaction.depth=1,
-                            learning.rate=0.1,
-                            link="linear",
-                            training.fraction=0.9,
-                            ...){
+                      training_date_cut,
+                      weather_vars,
+                      time_vars,
+                      trees,
+                      normalise,
+                      detect_breaks,
+                      samples,
+                      interaction.depth=1,
+                      learning.rate=0.1,
+                      link="linear",
+                      training.fraction=0.9,
+                      cv_folds=3,
+                      ...){
   
   if(is.null(training_date_cut)){
     training_date_cut <- "2099-01-01"
@@ -117,7 +118,7 @@ train_gbm <- function(data,
       formula = formula,
       data = training_data,
       distribution='gaussian',
-      cv.folds = 3,
+      cv.folds = cv_folds,
       shrinkage=learning.rate,
       interaction.depth=interaction.depth,
       train.fraction = 1, # We keep testing set separately
