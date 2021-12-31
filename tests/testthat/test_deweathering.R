@@ -26,32 +26,3 @@ test_that("deweathering", {
   expect_gte(sum(complete.cases(results$normalised[[2]])), toyday) # Anomaly
   
 })
-
-
-test_that("deweathering - caret", {
-  
-  # Testthat changes working directory
-  # -> the embedded load_dot_env doesn't find env file
-  readRenviron(".Renviron")
-  
-  # Delhi
-  city <- "delhi"
-  source <- "cpcb"
-  polls <- rcrea::NO2
-  engine <- "caret"
-  
-  results <- deweather(
-    poll=polls,
-    source=source,
-    city=city,
-    engine="caret",
-    output=c("anomaly","trend"),
-    upload_results=F
-  )
-  
-  expect_equal(nrow(results), 2)
-  toyday <- lubridate::yday(lubridate::today())
-  expect_gte(sum(complete.cases(results$normalised[[1]])), 3*365 + toyday - 10) # Trend
-  expect_gte(sum(complete.cases(results$normalised[[2]])), toyday) # Anomaly
-  
-})
