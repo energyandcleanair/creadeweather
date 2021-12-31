@@ -204,7 +204,7 @@ noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
         dplyr::select(location_id, weather, date_from, date_to, dates) %>%
         dplyr::rowwise() %>%
         # Only keep required dates
-        mutate(weather=list(weather %>% inner_join(dates))) %>%
+        mutate(weather=list(weather %>% inner_join(dates, by="date"))) %>%
         dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
         ungroup() %>%
         group_by(location_id) %>%
