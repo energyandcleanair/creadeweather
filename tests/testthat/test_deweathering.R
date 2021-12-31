@@ -9,10 +9,10 @@ test_that("deweathering", {
   # A station in Brussels
   location_id <- "sta-betn043"
   source <- "eea"
-  polls <- rcrea::NO2
+  poll <- rcrea::NO2
   
-  results <- deweather(
-    polls=polls,
+  results <- creadeweather::deweather(
+    poll=poll,
     source=source,
     location_id=location_id,
     aggregate_level="station",
