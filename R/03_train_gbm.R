@@ -109,6 +109,9 @@ train_gbm <- function(data,
   data_prepared[i_testing, 'set'] <- 'testing'
   data_prepared[i_prediction, 'set'] <- 'prediction'
   
+  if(length(i_prediction) * length(i_training)==0){
+    stop("Missing training or predicting data")
+  }
   
   # Train model -------------------------------------------------------------
   
