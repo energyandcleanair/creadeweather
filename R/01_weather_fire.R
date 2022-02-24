@@ -31,7 +31,8 @@ fire.add_fire <- function(weather,
                           split_days=F,
                           trajs_height=NULL,
                           trajs_parallel=T,
-                          trajs_height_default=50, 
+                          trajs_height_default=50,
+                          use_trajs_cache=T,
                           save_trajs_filename=NULL){
   
   
@@ -77,7 +78,7 @@ fire.add_fire <- function(weather,
         duration_hour=duration_hour,
         hours=seq(0,23,4), # To make it faster, we don't calculate trajectories every hour
         timezone=wt$timezone,
-        cache_folder=NULL, #utils.get_cache_folder('trajs'),
+        use_cache=use_trajs_cache,
         parallel=trajs_parallel
     )
     names(wt$trajs) <- NULL

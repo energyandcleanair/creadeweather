@@ -27,6 +27,7 @@ collect_weather <- function(meas,
                             fire_split_days=F,
                             trajs_parallel=T,
                             trajs_height=NULL,
+                            use_trajs_cache=T,
                             save_trajs_filename=NULL){
     
   if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
@@ -81,6 +82,7 @@ collect_weather <- function(meas,
                            trajs_height=trajs_height,
                            trajs_parallel=trajs_parallel,
                            split_days=fire_split_days,
+                           use_trajs_cache=use_trajs_cache,
                            save_trajs_filename=save_trajs_filename)  
   }
   
