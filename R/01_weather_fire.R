@@ -74,7 +74,7 @@ fire.add_fire <- function(weather,
         location_id=wt$location_id,
         geometry=wt$geometry,
         met_type=met_type,
-        heights=wt$trajs_height,
+        height=wt$trajs_height,
         duration_hour=duration_hour,
         hours=seq(0,23,4), # To make it faster, we don't calculate trajectories every hour
         timezone=wt$timezone,
@@ -98,7 +98,7 @@ fire.add_fire <- function(weather,
                 mc.cores=max(round(parallel::detectCores()-2), 1),
                 split_days=split_days)  
     }, error=function(e){
-      print("Failed to attach fires. Adding NAs instead")
+      print(sprintf("Failed to attach fires. Adding NAs instead, Error: %s", e))
       return(wt %>%
         rowwise() %>%
         mutate(fires=list(tibble(fire_frp=NA, fire_count=NA))) %>%
@@ -114,7 +114,7 @@ fire.add_fire <- function(weather,
   #     location_id=wt$location_id,
   #     geometry=wt$geometry,
   #     met_type=met_type,
-  #     heights=wt$trajs_height,
+  #     height=wt$trajs_height,
   #     duration_hour=duration_hour,
   #     timezone=wt$timezone,
   #     cache_folder=utils.get_cache_folder('dispersion'),

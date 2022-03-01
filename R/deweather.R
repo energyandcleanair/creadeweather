@@ -73,7 +73,8 @@ deweather <- function(
   # Trajectories
   trajs_parallel=T,
   trajs_height=NULL,
-  save_trajs_filename=NULL, # Only used if fire_mode==trajectories and add_fire==T
+  use_trajs_cache=T,
+  save_trajs_filename=NULL,
   
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
@@ -144,6 +145,7 @@ deweather <- function(
                                fire_split_days=fire_split_days,
                                trajs_parallel=trajs_parallel,
                                trajs_height=trajs_height,
+                               use_trajs_cache=use_trajs_cache,
                                save_trajs_filename=save_trajs_filename
     )
     if(!is.null(save_weather_filename)){

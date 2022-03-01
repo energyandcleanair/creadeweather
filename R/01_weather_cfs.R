@@ -93,18 +93,37 @@ cfs.process_date <- function(date, cache_rs=NULL){
                      rh <- cache_rs[[as.character(h)]]
                    }else{
                      fp <- cfs.hour_to_filepath(h, dir_cfs)
-                     rh <- raster::raster(fp, varname="HPBL_surface") %>%
-                       # Moving from 0-360 to -180-180
-                       # To match locations and timezone shapefiles
-                       raster::rotate()
+                     rh <- tryCatch({
+                       raster::raster(fp, varname="HPBL_surface") %>%
+                         # Moving from 0-360 to -180-180
+                         # To match locations and timezone shapefiles
+                         raster::rotate()
+                     }, error=function(x){
+                       print(sprintf("Trying trick with cfs %s",fp))
+                       return(tryCatch({
+                         h_safe <- as.Date("2021-01-01")
+                         fp_safe <- cfs.hour_to_filepath(h_safe, dir_cfs)
+                         dim_safe <- stars::read_ncdf(fp_safe, var="HPBL_surface") %>% stars::st_dimensions()
+                         stars::read_ncdf(fp, var="HPBL_surface") %>%
+                                stars::`st_dimensions<-`(dim_safe) %>%
+                                as("SpatRaster") %>%
+                                raster::raster() %>%
+                                raster::rotate()
+                       }, error=function(e){
+                         print("No data could be extracted")
+                         return(NULL)
+                       }))
+                     })
                    }
-                   
                    rh
                  },
                  cache_rs=cache_rs,
                  dir_cfs=dir_cfs)
     
     names(rs) <- as.character(hours)
+    valid <-!unlist(lapply(rs, is.null))
+    rs <- rs[valid]
+    hours <- hours[valid]
     
     # Mask rasters based on date
     rs.masked <- mapply(
