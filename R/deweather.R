@@ -67,6 +67,7 @@ deweather <- function(
   fire_vars_pattern=ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission"),
   fire_mode="circular",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
+  fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0" or "gadm_1"
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
   
@@ -143,6 +144,7 @@ deweather <- function(
                                fire_duration_hour=fire_duration_hour,
                                fire_buffer_km=fire_buffer_km,
                                fire_split_days=fire_split_days,
+                               fire_split_regions=fire_split_regions,
                                trajs_parallel=trajs_parallel,
                                trajs_height=trajs_height,
                                use_trajs_cache=use_trajs_cache,
@@ -171,7 +173,7 @@ deweather <- function(
       weather_vars <- c(weather_vars, grep(fire_vars_pattern, names(weather), value=T))
     }
     if(fire_source=="gfas"){
-      weather_vars <- c(weather_vars, grep("^pm25_emission", names(weather), value=T))
+      weather_vars <- c(weather_vars, grep("^pm25_emission.*", names(weather), value=T))
     }
   }
   

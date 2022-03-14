@@ -29,6 +29,7 @@ fire.add_fire <- function(weather,
                           delay_hour=24,
                           buffer_km=NULL,
                           split_days=F,
+                          split_regions=NULL,
                           trajs_height=NULL,
                           trajs_parallel=T,
                           trajs_height_default=50,
@@ -96,7 +97,8 @@ fire.add_fire <- function(weather,
                 buffer_km=buffer_km,
                 parallel=trajs_parallel,
                 mc.cores=max(round(parallel::detectCores()-2), 1),
-                split_days=split_days)  
+                split_days=split_days,
+                split_regions=split_regions)
     }, error=function(e){
       print(sprintf("Failed to attach fires. Adding NAs instead, Error: %s", e))
       return(wt %>%
