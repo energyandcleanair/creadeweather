@@ -125,7 +125,7 @@ train_gbm <- function(data,
       shrinkage=learning.rate,
       interaction.depth=interaction.depth,
       train.fraction = 1, # We keep testing set separately
-      n.cores = n_cores,
+      n.cores = 1, # nc_cores, Reaching C stack usage limit. Trying to see if this changes something
       n.trees = trees, #This is actually the max number of trees. Will adjust after
       verbose = FALSE,
       keep.data = F
@@ -135,12 +135,21 @@ train_gbm <- function(data,
   }
 
   formula_vars <- c(time_vars, weather_vars)
+  
+  # Some values may be all NA in training only
+  formula_vars <- data_prepared %>%
+    filter(set=='training') %>%
+    summarise_at(formula_vars, function(x) all(is.na(x))) %>%
+    tidyr::gather() %>%
+    filter(!value) %>%
+    pull(key)
+  
   formula <- reformulate(termlabels=formula_vars,
                          response='value')  
-  
   data_prepared <- data_prepared %>%
-    dplyr::filter_at(formula_vars, any_vars(!is.na(.))) %>%
+    dplyr::filter(if_any(formula_vars, ~ !is.na(.))) %>%
     dplyr::filter_at("value", all_vars(!is.na(.)))
+  
   
   # Add "link" transformation if required
   data_prepared$value <- do_link(data_prepared$value)
@@ -165,20 +174,33 @@ train_gbm <- function(data,
   # We create a no_fire counterfactual
   add_nofire <- any(stringr::str_detect(weather_vars, "fire|pm25_emission"))
   if(add_nofire){
+    
+    fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
+    fire_vars <- fire_vars[!grepl("_lag[[:digit:]]*$", fire_vars)]
+    for(fire_var in fire_vars){
+      data_prepared_nofire <- data_prepared
+      data_prepared_nofire[, fire_var] <- 0
+      # For lag
+      data_prepared_nofire[, grepl(paste0(fire_var,"_lag[[:digit:]]*$"), names(data_prepared_nofire))] <- 0
+      predicted_name <- paste0("predicted_nofire", gsub("fire_frp","",fire_var))
+      data_prepared[, predicted_name] <- do_unlink(predict(model,
+                                                data_prepared_nofire,
+                                                n.trees=n.trees.opt))
+    }
+    
+    
+    # Do a general no fire
+    fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
     data_prepared_nofire <- data_prepared
-    data_prepared_nofire[, grep("fire|pm25_emission", names(data_prepared))] <- 0
-    data_prepared$predicted_nofire <- predict(model,
-                                              data_prepared_nofire,
-                                              n.trees=n.trees.opt)
+    data_prepared_nofire[, fire_vars] <- 0
+    predicted_name <-"predicted_nofire"
+    data_prepared[, predicted_name] <- do_unlink(predict(model,
+                                                         data_prepared_nofire,
+                                                         n.trees=n.trees.opt))
   }
   
   data_prepared$value <- do_unlink(data_prepared$value)
   data_prepared$predicted <- do_unlink(data_prepared$predicted)
-  
-  if(add_nofire){
-    data_prepared$predicted_nofire <- do_unlink(data_prepared$predicted_nofire)
-  }
-  
   data_prepared$residuals <- data_prepared$predicted - data_prepared$value
   
   #-------------------------------------
@@ -215,7 +237,7 @@ train_gbm <- function(data,
   #----------------------------------------
   cols <- c("date", "set", "value", "predicted")
   if(add_nofire){
-    cols <- c(cols, "predicted_nofire")
+    cols <- c(cols, names(data_prepared)[grepl("predicted_nofire",names(data_prepared))])
   }
     
   res <- tibble(model=list(model_light),

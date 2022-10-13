@@ -40,7 +40,7 @@ utils.add_lag <- function(meas, lag_cols, group_cols, lags, lag_unit){
     group_by_at(vars(all_of(group_cols))) %>% arrange(date)
   for(lag in lags){
     my_lag <- list(function(x) dplyr::lag(x, n=lag))
-    names(my_lag) <- paste(lag) #will be appended to column name by mutate_at
+    names(my_lag) <- paste0('lag', lag) #will be appended to column name by mutate_at
     result <- result %>% dplyr::mutate_at(lag_cols, my_lag)
   }
   

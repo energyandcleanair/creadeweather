@@ -32,6 +32,7 @@ prep_data <- function(data,
 # Filter outliers etc.
 clean_data <- function(tbl){
   
+  
   # Remove infs in all vars
   tbl <- tbl %>% dplyr::mutate_if(is.numeric, function(x) ifelse(is.infinite(x), NA, x))
   
@@ -101,6 +102,7 @@ fill_data <- function(tbl){
 
 # Add lag and wind direction factor
 enrich_data <- function(tbl, lag, weather_vars){
+  
   tbl$wd_factor <- factor(tbl$wd %/% 45)
   
   # Add lag if need be
@@ -125,7 +127,7 @@ filter_data <- function(tbl, weather_vars){
   
   # With original weather data (lag doesn't count)
   tbl <- tbl %>%
-    filter_at(vars(weather_vars), any_vars(!is.na(.)))
+    dplyr::filter(if_any(weather_vars, ~ !is.na(.)))
   
   return(tbl)
 }

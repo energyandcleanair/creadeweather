@@ -53,6 +53,7 @@ deweather <- function(
   training_start_trend="2015-01-01",
   training_start_anomaly="2016-12-01",
   training_end_anomaly="2019-11-30",
+  date_to=NULL,
   lag=1,
   add_pbl=T, #INCLUDING PLANETARY BOUNDARY LAYER OR NOT
   training.fraction=0.9, #Used for testing
@@ -65,9 +66,9 @@ deweather <- function(
   calc_fire=add_fire, #Whether to calculate fire numbers
   fire_source="viirs",
   fire_vars_pattern=ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission"),
-  fire_mode="circular",
+  fire_mode="trajectory",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
-  fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0" or "gadm_1"
+  fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0", "gadm_1" or "gadm_2"
   fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
   
@@ -118,6 +119,7 @@ deweather <- function(
                            country=country,
                            source=source,
                            date_from=min(time_vars_output$training_start),
+                           date_to=date_to,
                            city=city,
                            process_id=process_id,
                            aggregate_level=aggregate_level,
@@ -129,7 +131,7 @@ deweather <- function(
   #----------------------
   print("1. Adding weather")
   if(!is.null(read_weather_filename) && file.exists(read_weather_filename)){
-    weather <- read_weather(read_weather_filename)
+    weather <- creadeweather::read_weather(read_weather_filename)
   }else{
     weather <- collect_weather(meas,
                                years=seq(lubridate::year(lubridate::date(min(time_vars_output$training_start))),

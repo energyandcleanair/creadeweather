@@ -41,7 +41,7 @@ train_models <- function(data,
   
   if(!is.null(lag) & lag>0){
     day_lags <- c(1:lag)
-    weather_vars_wlag <- c(weather_vars, unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_"))))
+    weather_vars_wlag <- c(weather_vars, unlist(lapply(weather_vars, function(x) paste(x,day_lags,sep="_lag"))))
   }else{
     weather_vars_wlag <- weather_vars
   }

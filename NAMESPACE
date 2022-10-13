@@ -3,6 +3,8 @@
 export("%>%")
 export(cfs.process_date)
 export(collect_weather)
+export(combine_meas_weather)
+export(read_weather)
 export(deweather)
 export(fire.add_fire)
 export(get_measurements)
