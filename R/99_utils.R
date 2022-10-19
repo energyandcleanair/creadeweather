@@ -280,3 +280,35 @@ utils.download_file <- function(URL, fil, last_modified=NULL, overwrite=TRUE, .v
   
 }
 
+
+utils.add_timevars <- function(data, add = c("hour", "hour.local", "wday", "date_unix", 
+                          "week", "yday", "month"), local.tz = "UTC", lag = NULL) 
+{
+  
+  if (!"date" %in% names(data)) 
+    stop("No date field supplied.")
+  if ("hour" %in% add) 
+    data$hour <- as.numeric(format(data$date, "%H"))
+  if ("hour.local" %in% add) 
+    data$hour.local <- as.numeric(format(as.POSIXct(format(data$date, 
+                                                             tz = local.tz)), "%H"))
+  if ("wday" %in% add) 
+    data$wday <- as.factor(format(data$date, "%A"))
+  if ("date_unix" %in% add) 
+    data$date_unix <- decimal_date(data$date)
+  if ("week" %in% add) 
+    data$week <- as.numeric(format(data$date, "%W"))
+  if ("yday" %in% add) 
+    data$yday <- as.numeric(format(data$date, "%j"))
+  if ("month" %in% add) 
+    data$month <- as.factor(format(data$date, "%b"))
+  if (!is.null(lag)) {
+    for (i in seq_along(lag)) data[[paste0("lag1", lag[i])]] <- data[[lag[i]]][c(NA, 
+                                                                                     1:(nrow(data) - 1))]
+  }
+  data[] <- lapply(data, function(x) {
+    replace(x, which(is.nan(x)), NA)
+  })
+  data
+}
+

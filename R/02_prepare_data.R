@@ -13,6 +13,7 @@
 #' @examples
 prep_data <- function(data,
                       weather_vars,
+                      time_vars=c('yday', 'date_unix'),
                       lag=0){
   
   data <- data %>%
@@ -22,7 +23,8 @@ prep_data <- function(data,
                                fill_data() %>%
                                enrich_data(lag=lag,
                                            weather_vars=weather_vars) %>%
-                               filter_data(weather_vars=weather_vars))) %>%
+                               filter_data(weather_vars=weather_vars) %>%
+                               utils.add_timevars(add=time_vars))) %>%
     ungroup()
  
   return(data)
@@ -59,7 +61,7 @@ clean_data <- function(tbl){
 # Certain stations miss certain weather variables
 fill_data <- function(tbl){
   
-  weather_cols <- setdiff(names(tbl), c("date","timezone","value"))
+  weather_cols <- setdiff(names(tbl), c("date", "timezone", "value"))
   
   # Different kind of treatments
   

@@ -1,6 +1,6 @@
 #' Pseudo-function to import \strong{dplyr}'s common functions. 
 #'
-#' @importFrom dplyr select rename mutate mutate_at filter filter_at arrange distinct
+#' @importFrom dplyr select select_at rename mutate mutate_at filter filter_at arrange distinct
 #'     summarise summarize do group_by group_by_at ungroup do left_join inner_join everything bind_rows 
 #'     pull tibble as_tibble rowwise any_vars all_vars vars collect full_join summarise_at filter_at
 NULL
@@ -8,6 +8,16 @@ NULL
 #' Pseudo-function to import \strong{tibble}'s common functions. 
 #'
 #' @importFrom tibble tibble
+NULL
+
+#' Pseudo-function to import \strong{tidyr}'s common functions. 
+#'
+#' @importFrom tidyr nest unnest
+NULL
+
+#' Pseudo-function to import and reexport \strong{lubridate} functions
+#'
+#' @importFrom lubridate today year date decimal_date
 NULL
 
 

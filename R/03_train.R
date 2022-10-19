@@ -1,3 +1,28 @@
+
+#' Title
+#'
+#' @param data 
+#' @param configs 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+train_configs <- function(data, configs){
+  
+  config_list <- lapply(split(configs, seq(nrow(configs))),
+                        function(config){lapply(as.list(config), unlist)})
+  
+  lapply(config_list,
+              function(x){
+                do.call(train_models,c(data=list(data), x)) %>%
+                  mutate(config=list(x))
+              }) %>%
+    do.call(bind_rows, .)
+} 
+
+
+
 #' Training models with several potential engines: deweather, rmweather or gbm directly
 #' (SVR not yet implemented)
 #'
@@ -16,7 +41,7 @@
 #' @examples
 train_models <- function(data,
                          engine,
-                         trees=600,
+                         trees=1000,
                          samples=300,
                          lag=0,
                          weather_vars=NULL,
@@ -24,7 +49,7 @@ train_models <- function(data,
                          training.fraction=0.9,
                          normalise=F,
                          detect_breaks=F,
-                         training_date_cut,
+                         training_end,
                          ...
 ){
   
@@ -45,8 +70,6 @@ train_models <- function(data,
   }else{
     weather_vars_wlag <- weather_vars
   }
-  
-  
   
   
   # Add certain time vars if required (rmweather doesn't handle month, none handles season etc)
@@ -93,36 +116,32 @@ train_models <- function(data,
   }
   
   data$index <- zoo::index(data)
-  # n_cores <- as.integer(future::availableCores()-1)
   
   result <- pbapply::pbmapply(train_model_safe,
                      index=data$index,
                      location_id=data$location_id,
                      data=data$meas_weather,
                      normalise=normalise,
-                     training_date_cut=training_date_cut,
+                     training_end=training_end,
                      weather_vars=list(weather_vars_wlag),
                      time_vars=list(time_vars),
                      trees=trees,
                      detect_breaks=detect_breaks,
                      samples=samples,
                      training.fraction=training.fraction,
-                     # mc.cores=n_cores,
                      USE.NAMES=F,
                      SIMPLIFY=FALSE,
                      ...)
   
-  if(!is.null(result$value)){
-    # When warning raised, sometimes actual results are in value column
-    result <- do.call('bind_rows', result$value[!is.na(result$value)])
-  }else{
-    result <- do.call('bind_rows', result[!is.na(result)])
+  result <- do.call('bind_rows', result[!is.na(result)])
+  
+  if(nrow(result)==0){
+    return(NA)
   }
   
-  if(nrow(result)==0) return(NA)
-  
-  # Re-add indos
-  result <- result %>% dplyr::left_join(data %>% dplyr::select(-c(meas_weather)),
+  # Re-add infos
+  result <- result %>%
+    dplyr::left_join(data %>% dplyr::select(-c(meas_weather)),
                                         by="index") %>%
     dplyr::select(-c(index))
   

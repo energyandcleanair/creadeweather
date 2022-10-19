@@ -4,14 +4,14 @@
 #' @param data 
 #' @param pollutant 
 #' @param unit 
-#' @param training_date_cut
+#' @param training_end
 #'
 #' @return
 #' @export
 #'
 #' @examples
 train_svr <- function(data,
-                                  training_date_cut,
+                                  training_end,
                                   weather_vars,
                                   time_vars,
                                   normalise,
@@ -25,7 +25,7 @@ train_svr <- function(data,
   # Correspondance between our time variables and deweather ones
   # our=deweather
   time_vars_corr <- list(
-    "trend"="trend",
+    "date_unix"="trend",
     "wday"="weekday",
     "month"="month",
     "week"="week",
@@ -43,8 +43,8 @@ train_svr <- function(data,
     mutate(date=as.POSIXct(date)) %>%
     deweather::prepData(add=time_vars)
  
-  data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
-  data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
+  data_prepared[data_prepared$date >= training_end,'set'] <- "prediction"
+  data_prepared[data_prepared$date <= training_end,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
   
   # Creating model
   model_svm  <- function(training_data, formula){

@@ -9,7 +9,7 @@
 #'
 #' @examples
 train_rmweather <- function(data,
-                                  training_date_cut,
+                                  training_end,
                                   weather_vars,
                                   time_vars,
                                   trees,
@@ -39,7 +39,7 @@ train_rmweather <- function(data,
       mutate(date=as.POSIXct(date)) %>%
       rmw_prepare_data(na.rm = TRUE)
     
-    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
+    data_prepared[data_prepared$date >= training_end,'set'] <- "prediction"
     
     variables <- c(time_vars, weather_vars)
     

@@ -1,10 +1,30 @@
+noaa.add_weather <- function(location_dates,
+                             weather_vars,
+                             n_per_location,
+                             years_force_refresh){
+  
+  # Find weather stations nearby
+  locations_w_stations <- noaa.add_close_stations(location_dates=location_dates,
+                            n_per_location = n_per_location)
+  
+  # Get weather at these stations
+  locations_weather <- noaa.collect_weather(locations_w_stations,
+                                            weather_vars=weather_vars,
+                                            years_force_refresh = years_force_refresh) %>%
+    dplyr::ungroup()
+  
+  # Ensure columns are preserved
+  result <- location_dates %>%
+    select(-c(weather)) %>%
+    left_join(locations_weather)
+  
+  return(result)
+}
 
 
-noaa.add_close_stations <- function(meas, n_per_station){
+noaa.add_close_stations <- function(location_dates, n_per_location){
 
-  meas_stations <- meas %>% ungroup() %>%
-    dplyr::select(location_id, geometry) %>%
-    distinct(location_id, .keep_all=T) %>%
+  suppressMessages(location_dates %>%
     rowwise() %>%
     mutate(noaa_station=list(
       rnoaa::isd_stations_search(
@@ -13,11 +33,8 @@ noaa.add_close_stations <- function(meas, n_per_station){
       radius=150) %>% #radius is in km
         dplyr::filter(end>=20200101) %>%
         dplyr::arrange(desc(end), distance) %>%
-        dplyr::slice(1:n_per_station)
-    ))
-
-  meas %>% 
-    dplyr::left_join(as.data.frame(meas_stations  %>% dplyr::select(-c(geometry))))
+        dplyr::slice(1:n_per_location)
+    )))
 }
 
 noaa.available_years <- function(code){
@@ -152,28 +169,30 @@ noaa.get_folder <- function(){
 }
 
 
-noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
+noaa.collect_weather <- function(locations_w_stations,
+                                 weather_vars,
+                                 years_force_refresh=year(today())){
   
   print("Adding weather from NOAA")
   cache_folder <- noaa.get_folder()
   
-  stations_weather <- stations_w_noaa %>%
+  weather <- locations_w_stations %>%
     dplyr::ungroup() %>%
     as.data.frame() %>%
     rowwise() %>%
-    mutate(date_from=min(dates$date, na.rm=T),
-           date_to=max(dates$date, na.rm=T)) %>%
+    mutate(date_from=min(weather$date, na.rm=T),
+           date_to=max(weather$date, na.rm=T)) %>%
     tidyr::unnest(cols=(noaa_station)) %>%
-    dplyr::distinct(location_id, usaf, wban, date_from, date_to, dates)
+    dplyr::distinct(location_id, usaf, wban, date_from, date_to, weather)
   
-  stations_weather$code <- paste(stations_weather$usaf, stations_weather$wban, sep="-")
-  print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
+  weather$code <- paste(weather$usaf, weather$wban, sep="-")
+  # print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
   
-  stations_weather$weather <- tryCatch({
+  weather$weather_noaa <- tryCatch({
     pbapply::pbmapply(noaa.get_noaa_at_code,
-                      code=stations_weather$code,
-                      year_from=lubridate::year(stations_weather$date_from),
-                      year_to=lubridate::year(stations_weather$date_to),
+                      code=weather$code,
+                      year_from=lubridate::year(weather$date_from),
+                      year_to=lubridate::year(weather$date_to),
                       years_force_refresh=list(years_force_refresh),
                       cache_folder=cache_folder,
                       SIMPLIFY=F)  
@@ -192,49 +211,47 @@ noaa.add_weather <- function(stations_w_noaa, years_force_refresh=c(2021)){
     })
   }
   
-  if(nrow(stations_weather %>% rowwise() %>% filter(!is.null(weather)))==0){
+  if(nrow(weather %>% rowwise() %>% filter(!is.null(weather)))==0){
     stop("Failed to find weather data")
   }
   
   # Note: Certain dates have no data at all and hence raise warnings
-  stations_weather <- suppressWarnings(stations_w_noaa %>%
-    dplyr::left_join(
-      stations_weather %>%
-        as.data.frame() %>%
-        dplyr::select(location_id, weather, date_from, date_to, dates) %>%
-        dplyr::rowwise() %>%
-        # Only keep required dates
-        mutate(weather=list(weather %>% inner_join(dates, by="date"))) %>%
-        dplyr::filter("air_temp_min" %in% colnames(weather)) %>%
-        ungroup() %>%
-        group_by(location_id) %>%
-        summarise(weather=list(bind_rows(weather) %>%
-                 dplyr::mutate(date=to_date(date)) %>%
-                 dplyr::filter(!is.na(date)) %>%
-                 dplyr::filter(date>=unique(date_from)) %>%
-                 dplyr::filter(date<=unique(date_to)) %>%
-                 dplyr::group_by(date) %>%
-                 dplyr::summarize(
-                   air_temp_min=min(air_temp_min, na.rm=T),
-                   air_temp_max=max(air_temp_max, na.rm=T),
-                   air_temp=mean(air_temp, na.rm=T),
-                   atmos_pres=mean(atmos_pres, na.rm=T),
-                   wd=mean(wd, na.rm=T),
-                   ws_max=max(ws_max, na.rm=T),
-                   ws=mean(ws, na.rm=T),
-                   ceil_hgt=mean(ceil_hgt, na.rm=T),
-                   visibility=mean(visibility, na.rm=T),
-                   precip=mean(precip, na.rm=T),
-                   RH=mean(RH, na.rm=T),
-                   RH_min=min(RH, na.rm=T),
-                   RH_max=max(RH, na.rm=T)
-                 )
-            )
-        ),
-      by="location_id"
-      ))
-  print("Done [Adding weather from NOAA]")
-  return(stations_weather)
+  locations_weather <- weather %>%
+    unnest(weather_noaa) %>%
+    group_by(location_id, weather) %>%
+    mutate(date=to_date(date)) %>%
+    filter(!is.na(date)) %>%
+    filter(date>=unique(date_from)) %>%
+    filter(date<=unique(date_to)) %>%
+    group_by(location_id, weather, date) %>%
+    summarize(
+      air_temp_min=min(air_temp_min, na.rm=T),
+      air_temp_max=max(air_temp_max, na.rm=T),
+      air_temp=mean(air_temp, na.rm=T),
+      atmos_pres=mean(atmos_pres, na.rm=T),
+      wd=mean(wd, na.rm=T),
+      ws_max=max(ws_max, na.rm=T),
+      ws=mean(ws, na.rm=T),
+      ceil_hgt=mean(ceil_hgt, na.rm=T),
+      visibility=mean(visibility, na.rm=T),
+      precip=mean(precip, na.rm=T),
+      RH=mean(RH, na.rm=T),
+      RH_min=min(RH, na.rm=T),
+      RH_max=max(RH, na.rm=T)
+    ) %>%
+    select(c('location_id', 'weather', 'date',
+             intersect(names(.), weather_vars))) %>%
+    group_by(location_id, weather) %>%
+    tidyr::nest() %>%
+    dplyr::rowwise() %>%
+    # Only keep required dates
+    mutate(weather=list(weather %>%
+                          left_join(data %>%
+                                      select(c('date', intersect(names(data), weather_vars))),
+                                    by="date"))) %>%
+    select(-c(data))
+  
+  return(locations_weather)
 }
 
 

@@ -1,3 +1,53 @@
+get_weather <- function(meas,
+                        weather_vars,
+                        read_weather_filename=NULL,
+                        save_weather_filename=NULL,
+                        n_per_location=4,
+                        years=seq(2015,2020),
+                        years_force_refresh=NULL,
+                        add_pbl=T,
+                        add_sunshine=T,
+                        add_fire=F,
+                        fire_source="viirs",
+                        fire_mode="oriented",
+                        fire_duration_hour=72,
+                        fire_buffer_km=NULL,
+                        fire_split_days=F,
+                        fire_split_regions=NULL,
+                        trajs_parallel=T,
+                        trajs_height=NULL,
+                        use_trajs_cache=T,
+                        save_trajs_filename=NULL){
+  
+  if(!is.null(read_weather_filename) && file.exists(read_weather_filename)){
+    weather <- read_weather(read_weather_filename)
+  }else{
+    weather <- collect_weather(meas,
+                               weather_vars=weather_vars,
+                               years=years,
+                               years_force_refresh=years_force_refresh,
+                               n_per_location=n_per_location,
+                               add_sunshine=F,
+                               add_fire=add_fire,
+                               fire_source=fire_source,
+                               fire_mode=fire_mode,
+                               fire_duration_hour=fire_duration_hour,
+                               fire_buffer_km=fire_buffer_km,
+                               fire_split_days=fire_split_days,
+                               fire_split_regions=fire_split_regions,
+                               trajs_parallel=trajs_parallel,
+                               trajs_height=trajs_height,
+                               use_trajs_cache=use_trajs_cache,
+                               save_trajs_filename=save_trajs_filename
+    )
+    if(!is.null(save_weather_filename)){
+      saveRDS(weather, save_weather_filename)
+    }
+  }
+  
+  return(weather)
+}
+
 #' Collect weather (and atmospheric) data from various sources including NOAA & UNCAR.
 #'
 #' @param meas tibble of measurements with date and geometry
@@ -14,9 +64,10 @@
 #' @examples
 #' 
 collect_weather <- function(meas,
-                            n_per_station=2,
+                            weather_vars,
+                            n_per_location=4,
                             years=seq(2015,2020),
-                            years_force_refresh=NULL,
+                            years_force_refresh=year(today()),
                             add_pbl=T,
                             add_sunshine=T,
                             add_fire=F,
@@ -31,39 +82,36 @@ collect_weather <- function(meas,
                             use_trajs_cache=T,
                             save_trajs_filename=NULL){
     
-  if("date" %in% colnames(meas) | !"meas" %in% colnames(meas)){
-    stop("Measurements should be nested in meas column")
+  
+  if(!all(c('meas','location_id','timezone','geometry') %in% names(meas))){
+    stop("meas is missing columns")
   }
 
-  # Find unique AQ stations
-  stations <- meas %>%
+  # Get unique location/date combinations
+  # e.g. some locations may gave different process_id
+  weather <- meas %>%
     as.data.frame() %>%
-    dplyr::select(country, location_id, meas) %>%
+    dplyr::select(country, location_id, meas, geometry) %>%
     tidyr::unnest(meas) %>%
     dplyr::distinct(country, location_id, timezone, date) %>%
     dplyr::group_by(country, location_id, timezone) %>%
     tidyr::nest() %>%
-    rename(dates=data) %>%
+    rename(weather=data) %>%
     left_join(meas %>% ungroup() %>% distinct(location_id, geometry)) %>%
     sf::st_as_sf() %>%
     ungroup()
   
-    
-
-  # Find weather stations nearby
-  stations_w_noaa <- suppressMessages(
-    noaa.add_close_stations(stations, n_per_station = n_per_station))
-
-  # Get weather at these stations
-  weather <- noaa.add_weather(stations_w_noaa,
-                              years_force_refresh = years_force_refresh) %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(!is.null(weather))
   
-  # Add Planet Boundary Layer from NCAR
-  if(add_pbl){
-    print("Getting Planet Boundary Layer")
-    weather <- cfs.add_pbl(weather)  
+  
+  weather <- noaa.add_weather(location_dates=weather,
+                              weather_vars=weather_vars,
+                              n_per_location=n_per_location,
+                              years_force_refresh=years_force_refresh)
+  
+  
+  if(any(grepl('pbl_', weather_vars))){
+    # Add Planet Boundary Layer from NCAR  
+    weather <- cfs.add_weather(weather, weather_vars)
   }
   
   # Add sunshine
@@ -87,53 +135,35 @@ collect_weather <- function(meas,
                            use_trajs_cache=use_trajs_cache,
                            save_trajs_filename=save_trajs_filename)  
   }
-  
-  # Unnest
-  weather <- weather %>%
-    as.data.frame() %>%
-    select(-c(noaa_station, dates)) %>%
-    tidyr::unnest(weather)
-  
+
   return(weather)
 }
 
 
 combine_meas_weather <- function(meas, weather){
   
-  # Join weather with measurements
   print("Attaching weather to measurements")
-  if("geometry" %in% colnames(meas)){
-    meas <- tibble(meas) %>% dplyr::select(-c(geometry))
-  }else{
-    meas <- tibble(meas)
-  }
-  
-  weather_nested <- weather %>%
-    group_by(location_id) %>%
-    tidyr::nest() %>%
-    rename(weather=data)
-  
-  meas_w_weather <- tibble(meas) %>%
-    dplyr::left_join(weather_nested,
-                     by="location_id") %>%
+  meas %>%
+    tibble() %>%
+    select(setdiff(names(.), 'geometry')) %>%
+    dplyr::left_join(weather %>%
+                       tibble() %>%
+                       select(location_id, weather),
+                     by='location_id') %>%
     dplyr::rowwise() %>%
-    dplyr::filter(!is.null(weather)) %>%
-    dplyr::filter(!is.null(meas)) %>%
+    dplyr::filter(!is.null(weather),
+                  !is.null(meas)) %>%
     dplyr::mutate(meas=list(
       meas %>%
-        dplyr::mutate(date=lubridate::date(date)) %>%
+        dplyr::mutate(date=date(date)) %>%
         dplyr::left_join(weather, by="date")
     )) %>%
     dplyr::rename(meas_weather=meas) %>%
     dplyr::select(-c(weather))
-  
-  return(meas_w_weather)
 }
 
 read_weather <- function(filename){
   readRDS(filename) %>%
-    # To accomodate for older versions that had one per date AND pollutant
-    distinct(location_id, date, .keep_all=T) %>%
     select_at(setdiff(names(.), "value"))
 }
 

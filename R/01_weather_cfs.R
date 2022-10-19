@@ -1,3 +1,77 @@
+cfs.add_weather <- function(weather, weather_vars){
+  
+  vars=c("pbl_min","pbl_max")
+  dir_cfs <- cfs.folder_cfs()
+  dir_pbl <- cfs.folder_pbl()
+    
+  location_dates <- weather %>%
+    tidyr::unnest(weather) %>%
+    distinct(location_id, timezone, date, geometry)
+  
+  dates <- unique(location_dates %>% pull(date))
+  cfs.refresh_files(dates)
+  
+  locations_sf <- st_as_sf(weather %>%
+                            ungroup() %>%
+                            dplyr::select(location_id, geometry) %>%
+                            dplyr::distinct(location_id, .keep_all=T))
+
+  
+  # Collecting all positions to be read for each file
+  # And group so we can use raster::stack
+  dates_files <- location_dates %>%
+    rowwise() %>%
+    mutate(fp=list(cfs.date_to_filepaths(date, dir_pbl, vars)),
+           date_group=strftime(date,"%Y")) %>%
+    tidyr::unnest(fp) %>%
+    tidyr::nest(data=-date_group)
+  
+  
+  process_date_group <- function(data){
+    
+    fps <- data %>% distinct(fp, date, variable) %>%
+      filter(file.exists(fp))
+    
+    gs <- sf::st_as_sf(data %>% distinct(location_id,geometry))
+    ts <- terra::rast(fps$fp)
+    pbls <- terra::extract(ts, st_coordinates(gs))
+    
+    
+    pbls.df <- data.frame(value=t(pbls))
+    names(pbls.df) <- gs$location_id
+    pbls.df$variable <- fps$variable
+    pbls.df$date <- fps$date
+    
+    pbls.tojoin <- tibble(pbls.df) %>%
+      tidyr::pivot_longer(cols=-c(date, variable), names_to="location_id", values_to="value") %>%
+      tidyr::pivot_wider(names_from=variable, values_from=value)
+    
+    data %>%
+      distinct(location_id, date) %>%
+      dplyr::left_join(pbls.tojoin)
+  }
+  
+  print(paste("Extracting pbl..."))
+  pbl_values <- do.call("rbind", pbapply::pblapply(dates_files$data, process_date_group))
+  pbl_values <- pbl_values %>%
+    select_at(c('location_id', 'date', intersect(names(.), weather_vars))) %>%
+    group_by(location_id) %>%
+    tidyr::nest()
+  print(paste("Done"))
+  
+  # Join to weather data
+  weather_new <- weather %>%
+    left_join(pbl_values) %>%
+    dplyr::rowwise() %>%
+    dplyr::filter(!is.null(weather)) %>%
+    mutate(weather=list(weather %>%
+                          left_join(data %>%
+                                      select(c('date', intersect(names(data), weather_vars))),
+                                    by="date"))) %>%
+    select(-c(data))
+  
+  return(weather_new)
+}
 
 cfs.folder_cfs <- function(){
   dir_cfs<- Sys.getenv("DIR_CFS")
@@ -241,82 +315,5 @@ cfs.date_to_filepaths <- function(d, dir_pbl, vars=c("pbl_min","pbl_max","pbl_me
             paste0(gsub("-","",d),gsub("pbl","",vars),".nc")))
 }
 
-cfs.add_pbl <- function(weather, vars=c("pbl_min","pbl_max")){
-  
-  dates <- weather %>%
-    as.data.frame() %>%
-    tidyr::unnest(weather) %>%
-    distinct(date) %>%
-    pull()
-  
-  cfs.refresh_files(dates)
-  
-  stations_sf <- st_as_sf(weather %>% ungroup() %>%
-                            dplyr::select(location_id, geometry) %>%
-                            dplyr::distinct(location_id, .keep_all=T))
-  
-  
-  dir_cfs <- cfs.folder_cfs()
-  dir_pbl <- cfs.folder_pbl()
-  
-  dates <- weather %>%
-    as.data.frame() %>%
-    rowwise() %>%
-    mutate(date=list(unique((weather$date)))) %>%
-    dplyr::select(location_id, timezone, date, geometry) %>%
-    tidyr::unnest(date) %>%
-    distinct(location_id, timezone, date, geometry) %>%
-    rowwise()
-  
-  # Collecting all positions to be read for each file
-  # And group so we can use raster::stack
-  dates_files <- dates %>%
-    rowwise() %>%
-    mutate(fp=list(cfs.date_to_filepaths(date, dir_pbl, vars)),
-           date_group=strftime(date,"%Y")) %>%
-    tidyr::unnest(fp) %>%
-    tidyr::nest(data=-date_group)
-    
-  
-  process_date_group <- function(data){
-   
-    fps <- data %>% distinct(fp, date, variable) %>%
-      filter(file.exists(fp))
-    
-    gs <- sf::st_as_sf(data %>% distinct(location_id,geometry))
-    ts <- terra::rast(fps$fp)
-    pbls <- terra::extract(ts, st_coordinates(gs))
-    
-    
-    pbls.df <- data.frame(value=t(pbls))
-    names(pbls.df) <- gs$location_id
-    pbls.df$variable <- fps$variable
-    pbls.df$date <- fps$date
-  
-    pbls.tojoin <- tibble(pbls.df) %>%
-      tidyr::pivot_longer(cols=-c(date, variable), names_to="location_id", values_to="value") %>%
-      tidyr::pivot_wider(names_from=variable, values_from=value)
-    
-    data %>%
-      distinct(location_id, date) %>%
-      dplyr::left_join(pbls.tojoin)
-  }
-  
-  print(paste("Extracting pbl..."))
-  pbl_values <- do.call("rbind", pbapply::pblapply(dates_files$data, process_date_group))
-  print(paste("Done"))
-  
-  # Join to weather data
-  joined <- weather %>%
-    dplyr::rowwise() %>%
-    dplyr::filter(!is.null(weather)) %>%
-    dplyr::mutate(weather_location_id=location_id,
-                  weather=list(weather %>% left_join(
-                    pbl_values %>% dplyr::filter(location_id==weather_location_id) %>%
-                      select(-c(location_id))
-    ))) %>% dplyr::select(-c(weather_location_id))
-  
-  return(joined)
-}
 
 

@@ -9,7 +9,7 @@
 #'
 #' @examples
 train_deweather <- function(data,
-                                  training_date_cut,
+                                  training_end,
                                   weather_vars,
                                   time_vars,
                                   trees,
@@ -23,7 +23,7 @@ train_deweather <- function(data,
     # Correspondance between our time variables and deweather ones
     # our=deweather
     time_vars_corr <- list(
-      "trend"="trend",
+      "date_unix"="trend",
       "wday"="weekday",
       "month"="month",
       "week"="week",
@@ -45,7 +45,7 @@ train_deweather <- function(data,
     data_prepared$set = ifelse(caTools::sample.split(data_prepared$value,SplitRatio=0.8),
                                  "training",
                                  "prediction")
-    data_prepared[data_prepared$date >= training_date_cut,'set'] <- "prediction"
+    data_prepared[data_prepared$date >= training_end,'set'] <- "prediction"
     vars <- c(time_vars, weather_vars)
     
     if("weekday" %in% time_vars){
@@ -91,16 +91,16 @@ train_deweather <- function(data,
     } 
     
 
-    if("trend" %in% time_vars){
+    if("date_unix" %in% time_vars){
       # Save trend impact (equivalent to weather corrected?)
       # Different form of output depending on timevars. Trying both
       tryCatch({
-        res$trend <- list(model$pd %>% dplyr::filter(var=="trend") %>%
+        res$trend <- list(model$pd %>% dplyr::filter(var=="date_unix") %>%
                             dplyr::mutate(date=lubridate::decimal_date(x)) %>%
                             dplyr::ungroup() %>%
                             dplyr::select(date, mean, lower, upper))  
       }, error=function(err){
-        res$trend <- list(model$pd %>% dplyr::filter(var=="trend") %>%
+        res$trend <- list(model$pd %>% dplyr::filter(var=="date_unix") %>%
                             dplyr::mutate(date=lubridate::date_decimal(as.numeric(x))) %>%
                             dplyr::ungroup() %>%
                             dplyr::select(date, mean, lower, upper))  

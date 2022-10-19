@@ -18,7 +18,7 @@
 #' @param data 
 #' @param pollutant 
 #' @param unit 
-#' @param training_date_cut
+#' @param training_end
 #' @param link: either null or 'log'
 #'
 #' @return
@@ -26,7 +26,7 @@
 #'
 #' @examples
 train_caret <- function(data,
-                        training_date_cut,
+                        training_end,
                         weather_vars,
                         time_vars,
                         mehod="gbm",
@@ -39,8 +39,8 @@ train_caret <- function(data,
                         ...){
   
   
-  if(is.null(training_date_cut)){
-    training_date_cut <- "2099-01-01"
+  if(is.null(training_end)){
+    training_end <- "2099-01-01"
   }
   
   n_cores <- as.integer(future::availableCores()-1)
@@ -62,7 +62,7 @@ train_caret <- function(data,
   # Correspondance between our time variables and deweather ones
   # our=deweather
   time_vars_corr <- list(
-    "trend"="trend",
+    "date_unix"="trend",
     "wday"="weekday",
     "month"="month",
     "week"="week",
@@ -95,8 +95,8 @@ train_caret <- function(data,
     data_prepared <- data_prepared[rows, ]
   }
   
-  data_prepared[data_prepared$date > training_date_cut,'set'] <- "prediction"
-  data_prepared[data_prepared$date <= training_date_cut,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
+  data_prepared[data_prepared$date > training_end,'set'] <- "prediction"
+  data_prepared[data_prepared$date <= training_end,'set'] <- "training" # Actually, gbm will use a fraction of it for validation
   
   # Train model -------------------------------------------------------------
   
@@ -232,7 +232,7 @@ train_caret <- function(data,
       ))
     
     
-    if("trend" %in% time_vars){
+    if("date_unix" %in% time_vars){
       # Rather than resimulating with average weather conditions,
       # we take partial dependency as the deweathered trend
       # TODO: Check it gives similar results

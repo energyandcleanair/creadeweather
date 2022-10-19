@@ -11,7 +11,7 @@
 #' @param aggregate_level 
 #' @param nest_and_sf 
 #'
-#' @return
+#' @return a nested sf
 #' @export
 #'
 #' @examples
@@ -77,7 +77,6 @@ get_measurements <- function(meas=NULL,
       dplyr::mutate(geometry=suppressWarnings(sf::st_centroid(geometry))) %>%
       sf::st_as_sf(sf_column_name="geometry", crs = 4326)
   }
-  
   
   return(meas)
 }
