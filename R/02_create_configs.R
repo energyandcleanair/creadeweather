@@ -1,5 +1,6 @@
 create_configs <- function(
   weather_vars,
+  add_fire,
   output,
   engine,
   link,
@@ -16,7 +17,8 @@ create_configs <- function(
   learning.rate=c(0.01),
   normalise=F,
   detect_breaks=F,
-  keep_model=T){
+  keep_model=T,
+  ...){
   
   
   time_vars_output <- tibble(
@@ -33,6 +35,7 @@ create_configs <- function(
                   lag,
                   training.fraction,
                   weather_vars=list(unique(weather_vars)),
+                  add_fire,
                   time_vars_output,
                   engine,
                   link,

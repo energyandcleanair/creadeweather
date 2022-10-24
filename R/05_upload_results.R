@@ -19,6 +19,34 @@ upload_results <- function(results){
 }
 
 
+upload_fire_results <- function(results,
+                                met_type,
+                                duration_hour,
+                                fire_source,
+                                fire_split,
+                                fire_buffer_km,
+                                trajs_height,
+                                trajs_hours
+                                ){
+  
+  results_list <- results %>%
+    filter(grepl('trend', process_id)) %>%
+    group_by(location_id) %>%
+    tidyr::nest()
+  
+  mapply(creafire::db.upload_meas,
+         meas=results_list$data,
+         location_id=results_list$location_id,
+         met_type=met_type,
+         duration_hour=duration_hour,
+         hours=list(trajs_hours),
+         buffer_km=fire_buffer_km,
+         height=list(trajs_height),
+         fire_source=fire_source,
+         fire_split=list(NULL))
+}
+
+
 upload_results_one <- function(config, result, process_id, processes, poll, unit, location_id, source){
   
   process_deweather_id <- config_to_process_deweather(config=config,

@@ -86,13 +86,16 @@ deweather <- function(
   fire_mode="trajectory",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0", "gadm_1" or "gadm_2"
-  fire_duration_hour=72, # For trajectories only
   fire_buffer_km=10,
+  upload_fire=F, # Upload trajs, weather, and meas for biomass burning dashboard
   
   
   # TRAJECTORIES
   trajs_parallel=T,
   trajs_height=NULL,
+  trajs_hours=seq(0,23,4),
+  trajs_duration_hour=72, # For trajectories only
+  trajs_met_type='gdas1',
   use_trajs_cache=T,
   save_trajs_filename=NULL
 ){
@@ -145,13 +148,17 @@ deweather <- function(
     add_fire=add_fire,
     fire_source=fire_source,
     fire_mode=fire_mode,
-    fire_duration_hour=fire_duration_hour,
     fire_buffer_km=fire_buffer_km,
     fire_split_days=fire_split_days,
     fire_split_regions=fire_split_regions,
     trajs_parallel=trajs_parallel,
     trajs_height=trajs_height,
+    trajs_hours=trajs_hours,
+    trajs_duration_hour=trajs_duration_hour,
+    trajs_met_type=trajs_met_type,
     use_trajs_cache=use_trajs_cache,
+    upload_trajs=upload_fire,
+    upload_weather=upload_fire,
     save_trajs_filename=save_trajs_filename
     )
   
@@ -167,7 +174,8 @@ deweather <- function(
   #-----------------------------------------
   if(add_fire){
     fire_vars_pattern <- ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission")
-    weather_vars <- c(weather_vars, grep(fire_vars_pattern, names(weather), value=T))
+    available_vars <- names(weather %>% select(weather) %>% unnest(weather))
+    weather_vars <- unique(c(weather_vars, grep(fire_vars_pattern, available_vars, value=T)))
   }
   
   #----------------------
@@ -180,6 +188,7 @@ deweather <- function(
   
   configs <- create_configs(
     weather_vars=weather_vars,
+    add_fire=add_fire,
     output=output,
     engine=engine,
     link=link,
@@ -190,7 +199,15 @@ deweather <- function(
     training_end_anomaly=training_end_anomaly,
     training_start_trend=training_start_trend,
     training_end_trend=training_end_trend,
-    keep_model=keep_model
+    keep_model=keep_model,
+    trajs_height=trajs_height,
+    trajs_hours=trajs_hours,
+    fire_source=fire_source,
+    fire_buffer_km=fire_buffer_km,
+    trajs_met_type=trajs_met_type,
+    trajs_height=trajs_height,
+    trajs_duration_hour=trajs_duration_hour,
+    trajs_hours=trajs_hours
   )
   
   #---------------------------
@@ -219,6 +236,16 @@ deweather <- function(
   if(upload_results){
     print("5. Uploading results")
     results <- upload_results(results)
+  }
+  
+  if(add_fire & upload_fire){
+    upload_fire_results(results=results,
+             met_type=trajs_met_type,
+             duration_hour=trajs_duration_hour,
+             fire_source=fire_source,
+             fire_split=fire_split_regions,
+             trajs_hours=trajs_hours,
+             fire_buffer_km=fire_buffer_km)
   }
   
   return(results)

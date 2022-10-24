@@ -16,13 +16,14 @@
 #' @param duration_hour duration in hours used for hysplit (if mode=="trajectory" or mode=="dispersion")
 #' @param trajs_height receptor height for trajectories in meter.
 #' If null or NA, pbl average will be considered.
+#' @param upload_weather upload weather data to our MongoDB to be used in the biomass burning dashboard
 #'
 #' @return
 #' @export
 #'
 #' @examples
 fire.add_fire <- function(weather,
-                          source="gfas", #or "viirs"
+                          source="viirs", #or "gfas"
                           mode="oriented",
                           met_type="gdas1",
                           duration_hour=72,
@@ -32,9 +33,12 @@ fire.add_fire <- function(weather,
                           split_regions=NULL,
                           trajs_height=NULL,
                           trajs_parallel=T,
-                          trajs_height_default=50,
+                          trajs_height_default=10,
+                          trajs_hours=seq(0,23,4),# To make it faster, we don't calculate trajectories every hour
                           use_trajs_cache=T,
-                          save_trajs_filename=NULL){
+                          upload_trajs=F,
+                          save_trajs_filename=NULL,
+                          upload_weather=F){
   
   
   if(is.null(buffer_km)){
@@ -77,7 +81,7 @@ fire.add_fire <- function(weather,
         met_type=met_type,
         height=wt$trajs_height,
         duration_hour=duration_hour,
-        hours=seq(0,23,4), # To make it faster, we don't calculate trajectories every hour
+        hours=trajs_hours, 
         timezone=wt$timezone,
         use_cache=use_trajs_cache,
         parallel=trajs_parallel
@@ -90,6 +94,19 @@ fire.add_fire <- function(weather,
       saveRDS(wt, save_trajs_filename)
       print("Done")
     }
+    
+    if(upload_trajs){
+      print("Uploading trajs")
+      pbapply::pbmapply(creatrajs::db.upload_trajs,
+             trajs=wt$trajs,
+             location_id=wt$location_id,
+             hours=trajs_hours,
+             met_type=met_type,
+             duration_hour=duration_hour,
+             height=wt$trajs_height,
+             date=wt$date)
+    }
+
     
     print("Attaching fires to trajectories")
     wtf <- tryCatch({
@@ -107,6 +124,10 @@ fire.add_fire <- function(weather,
         ungroup())
     })
     print("Done")
+    
+    
+    
+   
     
   # }else if(mode=="dispersion"){
   #   print("Calculating dispersion")
@@ -182,6 +203,21 @@ fire.add_fire <- function(weather,
     mutate(weather=list(weather %>% left_join(frp))) %>%
     dplyr::select(-c(frp))
   
+  if(upload_weather & mode=='trajectory'){
+    print("Uploading weather")
+    pbapply::pbmapply(creafire::db.upload_weather,
+                      weather=result$weather,
+                      location_id=result$location_id,
+                      met_type=met_type,
+                      duration_hour=duration_hour,
+                      buffer_km=buffer_km,
+                      height=list(trajs_height),
+                      fire_source=source,
+                      hours=list(trajs_hours),
+                      fire_split=list(NULL)
+                      )
+  }
+  
   return(result)
 }
 #' 
@@ -232,6 +268,36 @@ fire.add_fire <- function(weather,
 #' }
 #' 
 #' 
+#' 
+
+fire.split_archive <- function(file_archive, region="Global"){
+  
+  f <- readr::read_csv(file_archive)
+  fs <- split(f, f$acq_date)
+  
+  folder <- file.path(creatrajs::utils.get_firms_folder(),
+                      "suomi-npp-viirs-c2",
+                      region)
+  
+  lapply(fs, function(f){
+    date <- unique(f$acq_date)
+    file_day <- file.path(folder,
+                          sprintf("fire_archive_global_%s.txt",
+                                  strftime(date, "%Y%j")))
+    
+    # Remove existing file at that date
+    existing_files <- list.files(path=folder,
+                                 pattern=sprintf("%s.[txt|csv]", strftime(date, "%Y%j")),
+                                 full.names = T)
+    lapply(existing_files, file.remove)
+    
+    # Export
+    readr::write_csv(f, file_day)
+  })
+  
+  file.remove(file_archive)
+}
+#' 
 #' #' Archive active fire files were downloaded one year by one year
 #' #' which creates memory issues. We split them in more digestible ones.
 #' #' Should only be run once, manually on downloaded files.
@@ -241,10 +307,10 @@ fire.add_fire <- function(weather,
 #' #'
 #' #' @examples
 #' frp.split_yearly_activefire_by_date <- function(f){
-#'   
+#' 
 #'   d <- data.table::fread(f)
 #'   dates <- unique(d$acq_date)
-#'   
+#' 
 #'   write_date <- function(date, d, f){
 #'     f_date <- file.path(dirname(f),
 #'                         gsub("[0-9]{4}", strftime(date, "%Y%j"),

@@ -10,13 +10,17 @@ get_weather <- function(meas,
                         add_fire=F,
                         fire_source="viirs",
                         fire_mode="oriented",
-                        fire_duration_hour=72,
                         fire_buffer_km=NULL,
                         fire_split_days=F,
                         fire_split_regions=NULL,
                         trajs_parallel=T,
                         trajs_height=NULL,
+                        trajs_hours=seq(0,23,4),
+                        trajs_duration_hour=72,
+                        trajs_met_type='gdas1',
                         use_trajs_cache=T,
+                        upload_trajs=F,
+                        upload_weather=F,
                         save_trajs_filename=NULL){
   
   if(!is.null(read_weather_filename) && file.exists(read_weather_filename)){
@@ -31,13 +35,17 @@ get_weather <- function(meas,
                                add_fire=add_fire,
                                fire_source=fire_source,
                                fire_mode=fire_mode,
-                               fire_duration_hour=fire_duration_hour,
                                fire_buffer_km=fire_buffer_km,
                                fire_split_days=fire_split_days,
                                fire_split_regions=fire_split_regions,
                                trajs_parallel=trajs_parallel,
                                trajs_height=trajs_height,
+                               trajs_duration_hour=trajs_duration_hour,
+                               trajs_hours=trajs_hours,
+                               trajs_met_type=trajs_met_type,
                                use_trajs_cache=use_trajs_cache,
+                               upload_trajs=upload_trajs,
+                               upload_weather=upload_weather,
                                save_trajs_filename=save_trajs_filename
     )
     if(!is.null(save_weather_filename)){
@@ -73,13 +81,17 @@ collect_weather <- function(meas,
                             add_fire=F,
                             fire_source="viirs",
                             fire_mode="oriented",
-                            fire_duration_hour=72,
                             fire_buffer_km=NULL,
                             fire_split_days=F,
                             fire_split_regions=NULL,
                             trajs_parallel=T,
+                            trajs_hours=seq(0,23,4),
+                            trajs_duration_hour=72,
                             trajs_height=NULL,
+                            trajs_met_type='gdas1',
                             use_trajs_cache=T,
+                            upload_trajs=F,
+                            upload_weather=F,
                             save_trajs_filename=NULL){
     
   
@@ -110,8 +122,7 @@ collect_weather <- function(meas,
   
   
   if(any(grepl('pbl_', weather_vars))){
-    # Add Planet Boundary Layer from NCAR  
-    weather <- cfs.add_weather(weather, weather_vars)
+    weather <- era5.add_weather(weather, weather_vars=grep('pbl_', weather_vars, value = T))
   }
   
   # Add sunshine
@@ -126,14 +137,18 @@ collect_weather <- function(meas,
     weather <- fire.add_fire(weather,
                            source=fire_source,
                            mode=fire_mode,
-                           duration_hour=fire_duration_hour,
+                           duration_hour=trajs_duration_hour,
+                           met_type=trajs_met_type,
                            buffer_km=fire_buffer_km,
+                           trajs_hours=trajs_hours,
                            trajs_height=trajs_height,
                            trajs_parallel=trajs_parallel,
                            split_days=fire_split_days,
                            split_regions=fire_split_regions,
                            use_trajs_cache=use_trajs_cache,
-                           save_trajs_filename=save_trajs_filename)  
+                           upload_trajs=upload_trajs,
+                           upload_weather=upload_weather,
+                           save_trajs_filename=save_trajs_filename)
   }
 
   return(weather)

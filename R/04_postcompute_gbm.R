@@ -3,6 +3,7 @@ postcompute_gbm <- function(model, data, config, ...){
   weather_vars <- config$weather_vars
   time_vars <- config$time_vars
   formula_vars <- model$var.names
+  add_fire <- config$add_fire
   
   if(config$link=="linear"){
     do_link <- function(x){x}
@@ -20,9 +21,8 @@ postcompute_gbm <- function(model, data, config, ...){
   # Build a lite version of the model for saving purposes
   model_light <- postcompute_gbm_lighten_model(model=model, data=data)
   
-  # If fire was part of weather variable, we create a no_fire counterfactual
-  add_nofire <- any(stringr::str_detect(weather_vars, "fire|pm25_emission"))
-  if(add_nofire){
+  # If fire, we create a no_fire counterfactual
+  if(add_fire){
     data <- postcompute_gbm_fire(data=data, model=model, do_unlink=do_unlink,
                                  weather_vars=weather_vars)
   }
@@ -35,8 +35,8 @@ postcompute_gbm <- function(model, data, config, ...){
   
   # Keep only useful information
   cols <- c('date', 'trend', 'anomaly', 'predicted', 'observed')
-  if(add_nofire){
-    cols <- c(cols, names(data)[grepl("predicted_nofire",names(data))])
+  if(add_fire){
+    cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
   }
   
   result <- data %>%
