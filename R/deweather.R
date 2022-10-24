@@ -167,8 +167,8 @@ deweather <- function(
   # 1bis. Combine weather and measurements
   #-----------------------------------------
   data <- combine_meas_weather(meas, weather)
-  
-  
+
+
   #-----------------------------------------
   # 1ter. List weather variables
   #-----------------------------------------
@@ -177,7 +177,7 @@ deweather <- function(
     available_vars <- names(weather %>% select(weather) %>% unnest(weather))
     weather_vars <- unique(c(weather_vars, grep(fire_vars_pattern, available_vars, value=T)))
   }
-  
+
   #----------------------
   # 2. Preparing data
   #----------------------
@@ -185,7 +185,7 @@ deweather <- function(
   data <- prep_data(data=data,
                     weather_vars=weather_vars,
                     lag=lag)
-  
+
   configs <- create_configs(
     weather_vars=weather_vars,
     add_fire=add_fire,
@@ -209,27 +209,27 @@ deweather <- function(
     trajs_duration_hour=trajs_duration_hour,
     trajs_hours=trajs_hours
   )
-  
+
   #---------------------------
   # 3. Train models
   #---------------------------
   print("3. Training models")
   results <- train_configs(data=data,
                            configs=configs)
-  
+
   if(nrow(results)==0){
     warnings("Empty results. Returning NA")
     return(NA)
   }
-  
-  
+
+
   #--------------------------------------
   # 4. Post-compute / aggregate results
   #--------------------------------------
   print("4. Post-computing")
   results <- postcompute(results=results)
-  
-  
+
+
   #--------------------
   # 5. Upload results
   #--------------------
@@ -237,7 +237,7 @@ deweather <- function(
     print("5. Uploading results")
     results <- upload_results(results)
   }
-  
+
   if(add_fire & upload_fire){
     upload_fire_results(results=results,
              met_type=trajs_met_type,
@@ -247,6 +247,6 @@ deweather <- function(
              trajs_hours=trajs_hours,
              fire_buffer_km=fire_buffer_km)
   }
-  
-  return(results)
+
+  return(weather)
 }

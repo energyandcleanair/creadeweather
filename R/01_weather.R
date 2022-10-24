@@ -121,16 +121,16 @@ collect_weather <- function(meas,
                               years_force_refresh=years_force_refresh)
   
   
-  if(any(grepl('pbl_', weather_vars))){
-    weather <- era5.add_weather(weather, weather_vars=grep('pbl_', weather_vars, value = T))
+  if(any(grepl('pbl', weather_vars))){
+    weather <- era5.add_weather(weather, weather_vars=grep('pbl', weather_vars, value = T))
   }
-  
+
   # Add sunshine
   if(add_sunshine){
     print("Getting Sunshine")
-    weather <- sirad.add_sunshine(weather)  
+    weather <- sirad.add_sunshine(weather)
   }
-  
+
   # Add fire radiative power
   if(add_fire){
     print("Getting Fire Radiative Power (will compute trajectories if required)")
