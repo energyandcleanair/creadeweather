@@ -92,9 +92,9 @@ deweather <- function(
   
   # TRAJECTORIES
   trajs_parallel=T,
-  trajs_height=NULL,
+  trajs_height=10,
   trajs_hours=seq(0,23,4),
-  trajs_duration_hour=72, # For trajectories only
+  trajs_duration_hour=72,
   trajs_met_type='gdas1',
   use_trajs_cache=T,
   save_trajs_filename=NULL
@@ -235,17 +235,20 @@ deweather <- function(
   #--------------------
   if(upload_results){
     print("5. Uploading results")
-    results <- upload_results(results)
+    try({results_uploaded <- upload_results(results)})
   }
   
   if(add_fire & upload_fire){
-    upload_fire_results(results=results,
-             met_type=trajs_met_type,
-             duration_hour=trajs_duration_hour,
-             fire_source=fire_source,
-             fire_split=fire_split_regions,
-             trajs_hours=trajs_hours,
-             fire_buffer_km=fire_buffer_km)
+    try({
+      upload_fire_results(results=results,
+                          met_type=trajs_met_type,
+                          duration_hour=trajs_duration_hour,
+                          fire_source=fire_source,
+                          fire_split_regions=fire_split_regions,
+                          trajs_hours=trajs_hours,
+                          trajs_height=trajs_height,
+                          fire_buffer_km=fire_buffer_km)
+    })
   }
   
   return(results)
