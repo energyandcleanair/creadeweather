@@ -244,15 +244,5 @@ era5.add_weather <- function(weather,
     
   }
   return(weather)
-  # # Join to weather data
-  # joined <- weather %>%
-  #   dplyr::rowwise() %>%
-  #   dplyr::filter(!is.null(weather)) %>%
-  #   dplyr::mutate(weather_location_id=location_id,
-  #                 weather=list(weather %>% left_join(
-  #                   pbl_values %>% dplyr::filter(location_id==weather_location_id) %>%
-  #                     select(-c(location_id))
-  #                 ))) %>% dplyr::select(-c(weather_location_id))
-  
-  # return(joined)
+
 }
