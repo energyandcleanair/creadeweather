@@ -12,7 +12,10 @@ extract_date <- function(fname){
 
 era5.processed_dates <- function(){
   dir_era5 <- era5.folder_era5()
-  ds <- list.files(path = dir_era5, full.names = F, recursive = TRUE)
+  ds <- list.files(path = dir_era5,
+                   pattern = "*.tif",
+                   full.names = F,
+                   recursive = TRUE)
   dates <- unique(lubridate::ymd(lapply(as.list(ds), extract_date)))
   # dates <- unique(lapply(as.list(ds), extract_date))
   date <- dates[!is.na(dates)]
@@ -22,7 +25,7 @@ era5.processed_dates <- function(){
 era5.processable_dates <- function(dates){
   # Returns list of dates (in dates argument) that are available on CDS
   # All dates are available on CDS (few exceptions, but no easy way to get in advance)
-  return(dates)
+  return(dates[dates < lubridate::today() - 3])
 }
 
 
@@ -64,25 +67,26 @@ era5.process_date <- function(date){
       target = paste0(fname)
     )
     
-    wf_request(user = Sys.getenv('uid'),
+    ecmwfr::wf_request(user = Sys.getenv('CDS_UID'),
                request = request,
                transfer = TRUE,
                path = era5.folder_era5(),
                verbose = TRUE)
     
     layers_dict = list()
-    layers_dict['pbl'] <- mean(brick(file.path(era5.folder_era5(), 
-                                                    fname), var='blh'))
-    layers_dict['pbl_min'] <- min(brick(file.path(era5.folder_era5(), 
-                                                  fname), var='blh'))
-    layers_dict['pbl_max'] <- max(brick(file.path(era5.folder_era5(), 
-                                                  fname), var='blh'))
-    layers_dict['mean_temp'] <- mean(brick(file.path(era5.folder_era5(), 
-                                                   fname), var='t2m'))
-    layers_dict['max_temp'] <- max(brick(file.path(era5.folder_era5(), 
-                                                   fname), var='t2m'))
-    layers_dict['min_temp'] <- min(brick(file.path(era5.folder_era5(), 
-                                                   fname), var='t2m'))
+    
+    calc_raster <- function(fname, var, fun){
+      raster::calc(raster::brick(file.path(era5.folder_era5(), fname), var=var),
+                   fun=fun,
+                   na.rm=T)
+    }
+    
+    layers_dict['pbl'] <- calc_raster(fname, 'blh', mean)
+    layers_dict['pbl_min'] <- calc_raster(fname, 'blh', min)
+    layers_dict['pbl_max'] <- calc_raster(fname, 'blh', max)
+    layers_dict['temp'] <- calc_raster(fname, 't2m', mean)
+    layers_dict['temp_max'] <- calc_raster(fname, 't2m', max)
+    layers_dict['temp_min'] <- calc_raster(fname, 't2m', min)
 
     # Wind direction and wind speed calculation
     uv2wdws <- function(s) {
@@ -93,21 +97,17 @@ era5.process_date <- function(date){
       ws <- sqrt(s[1]^2 + s[2]^2)
       return(cbind(wd, ws))
     }
-    u10 <- mean(brick(file.path(era5.folder_era5(), 
-                                fname), var='u10'))
-    v10 <- mean(brick(file.path(era5.folder_era5(), 
-                                fname), var='v10'))
-    wind_stack <- stack(u10, v10)
+    u10 <- calc_raster(fname, 'u10', mean)
+    v10 <- calc_raster(fname, 'v10', mean)
+    wind_stack <- raster::stack(u10, v10)
     
-    wdws <- calc(wind_stack, uv2wdws)
+    wdws <- raster::calc(wind_stack, uv2wdws)
     
-    wd <- subset(wdws, 1)
-    ws <- subset(wdws, 2)
+    wd <- raster::subset(wdws, 1)
+    ws <- raster::subset(wdws, 2)
       
     layers_dict['ws'] <- ws
     layers_dict['wd'] <- wd
-      
-    
     
     # Humidity calculation: https://confluence.ecmwf.int/pages/viewpage.action?pageId=171411214
     Rdry <- 287.0597 # Constant for dry air J kg−1 K−1
@@ -129,22 +129,19 @@ era5.process_date <- function(date){
       return(huss)
     }
     
-    sp <- mean(brick(file.path(era5.folder_era5(), 
-                               fname), var='sp'))
-    t2m <- mean(brick(file.path(era5.folder_era5(), 
-                                fname), var='t2m'))
-    t2msp <- stack(t2m, sp)
-    huss <- calc(t2msp, humidity_fun)
-    layers_dict <- layers_dict[!names(layers_dict)=='sp']
+    sp <- calc_raster(fname, 'sp', mean)
+    t2m <- layers_dict['temp']
+    t2msp <- raster::stack(c(t2m, sp))
+    huss <- raster::calc(t2msp, humidity_fun)
+    layers_dict['sp'] <- NULL
     layers_dict['humid'] <- huss
 
     output_path <- file.path(era5.folder_era5(), paste0(strsplit(fname, split =  "[.]")[[1]][1], '.tiff'))
     
-    tif <- stack(layers_dict)
+    tif <- raster::stack(layers_dict)
     names(tif) <- names(layers_dict)
     
-    terra_ras <- rast(tif)
-    
+    terra_ras <- terra::rast(tif)
     t <- terra::writeRaster(terra_ras, output_path, overwrite=TRUE)
     file.remove(file.path(era5.folder_era5(), fname))
   },
@@ -218,29 +215,27 @@ era5.add_weather <- function(weather,
   
   
   for (i in seq_along(stations_sf$geometry)){
-    x <- st_coordinates(stations_sf[i]$geometry)[1]
-    y <- st_coordinates(stations_sf[i]$geometry)[2]
+    x <- st_coordinates(stations_sf[i,]$geometry)[1]
+    y <- st_coordinates(stations_sf[i,]$geometry)[2]
     coords <- cbind(x, y)
-    
-    
     
     main_tb <- NULL
     
     for (j in seq_along(dates)){
-      tif <- brick(era5.date_to_filepaths(dates[j], dir_era5))
+      tif <- raster::brick(era5.date_to_filepaths(dates[j], dir_era5))
       
       tb <- tibble('date'= dates[j])
       
       for (k in weather_vars){
-        band <- subset(tif, k)
-        tb[k] <- extract(band, coords)
+        band <- raster::subset(tif, k)
+        tb[k] <- raster::extract(band, coords)
       }
       main_tb = bind_rows(main_tb,tb)
     }
     
-    df <- merge(x=weather[weather$location_id==stations_sf$location_id]$weather, 
+    df <- merge(x=weather[which(weather$location_id==stations_sf$location_id[i]),]$weather[[1]], 
                 y=main_tb, by='date', all.x=TRUE)
-    weather[weather$location_id==stations_sf$location_id]$weather <- list(df)
+    weather[which(weather$location_id==stations_sf$location_id[i]),]$weather[[1]] <- tibble(df)
     
   }
   return(weather)
