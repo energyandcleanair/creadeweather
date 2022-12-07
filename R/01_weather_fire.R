@@ -55,8 +55,22 @@ fire.add_fire <- function(weather,
   
   cols <- setdiff(c(names(weather), "date", "trajs_height", "wd_copy", "ws_copy"),"weather")
   
+  # Add existing fire data (that is stored in MongoDB)
+  weather <- fire.add_existing_weather(weather=weather,
+                                                source=source,
+                                                mode=mode,
+                                                met_type=met_type,
+                                                duration_hour=duration_hour,
+                                                delay_hour=delay_hour,
+                                                buffer_km=buffer_km,
+                                                split_days=split_days,
+                                                split_regions=split_regions,
+                                                trajs_height=trajs_height,
+                                                trajs_hours=trajs_hours)
+  
   w <- tibble(weather) %>%
     tidyr::unnest(weather) %>%
+    filter(!'fire_frp' %in% names(.) | is.na(fire_frp)) %>%
     # We keep wind information (in case mode=='oriented')
     # as well as pbl for trajectory height (in case mode=='trajectory', used for height in splitr)
     rowwise() %>%
@@ -69,6 +83,7 @@ fire.add_fire <- function(weather,
                                   !!trajs_height)) %>%
     mutate(trajs_height=tidyr::replace_na(trajs_height, trajs_height_default)) %>%
     tidyr::nest(meas=!cols)
+  
   
   if(mode=="trajectory"){
     
@@ -107,7 +122,6 @@ fire.add_fire <- function(weather,
              date=wt$date)
     }
 
-    
     print("Attaching fires to trajectories")
     wtf <- tryCatch({
       attach_fn(wt,
@@ -192,20 +206,37 @@ fire.add_fire <- function(weather,
     print("Done")
   }
   
-  # Adding frp to weather data
+  # Adding new fire data to weather
+  
+  merge_new_weather <- function(weather, fire){
+    df <- weather %>%
+      left_join(fire,
+                by='date',
+                suffix=c('', '_newweather'))
+    
+    fire_vars <- grep(fire_vars_pattern, names(fire), value=T)
+    for(fire_var in fire_vars){
+      df[fire_var] <- dplyr::coalesce(df[[fire_var]], df[[paste0(fire_var, '_newweather')]])
+    }
+    df[paste0(fire_vars, '_newweather')] <- NULL
+    return(df)
+  }
+  
+  
   result <- weather %>%
     left_join(wtf %>%
-                tidyr::unnest(fires) %>%
-                dplyr::select_at(c("location_id"="location_id", "date",
+                unnest(fires) %>%
+                select_at(c("location_id"="location_id", "date",
                                    grep(fire_vars_pattern, names(.), value=T))) %>%
-                tidyr::nest(frp=-c(location_id))) %>%
+                nest(fire=-c(location_id))) %>%
     rowwise() %>%
-    mutate(weather=list(weather %>% left_join(frp))) %>%
-    dplyr::select(-c(frp))
+    mutate(weather=list(merge_new_weather(weather, fire))) %>%
+    dplyr::select(-c(fire)) %>%
+    ungroup()
   
   if(upload_weather & mode=='trajectory'){
     print("Uploading weather")
-    pbapply::pbmapply(creafire::db.upload_weather,
+    pbmapply(creafire::db.upload_weather,
                       weather=result$weather,
                       location_id=result$location_id,
                       met_type=met_type,
@@ -214,15 +245,63 @@ fire.add_fire <- function(weather,
                       height=list(trajs_height),
                       fire_source=source,
                       hours=list(trajs_hours),
-                      fire_split=list(NULL)
+                      fire_split_regions=list(split_regions)
                       )
   }
   
   return(result)
 }
-#' 
-#' 
-#' 
+
+
+
+#' Look on MongoDB for what matching fire data we already have
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fire.add_existing_weather <- function(weather,
+                                      source,
+                                      mode,
+                                      met_type,
+                                      duration_hour,
+                                      delay_hour,
+                                      buffer_km,
+                                      split_days,
+                                      split_regions,
+                                      trajs_height,
+                                      trajs_hours){
+  
+  if(mode != 'trajectory'){return(weather)}
+  
+  split_regions <- ifelse(is.null(split_regions), NA, split_regions)
+  location_ids <- unique(weather$location_id)
+  
+  available_weathers <- lapply(location_ids, function(location_id){
+    creafire::db.download_weather(location_id=location_id,
+                                  duration_hour=duration_hour,
+                                  height=trajs_height,
+                                  met_type=met_type,
+                                  buffer_km=buffer_km,
+                                  fire_source=source,
+                                  fire_split_regions=split_regions,
+                                  hours=paste0(trajs_hours, collapse=","))  
+  }) %>%
+    do.call(bind_rows, .) %>%
+    select(location_id, weather_fire=weather)
+  
+  weather %>%
+    left_join(available_weathers) %>%
+    rowwise() %>%
+    mutate(weather=list(left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T))))) %>%
+    dplyr::select(-c(weather_fire)) %>%
+    ungroup()
+  
+}
+
+
+
+
 #' frp.geotiffs <- function(date_from, date_to, extent, ...){
 #'   
 #'   
