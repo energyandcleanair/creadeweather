@@ -77,8 +77,8 @@ fill_data <- function(tbl){
                            allnatozero)
   
   # Treatment 2: Replace NA with 0
-  # We do it only for precipitation
-  vars_natozero <- c("precip")
+  # We do it only for precipitation and fire
+  vars_natozero <- c("precip", grep("fire_", names(tbl), value=T))
   natozero <- function(v){
     v[is.na(v)] <- 0
     v

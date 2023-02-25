@@ -35,6 +35,7 @@ postcompute_gbm <- function(model, data, config, ...){
   
   # Keep only useful information
   cols <- c('date', 'trend', 'anomaly', 'predicted', 'observed')
+  data$observed <- data$value
   if(add_fire){
     cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
   }

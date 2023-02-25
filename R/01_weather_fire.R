@@ -24,13 +24,14 @@
 #' @examples
 fire.add_fire <- function(weather,
                           source="viirs", #or "gfas"
-                          mode="oriented",
+                          mode="trajectory",
                           met_type="gdas1",
                           duration_hour=72,
                           delay_hour=24,
                           buffer_km=NULL,
                           split_days=F,
                           split_regions=NULL,
+                          split_regions_res='low',
                           trajs_height=NULL,
                           trajs_parallel=T,
                           trajs_height_default=10,
@@ -115,7 +116,8 @@ fire.add_fire <- function(weather,
                 parallel=trajs_parallel,
                 mc.cores=max(round(parallel::detectCores()-2), 1),
                 split_days=split_days,
-                split_regions=split_regions)
+                split_regions=split_regions,
+                adm_res=split_regions_res)
     }, error=function(e){
       print(sprintf("Failed to attach fires. Adding NAs instead, Error: %s", e))
       return(wt %>%

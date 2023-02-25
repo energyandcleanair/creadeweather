@@ -173,7 +173,7 @@ deweather <- function(
   # 1ter. List weather variables
   #-----------------------------------------
   if(add_fire){
-    fire_vars_pattern <- ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission")
+    fire_vars_pattern <- ifelse(fire_source=="viirs","^fire_frp","^pm25_emission")
     available_vars <- names(weather %>% select(weather) %>% unnest(weather))
     weather_vars <- unique(c(weather_vars, grep(fire_vars_pattern, available_vars, value=T)))
   }
@@ -235,7 +235,7 @@ deweather <- function(
   #--------------------
   if(upload_results){
     print("5. Uploading results")
-    results <- upload_results(results)
+    upload_results(results)
   }
 
   if(add_fire & upload_fire){
@@ -248,5 +248,5 @@ deweather <- function(
              fire_buffer_km=fire_buffer_km)
   }
 
-  return(weather)
+  return(results)
 }
