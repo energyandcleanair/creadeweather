@@ -86,6 +86,7 @@ deweather <- function(
   fire_mode="trajectory",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0", "gadm_1" or "gadm_2"
+  fire_split_regions_res='low', # GADM resolution
   fire_buffer_km=10,
   upload_fire=F, # Upload trajs, weather, and meas for biomass burning dashboard
   
@@ -151,6 +152,7 @@ deweather <- function(
     fire_buffer_km=fire_buffer_km,
     fire_split_days=fire_split_days,
     fire_split_regions=fire_split_regions,
+    fire_split_regions_res=fire_split_regions_res,
     trajs_parallel=trajs_parallel,
     trajs_height=trajs_height,
     trajs_hours=trajs_hours,
