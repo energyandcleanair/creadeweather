@@ -115,6 +115,13 @@ train_models <- function(data,
     })
   }
   
+  # train_model_unsafe <- function(index, location_id, ...){
+  #   print(paste("Training model on location", location_id))
+  #   res <- train_model(...)
+  #   res$index <- index
+  #   return(res)
+  # }
+  
   data$index <- zoo::index(data)
   
   result <- pbapply::pbmapply(train_model_safe,

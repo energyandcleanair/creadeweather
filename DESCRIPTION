@@ -52,7 +52,8 @@ Imports:
     httr,
     terra,
     ncdf4,
-    caret
+    caret,
+    ecmwfr
 Depends:
     ggplot2,
     worldmet

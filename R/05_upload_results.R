@@ -23,16 +23,21 @@ upload_fire_results <- function(results,
                                 met_type,
                                 duration_hour,
                                 fire_source,
-                                fire_split,
+                                fire_split_regions,
                                 fire_buffer_km,
                                 trajs_height,
                                 trajs_hours
                                 ){
   
   results_list <- results %>%
-    filter(grepl('trend', process_id)) %>%
+    rowwise() %>%
+    filter(config$output=='trend') %>% 
+    select(result,location_id, poll, unit, source, process_id) %>%
+    ungroup() %>%
+    tidyr::unnest(result) %>%
     group_by(location_id) %>%
     tidyr::nest()
+  
   
   mapply(creafire::db.upload_meas,
          meas=results_list$data,
@@ -43,7 +48,7 @@ upload_fire_results <- function(results,
          buffer_km=fire_buffer_km,
          height=list(trajs_height),
          fire_source=fire_source,
-         fire_split=list(NULL))
+         fire_split_regions=list(fire_split_regions))
 }
 
 

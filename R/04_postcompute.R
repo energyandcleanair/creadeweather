@@ -288,25 +288,25 @@ postcompute_one <- function(model, data, config, location_id, poll, unit, source
 # Group by GADM2 and GADM1
 # results_anomaly_gadm1
 # process_id replace city->gadm
-post_agg_gadm1 <- function(results, locs){
-  results %>%
-    dplyr::left_join(locs %>% dplyr::select(city, gid_1), by=c("location_id"="city")) %>%
-    dplyr::mutate(process_id=gsub("city","gadm1",process_id)) %>%
-    tidyr::unnest(cols=normalised) %>%
-    dplyr::group_by(process_id, process_deweather, poll, unit, source, gid_1, date, output) %>%
-    dplyr::summarise(value=mean(value, na.rm=T)) %>%
-    tidyr::nest() %>%
-    rename(location_id=gid_1, normalised=data)
-}
-
-post_agg_gadm2 <- function(results, locs){
-  results %>%
-    left_join(locs %>% dplyr::select(city, gid_1, gid_2), by=c("location_id"="city")) %>%
-    mutate(process_id=gsub("city","gadm2",process_id)) %>%
-    tidyr::unnest(cols=normalised) %>%
-    group_by(process_id, process_deweather, poll, unit, source, gid_2, date, output) %>%
-    summarise(value=mean(value, na.rm=T)) %>%
-    tidyr::nest() %>%
-    rename(location_id=gid_2, normalised=data)
-}
+# post_agg_gadm1 <- function(results, locs){
+#   results %>%
+#     dplyr::left_join(locs %>% dplyr::select(city, gid_1), by=c("location_id"="city")) %>%
+#     dplyr::mutate(process_id=gsub("city","gadm1",process_id)) %>%
+#     tidyr::unnest(cols=normalised) %>%
+#     dplyr::group_by(process_id, process_deweather, poll, unit, source, gid_1, date, output) %>%
+#     dplyr::summarise(value=mean(value, na.rm=T)) %>%
+#     tidyr::nest() %>%
+#     rename(location_id=gid_1, normalised=data)
+# }
+# 
+# post_agg_gadm2 <- function(results, locs){
+#   results %>%
+#     left_join(locs %>% dplyr::select(city, gid_1, gid_2), by=c("location_id"="city")) %>%
+#     mutate(process_id=gsub("city","gadm2",process_id)) %>%
+#     tidyr::unnest(cols=normalised) %>%
+#     group_by(process_id, process_deweather, poll, unit, source, gid_2, date, output) %>%
+#     summarise(value=mean(value, na.rm=T)) %>%
+#     tidyr::nest() %>%
+#     rename(location_id=gid_2, normalised=data)
+# }
 

@@ -86,6 +86,7 @@ deweather <- function(
   fire_mode="trajectory",
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0", "gadm_1" or "gadm_2"
+  fire_split_regions_res='low', # GADM resolution
   fire_buffer_km=10,
   upload_fire=F, # Upload trajs, weather, and meas for biomass burning dashboard
   
@@ -151,6 +152,7 @@ deweather <- function(
     fire_buffer_km=fire_buffer_km,
     fire_split_days=fire_split_days,
     fire_split_regions=fire_split_regions,
+    fire_split_regions_res=fire_split_regions_res,
     trajs_parallel=trajs_parallel,
     trajs_height=trajs_height,
     trajs_hours=trajs_hours,
@@ -167,17 +169,17 @@ deweather <- function(
   # 1bis. Combine weather and measurements
   #-----------------------------------------
   data <- combine_meas_weather(meas, weather)
-  
-  
+
+
   #-----------------------------------------
   # 1ter. List weather variables
   #-----------------------------------------
   if(add_fire){
-    fire_vars_pattern <- ifelse(fire_source=="viirs", "^fire_frp","^pm25_emission")
+    fire_vars_pattern <- ifelse(fire_source=="viirs","^fire_frp","^pm25_emission")
     available_vars <- names(weather %>% select(weather) %>% unnest(weather))
     weather_vars <- unique(c(weather_vars, grep(fire_vars_pattern, available_vars, value=T)))
   }
-  
+
   #----------------------
   # 2. Preparing data
   #----------------------
@@ -185,7 +187,7 @@ deweather <- function(
   data <- prep_data(data=data,
                     weather_vars=weather_vars,
                     lag=lag)
-  
+
   configs <- create_configs(
     weather_vars=weather_vars,
     add_fire=add_fire,
@@ -209,36 +211,42 @@ deweather <- function(
     trajs_duration_hour=trajs_duration_hour,
     trajs_hours=trajs_hours
   )
-  
+
   #---------------------------
   # 3. Train models
   #---------------------------
   print("3. Training models")
+  print(data)
   results <- train_configs(data=data,
                            configs=configs)
-  
+
   if(nrow(results)==0){
     warnings("Empty results. Returning NA")
     return(NA)
   }
-  
-  
+
+
   #--------------------------------------
   # 4. Post-compute / aggregate results
   #--------------------------------------
   print("4. Post-computing")
   results <- postcompute(results=results)
-  
-  
+
+
   #--------------------
   # 5. Upload results
   #--------------------
   if(upload_results){
     print("5. Uploading results")
+<<<<<<< HEAD
     try({results_uploaded <- upload_results(results)})
+=======
+    upload_results(results)
+>>>>>>> 0c4f5d25e5ccb0b9d1bb4c95193b986888248c84
   }
-  
+
   if(add_fire & upload_fire){
+<<<<<<< HEAD
     try({
       upload_fire_results(results=results,
                           met_type=trajs_met_type,
@@ -249,7 +257,17 @@ deweather <- function(
                           trajs_height=trajs_height,
                           fire_buffer_km=fire_buffer_km)
     })
+=======
+    upload_fire_results(results=results,
+             met_type=trajs_met_type,
+             duration_hour=trajs_duration_hour,
+             fire_source=fire_source,
+             fire_split=fire_split_regions,
+             trajs_hours=trajs_hours,
+             trajs_height=trajs_height,
+             fire_buffer_km=fire_buffer_km)
+>>>>>>> 0c4f5d25e5ccb0b9d1bb4c95193b986888248c84
   }
-  
+
   return(results)
 }
