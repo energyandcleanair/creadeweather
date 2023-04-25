@@ -57,6 +57,10 @@ deweather <- function(
   date_to=NULL,
   
   
+  # PRESET CONFIG
+  deweather_process_id=NULL,
+  
+  
   # DEWEATHERING GENERAL
   output=c("trend"), #c("trend", "anomaly")
   upload_results=T,
@@ -79,6 +83,7 @@ deweather <- function(
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
   weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'precip', 'RH_max', 'pbl_min', 'pbl_max'),
+  
   
   # BIOMASS BURNING
   add_fire=F, #Whether to add it in the model, 
@@ -105,9 +110,20 @@ deweather <- function(
   try(readRenviron(".Renviron"))
   
   #----------------------
-  # Input check
+  # Input presets
   #----------------------
+  if(!is.null(deweather_process_id)){
+    # Overwrite parameters by those specified in the process
+    deweather_parameters <- process_id_to_parameters(
+      process_id=deweather_process_id,
+      key="deweather")
 
+    # Log parameters
+    print("Using parameters from process_id:")
+    print(deweather_parameters)
+    
+    list2env(deweather_parameters, globalenv())
+  }
   
   #----------------------
   # 0. Get AQ measurements
@@ -238,15 +254,12 @@ deweather <- function(
   #--------------------
   if(upload_results){
     print("5. Uploading results")
-<<<<<<< HEAD
-    try({results_uploaded <- upload_results(results)})
-=======
-    upload_results(results)
->>>>>>> 0c4f5d25e5ccb0b9d1bb4c95193b986888248c84
+    try({
+      results <- upload_results(results, deweather_process_id=deweather_process_id)
+    })
   }
 
   if(add_fire & upload_fire){
-<<<<<<< HEAD
     try({
       upload_fire_results(results=results,
                           met_type=trajs_met_type,
@@ -257,16 +270,6 @@ deweather <- function(
                           trajs_height=trajs_height,
                           fire_buffer_km=fire_buffer_km)
     })
-=======
-    upload_fire_results(results=results,
-             met_type=trajs_met_type,
-             duration_hour=trajs_duration_hour,
-             fire_source=fire_source,
-             fire_split=fire_split_regions,
-             trajs_hours=trajs_hours,
-             trajs_height=trajs_height,
-             fire_buffer_km=fire_buffer_km)
->>>>>>> 0c4f5d25e5ccb0b9d1bb4c95193b986888248c84
   }
 
   return(results)
