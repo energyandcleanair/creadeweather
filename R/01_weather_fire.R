@@ -216,7 +216,8 @@ fire.add_fire <- function(weather,
                       height=list(trajs_height),
                       fire_source=source,
                       hours=list(trajs_hours),
-                      fire_split=list(NULL)
+                      fire_split=list(NULL),
+                      fire_split_regions=split_regions
                       )
   }
   

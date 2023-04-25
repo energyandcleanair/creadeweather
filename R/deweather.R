@@ -247,6 +247,7 @@ deweather <- function(
              fire_source=fire_source,
              fire_split=fire_split_regions,
              trajs_hours=trajs_hours,
+             trajs_height=trajs_height,
              fire_buffer_km=fire_buffer_km)
   }
 
