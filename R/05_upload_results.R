@@ -1,4 +1,4 @@
-upload_results <- function(results){
+upload_results <- function(results, deweather_process_id){
   
   processes <- rcrea::processes()
   # processes <- results %>% distinct(process_id, process_deweather)
@@ -52,14 +52,16 @@ upload_fire_results <- function(results,
 }
 
 
-upload_results_one <- function(config, result, process_id, processes, poll, unit, location_id, source){
+upload_results_one <- function(config, result, process_id, processes, poll, unit, location_id, source, deweather_process_id){
   
-  process_deweather_id <- config_to_process_deweather(config=config,
-                                                      process_id=process_id,
-                                                      processes=processes)
+  if(is.null(deweather_process_id)){
+    deweather_process_id <- config_to_process_deweather(config=config,
+                                                        process_id=process_id,
+                                                        processes=processes)
+  }
   
   message(sprintf('Uploading with process_id %s', process_deweather_id))
-  upload_meas(result, process_deweather_id, poll, unit, location_id, source)
+  upload_meas(result, deweather_process_id, poll, unit, location_id, source)
 }
 
 
@@ -115,13 +117,13 @@ config_to_preferred_name <- function(config, process_id, processes){
 }
 
 
-upload_meas <- function(result, process_deweather_id, poll, unit, location_id, source){
+upload_meas <- function(result, deweather_process_id, poll, unit, location_id, source){
   to_upload <- result %>%
-    mutate(process_id=process_deweather_id,
-           poll=poll,
-           unit=unit,
-           source=source,
-           location_id=location_id
+    mutate(process_id=deweather_process_id,
+           poll=!!poll,
+           unit=!!unit,
+           source=!!source,
+           location_id=!!location_id
            )
   
   rcrea::upsert_meas(to_upload)
