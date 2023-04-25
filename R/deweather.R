@@ -216,6 +216,7 @@ deweather <- function(
   # 3. Train models
   #---------------------------
   print("3. Training models")
+  print(data)
   results <- train_configs(data=data,
                            configs=configs)
 
