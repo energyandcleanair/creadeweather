@@ -66,11 +66,19 @@ era5.process_date <- function(date){
       area = c(90, -180, -90, 180),
       target = paste0(fname)
     )
+    if(Sys.getenv('KEYRING_PASSWORD') != ""){
+      keyring::keyring_unlock(keyring="ecmwfr", password = Sys.getenv('KEYRING_PASSWORD'))  
+    }
+    
+    ecmwfr::wf_set_key(user = Sys.getenv('CDS_UID'),
+                       key = Sys.getenv('CDS_API_KEY'),
+                       service = "cds")
     
     ecmwfr::wf_request(user = Sys.getenv('CDS_UID'),
                request = request,
                transfer = TRUE,
                path = era5.folder_era5(),
+               time_out=60, #shorten timeout
                verbose = TRUE)
     
     layers_dict = list()
@@ -203,7 +211,9 @@ era5.add_weather <- function(weather,
     distinct(date) %>%
     pull()
   
+  print("=== Refreshing ERA5 files ===")
   era5.refresh_files(dates)
+  print("=== Done ===")
   
   stations_sf <- st_as_sf(weather %>%
                             ungroup() %>%
@@ -213,31 +223,30 @@ era5.add_weather <- function(weather,
   
   dir_era5 <- era5.folder_era5()
   
+  print("=== Extracting ERA5 data at locations ===")
   
-  for (i in seq_along(stations_sf$geometry)){
-    x <- st_coordinates(stations_sf[i,]$geometry)[1]
-    y <- st_coordinates(stations_sf[i,]$geometry)[2]
-    coords <- cbind(x, y)
+  coords <- terra::vect(stations_sf)
+  era5_data <- pbmcapply::pbmclapply(dates, function(date){
+    tryCatch({
+      tif <- terra::rast(era5.date_to_filepaths(date, dir_era5), lyrs=weather_vars)
+      tb <- tibble('date'= date)
+      extracted_values <- terra::extract(tif, coords)
+      dplyr::bind_cols(location_id=coords$location_id, tb, as.data.frame(extracted_values) %>% dplyr::select(-c(ID)))
+    }, error=function(error){return(NULL)})
+  }, mc.cores = parallel::detectCores() - 1) %>%
+    bind_rows
     
-    main_tb <- NULL
-    
-    for (j in seq_along(dates)){
-      tif <- raster::brick(era5.date_to_filepaths(dates[j], dir_era5))
-      
-      tb <- tibble('date'= dates[j])
-      
-      for (k in weather_vars){
-        band <- raster::subset(tif, k)
-        tb[k] <- raster::extract(band, coords)
-      }
-      main_tb = bind_rows(main_tb,tb)
-    }
-    
-    df <- merge(x=weather[which(weather$location_id==stations_sf$location_id[i]),]$weather[[1]], 
-                y=main_tb, by='date', all.x=TRUE)
-    weather[which(weather$location_id==stations_sf$location_id[i]),]$weather[[1]] <- tibble(df)
-    
+  
+  for(location_id in coords$location_id){
+    df <- merge(x=weather[weather$location_id==location_id,]$weather[[1]], 
+                y=era5_data[era5_data$location_id==location_id,] %>% dplyr::select(-c(location_id)),
+                by='date', all.x=TRUE)  
+    weather[weather$location_id==location_id,]$weather[[1]] <- tibble(df)
   }
+  
+  
+  print("=== Done ===")
+  
   return(weather)
 
 }
