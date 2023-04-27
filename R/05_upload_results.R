@@ -12,6 +12,7 @@ upload_results <- function(results, deweather_process_id){
          unit=results$unit,
          location_id=results$location_id,
          source=results$source,
+         deweather_process_id=deweather_process_id,
          USE.NAMES=F,
          SIMPLIFY=FALSE
          ) %>%
@@ -60,7 +61,7 @@ upload_results_one <- function(config, result, process_id, processes, poll, unit
                                                         processes=processes)
   }
   
-  message(sprintf('Uploading with process_id %s', process_deweather_id))
+  message(sprintf('Uploading with process_id %s', deweather_process_id))
   upload_meas(result, deweather_process_id, poll, unit, location_id, source)
 }
 
@@ -89,7 +90,7 @@ config_to_process_deweather <- function(config, process_id, processes){
   
   meas_process <- processes %>% filter(id==process_id)
   
-  process_deweather_id = rcrea::retrieve_or_create_process(
+  deweather_process_id = rcrea::retrieve_or_create_process(
     filter=meas_process$filter[[1]],
     agg_spatial=meas_process$agg_spatial[[1]],
     agg_temp=meas_process$agg_temp[[1]],
@@ -97,7 +98,7 @@ config_to_process_deweather <- function(config, process_id, processes){
     preferred_name=preferred_name
   )
   
-  return(process_deweather_id)
+  return(deweather_process_id)
 }
 
 

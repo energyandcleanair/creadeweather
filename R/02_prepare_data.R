@@ -129,7 +129,7 @@ filter_data <- function(tbl, weather_vars){
   
   # With original weather data (lag doesn't count)
   tbl <- tbl %>%
-    dplyr::filter(if_any(weather_vars, ~ !is.na(.)))
+    dplyr::filter(if_all(weather_vars, ~ !is.na(.)))
   
   return(tbl)
 }

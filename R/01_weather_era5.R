@@ -1,3 +1,14 @@
+era5.weather_vars <- function(){
+  # r <- raster::brick(era5.date_to_filepath("2020-10-03"))
+  # return(names(r))
+  return(c('pbl_min', 'pbl_max', 'total_precip'))
+}
+
+era5.date_to_filepath <- function(date, extension='tiff'){
+  fname <- paste0('era5_', strftime(as.Date(date), "%Y-%m-%d"), '.', extension)
+  file.path(era5.folder_era5(), fname)
+}
+
 era5.folder_era5 <- function(){
   dir_era5 <- Sys.getenv("DIR_ERA5")
   if(dir_era5==""){
@@ -138,12 +149,14 @@ era5.process_date <- function(date){
     }
     
     sp <- calc_raster(fname, 'sp', mean)
+    tp <- calc_raster(fname, 'tp', sum)
     t2m <- layers_dict['temp']
     t2msp <- raster::stack(c(t2m, sp))
     huss <- raster::calc(t2msp, humidity_fun)
     layers_dict['sp'] <- NULL
     layers_dict['humid'] <- huss
-
+    layers_dict['total_precip'] <- tp
+    
     output_path <- file.path(era5.folder_era5(), paste0(strsplit(fname, split =  "[.]")[[1]][1], '.tiff'))
     
     tif <- raster::stack(layers_dict)
@@ -200,11 +213,7 @@ era5.date_to_filepaths <- function(date, dir_era5){
 #' @export
 #'
 #' @examples
-era5.add_weather <- function(weather,
-                                  weather_vars=c('pbl', 'pbl_min', 'pbl_max', 
-                                                 'mean_temp', 'precip',
-                                                 'max_temp', 'min_temp', 'ws',
-                                                 'wd', 'humid')){
+era5.add_weather <- function(weather, weather_vars){
   dates <- weather %>%
     as.data.frame() %>%
     tidyr::unnest(weather) %>%

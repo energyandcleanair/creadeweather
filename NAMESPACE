@@ -1,5 +1,5 @@
 # Export all functions
-exportPattern("^(:?[^.]+)$")
+exportPattern("^[[:alpha:]]+")
 
 importFrom(dplyr,all_vars)
 importFrom(dplyr,any_vars)

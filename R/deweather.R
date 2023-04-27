@@ -82,7 +82,8 @@ deweather <- function(
   # WEATHER
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
-  weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres', 'wd', 'ws_max', 'precip', 'RH_max', 'pbl_min', 'pbl_max'),
+  weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres',
+                 'wd', 'ws_max', 'precip', 'RH_max', 'pbl_min', 'pbl_max'),
   
   
   # BIOMASS BURNING

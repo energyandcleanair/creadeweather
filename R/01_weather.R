@@ -124,8 +124,9 @@ collect_weather <- function(meas,
                               years_force_refresh=years_force_refresh)
   
   
-  if(any(grepl('pbl', weather_vars))){
-    weather <- era5.add_weather(weather, weather_vars=grep('pbl', weather_vars, value = T))
+  if(any(weather_vars %in% era5.weather_vars())){
+    weather <- era5.add_weather(weather,
+                                weather_vars=intersect(weather_vars, era5.weather_vars()))
   }
 
   # Add sunshine
