@@ -54,7 +54,7 @@ train_models <- function(data,
 ){
   
   
-  if(nrow(data)==0 || nrow(data$meas_weather[[1]])==0 || is.na(data$meas_weather[[1]])){
+  if(nrow(data)==0 || nrow(data$meas_weather[[1]])==0 || all(is.na(data$meas_weather[[1]]))){
     warning("No measurements available. Returning NA")
     return(NA)
   }

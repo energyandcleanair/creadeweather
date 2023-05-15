@@ -16,16 +16,27 @@ prep_data <- function(data,
                       time_vars=c('yday', 'date_unix'),
                       lag=0){
   
+  prep_meas_weather <- function(meas_weather){
+      tryCatch({
+        meas_weather %>%
+          clean_data() %>%
+          fill_data() %>%
+          enrich_data(lag=lag,
+                      weather_vars=weather_vars) %>%
+          filter_data(weather_vars=weather_vars) %>%
+          utils.add_timevars(add=time_vars)
+      }, error = function(e){
+        return(NULL)
+      })
+  }
+  
   data <- data %>%
     dplyr::rowwise() %>%
-    mutate(meas_weather=list(meas_weather %>%
-                               clean_data() %>%
-                               fill_data() %>%
-                               enrich_data(lag=lag,
-                                           weather_vars=weather_vars) %>%
-                               filter_data(weather_vars=weather_vars) %>%
-                               utils.add_timevars(add=time_vars))) %>%
+    mutate(meas_weather=list(prep_meas_weather(meas_weather))) %>%
     ungroup()
+  
+  # Remove empty configurations
+  data <- data[unlist(sapply(data$meas_weather, length)) > 0, ]
  
   return(data)
 }

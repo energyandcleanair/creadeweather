@@ -123,7 +123,7 @@ deweather <- function(
     print("Using parameters from process_id:")
     print(deweather_parameters)
     
-    list2env(deweather_parameters, globalenv())
+    list2env(deweather_parameters, environment())
   }
   
   #----------------------

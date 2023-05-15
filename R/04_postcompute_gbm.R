@@ -16,7 +16,8 @@ postcompute_gbm <- function(model, data, config, ...){
   # Predict results ---------------------------------------------------------
   data$predicted <- do_unlink(gbm::predict.gbm(model, data))
   data$value <- do_unlink(data$value)
-  data$residuals <- data$predicted - data$value
+  data$observed <- data$value
+  data$anomaly <- data$observed - data$predicted
   
   # Build a lite version of the model for saving purposes
   model_light <- postcompute_gbm_lighten_model(model=model, data=data)
@@ -35,7 +36,6 @@ postcompute_gbm <- function(model, data, config, ...){
   
   # Keep only useful information
   cols <- c('date', 'trend', 'anomaly', 'predicted', 'observed')
-  data$observed <- data$value
   if(add_fire){
     cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
   }
