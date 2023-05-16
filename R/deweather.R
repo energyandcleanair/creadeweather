@@ -132,10 +132,12 @@ deweather <- function(
   print("0. Getting measurements")
   date_from <- min(c(anomaly=training_start_anomaly,
                      trend=training_start_trend)[output])
+  
+  
   date_to <- min(Sys.Date(),
-                 ifelse(is.null(date_to), as.Date('2100-01-01'), as.Date(date_to)),
-                 max(c(anomaly=training_end_anomaly,
-                       trend=training_end_trend)[output]))
+                 as.Date(if(is.null(date_to)) {as.Date('2100-01-01')} else {as.Date(date_to)}),
+                 as.Date(max(c(anomaly=training_end_anomaly,
+                       trend=training_end_trend)[output])))
   
   meas <- get_measurements(meas=meas,
                            poll=poll,
