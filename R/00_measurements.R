@@ -30,6 +30,14 @@ get_measurements <- function(meas=NULL,
   
   
   if(is.null(meas)){
+    
+    # Print environment for debugging
+    for (obj in ls()) {
+      cat(paste0(obj, ": "))
+      print(get(obj))
+    }
+    
+    
     meas <- rcrea::measurements(poll=poll,
                                 country=country,
                                 location_id=location_id,
