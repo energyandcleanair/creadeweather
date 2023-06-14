@@ -78,6 +78,9 @@ era5.process_date <- function(date){
       target = paste0(fname)
     )
     if(Sys.getenv('KEYRING_PASSWORD') != ""){
+      if(! "ecmwfr" %in% keyring::keyring_list()$keyring){
+        keyring::keyring_create(keyring="ecmwfr", password = Sys.getenv('KEYRING_PASSWORD'))  
+      }
       keyring::keyring_unlock(keyring="ecmwfr", password = Sys.getenv('KEYRING_PASSWORD'))  
     }
     
