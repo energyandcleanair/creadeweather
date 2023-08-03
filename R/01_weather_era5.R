@@ -240,7 +240,9 @@ era5.add_weather <- function(weather, weather_vars){
   coords <- terra::vect(stations_sf)
   era5_data <- pbmcapply::pbmclapply(dates, function(date){
     tryCatch({
-      tif <- terra::rast(era5.date_to_filepaths(date, dir_era5), lyrs=weather_vars)
+      tif_file <- era5.date_to_filepaths(date, dir_era5)
+      if(!file.exists(tif_file)) return(NULL)
+      tif <- terra::rast(tif_file, lyrs=weather_vars)
       tb <- tibble('date'= date)
       extracted_values <- terra::extract(tif, coords)
       dplyr::bind_cols(location_id=coords$location_id, tb, as.data.frame(extracted_values) %>% dplyr::select(-c(ID)))
