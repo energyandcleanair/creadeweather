@@ -26,7 +26,7 @@ fire.add_fire <- function(weather,
                           source="viirs", #or "gfas"
                           mode="trajectory",
                           met_type="gdas1",
-                          duration_hour=72,
+                          duration_hour=120,
                           delay_hour=24,
                           buffer_km=NULL,
                           split_days=F,
@@ -34,6 +34,7 @@ fire.add_fire <- function(weather,
                           split_regions_res='low',
                           trajs_height=NULL,
                           trajs_parallel=T,
+                          trajs_cores=parallel::detectCores() - 1,
                           trajs_height_default=10,
                           trajs_hours=seq(0,23,4),# To make it faster, we don't calculate trajectories every hour
                           use_trajs_cache=T,
@@ -98,9 +99,10 @@ fire.add_fire <- function(weather,
         height=wt$trajs_height,
         duration_hour=duration_hour,
         hours=trajs_hours, 
-        timezone=wt$timezone,
+        timezone=unique(wt$timezone),
         use_cache=use_trajs_cache,
-        parallel=trajs_parallel
+        parallel=trajs_parallel,
+        mc.cores = trajs_cores
     )
     names(wt$trajs) <- NULL
     print("Done")
@@ -290,16 +292,19 @@ fire.add_existing_weather <- function(weather,
                                   fire_split_regions=split_regions,
                                   hours=paste0(trajs_hours, collapse=","))  
   }) %>%
-    do.call(bind_rows, .) %>%
-    select(location_id, weather_fire=weather)
+    do.call(bind_rows, .)
   
-  weather %>%
-    left_join(available_weathers) %>%
-    rowwise() %>%
-    mutate(weather=list(left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T))))) %>%
-    dplyr::select(-c(weather_fire)) %>%
-    ungroup()
-  
+  if(nrow(available_weathers) > 0){
+    weather %>%
+      left_join(available_weathers %>%
+                  select(location_id, weather_fire=weather)) %>%
+      rowwise() %>%
+      mutate(weather=list(left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T))))) %>%
+      dplyr::select(-c(weather_fire)) %>%
+      ungroup()
+  }else{
+    weather
+  }
 }
 
 
