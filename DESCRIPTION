@@ -32,6 +32,7 @@ Imports:
     rmarkdown,
     countrycode,
     magrittr,
+    glue,
     ggthemes,
     scales,
     tibble,
