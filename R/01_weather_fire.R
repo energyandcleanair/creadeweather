@@ -38,6 +38,7 @@ fire.add_fire <- function(weather,
                           trajs_height_default=10,
                           trajs_hours=seq(0,23,4),# To make it faster, we don't calculate trajectories every hour
                           use_trajs_cache=T,
+                          use_weather_cache=T,
                           upload_trajs=F,
                           save_trajs_filename=NULL,
                           upload_weather=F){
@@ -57,22 +58,26 @@ fire.add_fire <- function(weather,
   
   cols <- setdiff(c(names(weather), "date", "trajs_height", "wd_copy", "ws_copy"),"weather")
   
-  # Add existing fire data (that is stored in MongoDB)
-  weather <- fire.add_existing_weather(weather=weather,
-                                                source=source,
-                                                mode=mode,
-                                                met_type=met_type,
-                                                duration_hour=duration_hour,
-                                                delay_hour=delay_hour,
-                                                buffer_km=buffer_km,
-                                                split_days=split_days,
-                                                split_regions=split_regions,
-                                                trajs_height=trajs_height,
-                                                trajs_hours=trajs_hours)
+ 
+  if(use_weather_cache){
+    # Add existing fire data (that is stored in MongoDB)
+    weather <- fire.add_existing_weather(weather=weather,
+                                         source=source,
+                                         mode=mode,
+                                         met_type=met_type,
+                                         duration_hour=duration_hour,
+                                         delay_hour=delay_hour,
+                                         buffer_km=buffer_km,
+                                         split_days=split_days,
+                                         split_regions=split_regions,
+                                         trajs_height=trajs_height,
+                                         trajs_hours=trajs_hours)
+  }
+  
   
   w <- tibble(weather) %>%
     tidyr::unnest(weather) %>%
-    filter(!'fire_frp' %in% names(.) | is.na(fire_frp)) %>%
+    filter(if('fire_frp' %in% names(.)) is.na(fire_frp) else T) %>%
     # We keep wind information (in case mode=='oriented')
     # as well as pbl for trajectory height (in case mode=='trajectory', used for height in splitr)
     rowwise() %>%
@@ -249,7 +254,6 @@ fire.add_fire <- function(weather,
                       height=list(trajs_height),
                       fire_source=source,
                       hours=list(trajs_hours),
-                      fire_split=list(NULL),
                       fire_split_regions=split_regions
                       )
   }
