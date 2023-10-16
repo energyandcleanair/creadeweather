@@ -31,14 +31,8 @@ upload_fire_results <- function(results,
                                 ){
   
   results_list <- results %>%
-    rowwise() %>%
-    filter(config$output=='trend') %>% 
-    select(result,location_id, poll, unit, source, process_id) %>%
-    ungroup() %>%
-    tidyr::unnest(result) %>%
     group_by(location_id) %>%
     tidyr::nest()
-  
   
   mapply(creafire::db.upload_meas,
          meas=results_list$data,

@@ -93,17 +93,19 @@ deweather <- function(
   fire_split_days=F, # whether to split fires by "age" (e.g. 1-day old, 2-day old etc)
   fire_split_regions=NULL, # whether to split fires by region. NULL, "gadm_0", "gadm_1" or "gadm_2"
   fire_split_regions_res='low', # GADM resolution
-  fire_buffer_km=10,
+  fire_buffer_km=50,
   upload_fire=F, # Upload trajs, weather, and meas for biomass burning dashboard
   
   
   # TRAJECTORIES
   trajs_parallel=T,
+  trajs_cores=parallel::detectCores() - 1,
   trajs_height=10,
   trajs_hours=seq(0,23,4),
   trajs_duration_hour=72,
   trajs_met_type='gdas1',
   use_trajs_cache=T,
+  use_weather_cache=T,
   save_trajs_filename=NULL
 ){
   
@@ -135,9 +137,7 @@ deweather <- function(
   
   
   date_to <- min(Sys.Date(),
-                 as.Date(if(is.null(date_to)) {as.Date('2100-01-01')} else {as.Date(date_to)}),
-                 as.Date(max(c(anomaly=training_end_anomaly,
-                       trend=training_end_trend)[output])))
+                 as.Date(if(is.null(date_to)) {as.Date('2100-01-01')} else {as.Date(date_to)}))
   
   meas <- get_measurements(meas=meas,
                            poll=poll,
@@ -173,11 +173,13 @@ deweather <- function(
     fire_split_regions=fire_split_regions,
     fire_split_regions_res=fire_split_regions_res,
     trajs_parallel=trajs_parallel,
+    trajs_cores=trajs_cores,
     trajs_height=trajs_height,
     trajs_hours=trajs_hours,
     trajs_duration_hour=trajs_duration_hour,
     trajs_met_type=trajs_met_type,
     use_trajs_cache=use_trajs_cache,
+    use_weather_cache=use_weather_cache,
     upload_trajs=upload_fire,
     upload_weather=upload_fire,
     save_trajs_filename=save_trajs_filename

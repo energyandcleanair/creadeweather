@@ -63,10 +63,8 @@ train_gbm <- function(data,
   }
 
   # Prepare data ------------------------------------------------------------
-
   data_prepared <- data %>%
     mutate(date=as.POSIXct(date))
-    
   
   # Reshuffle as it seems GBM doesn't do it
   # Very important
@@ -126,7 +124,8 @@ train_gbm <- function(data,
     pull(key)
   
   formula <- reformulate(termlabels=formula_vars,
-                         response='value')  
+                         response='value')
+  
   data_prepared <- data_prepared %>%
     dplyr::filter(if_any(formula_vars, ~ !is.na(.))) %>%
     dplyr::filter_at("value", all_vars(!is.na(.)))
