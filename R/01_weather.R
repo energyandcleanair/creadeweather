@@ -1,4 +1,6 @@
-get_weather <- function(meas,
+get_weather <- function(location_ids,
+                        date_from,
+                        date_to,
                         weather_vars,
                         read_weather_filename=NULL,
                         save_weather_filename=NULL,
@@ -29,7 +31,9 @@ get_weather <- function(meas,
   if(!is.null(read_weather_filename) && file.exists(read_weather_filename)){
     weather <- read_weather(read_weather_filename)
   }else{
-    weather <- collect_weather(meas,
+    weather <- collect_weather(location_ids=location_ids,
+                               date_from=date_from,
+                               date_to=date_to,
                                weather_vars=weather_vars,
                                years=years,
                                years_force_refresh=years_force_refresh,
@@ -64,7 +68,7 @@ get_weather <- function(meas,
 
 #' Collect weather (and atmospheric) data from various sources including NOAA & UNCAR.
 #'
-#' @param meas tibble of measurements with date and geometry
+#' @param location_ids
 #' @param n_per_station how many NOAA stations do we fetch per AQ measurement station (default 2)
 #' @param years which years are we getting measurements from
 #' @param years_force_refresh ignoring cache files for these years
@@ -77,7 +81,9 @@ get_weather <- function(meas,
 #'
 #' @examples
 #' 
-collect_weather <- function(meas,
+collect_weather <- function(location_ids,
+                            date_from,
+                            date_to,
                             weather_vars,
                             n_per_location=4,
                             years=seq(2015,2020),
@@ -104,25 +110,20 @@ collect_weather <- function(meas,
                             save_trajs_filename=NULL){
     
   
-  if(!all(c('meas','location_id','timezone','geometry') %in% names(meas))){
-    stop("meas is missing columns")
+  # if(!all(c('meas','location_id','timezone','geometry') %in% names(meas))){
+  #   stop("meas is missing columns")
+  # }
+  
+  if(is.null(location_ids)){
+    stop("missing location_ids")
   }
 
-  # Get unique location/date combinations
-  # e.g. some locations may gave different process_id
-  weather <- meas %>%
-    as.data.frame() %>%
-    dplyr::select(country, location_id, meas, geometry) %>%
-    tidyr::unnest(meas) %>%
-    dplyr::distinct(country, location_id, timezone, date) %>%
-    dplyr::group_by(country, location_id, timezone) %>%
-    tidyr::nest() %>%
-    rename(weather=data) %>%
-    left_join(meas %>% ungroup() %>% distinct(location_id, geometry)) %>%
-    sf::st_as_sf() %>%
-    ungroup()
+  locations <- rcrea::locations(id=location_ids, with_source=F) %>%
+    distinct(location_id=id, country, geometry)  %>%
+    mutate(weather=list(tibble(date=seq.Date(date(date_from), date(date_to), by='day'))))
   
-  
+  weather <- locations %>%
+    sf::st_as_sf()
   
   weather <- noaa.add_weather(location_dates=weather,
                               weather_vars=weather_vars,

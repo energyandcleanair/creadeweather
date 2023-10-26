@@ -80,6 +80,7 @@ deweather <- function(
   
   
   # WEATHER
+  weather_for_whole_period=T, # Collect weather even where there is no measurement
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
   weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres',
@@ -95,6 +96,7 @@ deweather <- function(
   fire_split_regions_res='low', # GADM resolution
   fire_buffer_km=50,
   upload_fire=F, # Upload trajs, weather, and meas for biomass burning dashboard
+  upload_weather=upload_fire,
   
   
   # TRAJECTORIES
@@ -154,9 +156,11 @@ deweather <- function(
   #---------------------------------------------
   # 1. Get weather data (and fire if demanded)
   #---------------------------------------------
-  print("1. Adding weather")
+  print("1. Collecting weather")
   weather <- get_weather(
-    meas=meas,
+    location_ids=location_id,
+    date_from=date_from,
+    date_to=date_to,
     weather_vars=weather_vars,
     read_weather_filename=read_weather_filename,
     save_weather_filename=save_weather_filename,
@@ -181,10 +185,15 @@ deweather <- function(
     use_trajs_cache=use_trajs_cache,
     use_weather_cache=use_weather_cache,
     upload_trajs=upload_fire,
-    upload_weather=upload_fire,
+    upload_weather=upload_weather,
     save_trajs_filename=save_trajs_filename
     )
   
+  # We might want to collect weather,
+  # hence doing this here
+  if(is.null(meas)){
+    return(NULL)
+  }
   
   #-----------------------------------------
   # 1bis. Combine weather and measurements

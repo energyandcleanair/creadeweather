@@ -5,13 +5,12 @@ noaa.add_weather <- function(location_dates,
   
   # Find weather stations nearby
   locations_w_stations <- noaa.add_close_stations(location_dates=location_dates,
-                            n_per_location = n_per_location)
+                                                  n_per_location = n_per_location)
   
   # Get weather at these stations
   locations_weather <- noaa.collect_weather(locations_w_stations,
                                             weather_vars=weather_vars,
-                                            years_force_refresh = years_force_refresh) %>%
-    dplyr::ungroup()
+                                            years_force_refresh = years_force_refresh)
   
   # Ensure columns are preserved
   result <- location_dates %>%
@@ -211,7 +210,7 @@ noaa.collect_weather <- function(locations_w_stations,
     })
   }
   
-  if(nrow(weather %>% rowwise() %>% filter(!is.null(weather)))==0){
+  if(nrow(weather %>% rowwise() %>% filter(!is.null(weather_noaa)))==0){
     stop("Failed to find weather data")
   }
   
@@ -249,7 +248,8 @@ noaa.collect_weather <- function(locations_w_stations,
                           left_join(data %>%
                                       select(c('date', intersect(names(data), weather_vars))),
                                     by="date"))) %>%
-    select(-c(data))
+    select(-c(data)) %>%
+    ungroup()
   
   return(locations_weather)
 }

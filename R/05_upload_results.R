@@ -43,7 +43,9 @@ upload_fire_results <- function(results,
          buffer_km=fire_buffer_km,
          height=list(trajs_height),
          fire_source=fire_source,
-         fire_split_regions=list(fire_split_regions))
+         fire_split_regions=list(ifelse(is.null(fire_split_regions),
+                                        creafire::NO_SPLIT_REGION,
+                                        fire_split_regions)))
 }
 
 

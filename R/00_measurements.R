@@ -60,7 +60,8 @@ get_measurements <- function(meas=NULL,
     dplyr::summarise(value=mean(value, na.rm=T))
   
   if(nrow(meas)==0){
-    stop("No measurement found")
+    warning("No measurement found")
+    return(NULL)
   }
   
   if(nest_and_sf){
