@@ -91,10 +91,15 @@ fire.add_fire <- function(weather,
     mutate(trajs_height=tidyr::replace_na(trajs_height, trajs_height_default)) %>%
     tidyr::nest(meas=!cols)
   
+  print(sprintf("Found %d weather rows. Need to update fire data for %d of them",
+               nrow(tibble(weather) %>%
+                      tidyr::unnest(weather)),
+               nrow(w)))
+  
   
   if(mode=="trajectory"){
     
-    print("Calculating trajs")
+    print(sprintf("Calculating trajs for %d dates", length(w$date)))
     wt <- w
     wt$trajs <- creatrajs::trajs.get(
         dates=wt$date,
@@ -130,7 +135,7 @@ fire.add_fire <- function(weather,
              date=wt$date)
     }
 
-    print("Attaching fires to trajectories")
+    print(sprintf("Attaching fires to trajectories for %d dates", length(w$date)))
     wtf <- tryCatch({
       attach_fn(wt,
                 buffer_km=buffer_km,
