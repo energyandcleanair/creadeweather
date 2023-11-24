@@ -104,7 +104,7 @@ deweather <- function(
   trajs_cores=parallel::detectCores() - 1,
   trajs_height=10,
   trajs_hours=seq(0,23,4),
-  trajs_duration_hour=72,
+  trajs_duration_hour=96,
   trajs_met_type='gdas1',
   use_trajs_cache=T,
   use_weather_cache=T,

@@ -312,3 +312,7 @@ utils.add_timevars <- function(data, add = c("hour", "hour.local", "wday", "date
   data
 }
 
+
+utils.get_env <- function(x){
+  gsub('"', '', Sys.getenv(x))
+}
