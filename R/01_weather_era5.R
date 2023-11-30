@@ -77,12 +77,12 @@ era5.process_date <- function(date){
       area = c(90, -180, -90, 180),
       target = paste0(fname)
     )
-    if(utils.get_env('KEYRING_PASSWORD') != ""){
-      if(! "ecmwfr" %in% keyring::keyring_list()$keyring){
-        keyring::keyring_create(keyring="ecmwfr", password = utils.get_env('KEYRING_PASSWORD'))  
-      }
-      keyring::keyring_unlock(keyring="ecmwfr", password = utils.get_env('KEYRING_PASSWORD'))  
+    
+    if(! "ecmwfr" %in% keyring::keyring_list()$keyring){
+      keyring::keyring_create(keyring="ecmwfr", password = utils.get_env('KEYRING_PASSWORD'))  
     }
+    
+    try(keyring::keyring_unlock(keyring="ecmwfr", password = utils.get_env('KEYRING_PASSWORD')))
     
     ecmwfr::wf_set_key(user = utils.get_env('CDS_UID'),
                        key = utils.get_env('CDS_API_KEY'),
