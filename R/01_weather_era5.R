@@ -19,7 +19,7 @@ era5.folder_era5 <- function(){
     if(dir_mnt==""){
       stop("Missing both DIR_ERA5 & MNT_DIR folder")
     }else{
-      return(file.path(dir_mnt, "era5"))
+      return(file.path(dir_mnt, "weather", "era5"))
     }
     
     stop("Missing DIR_ERA5 folder")
