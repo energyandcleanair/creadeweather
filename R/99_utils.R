@@ -313,6 +313,8 @@ utils.add_timevars <- function(data, add = c("hour", "hour.local", "wday", "date
 }
 
 
-utils.get_env <- function(x){
-  gsub('"', '', Sys.getenv(x))
+utils.get_env <- function(x, error_if_not_found=F){
+  res <- gsub('"', '', Sys.getenv(x))
+  if( res=="" && error_if_not_found) stop(glue("Couldn't find environmental variable {x}"))
+  res
 }

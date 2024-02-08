@@ -84,8 +84,8 @@ era5.process_date <- function(date){
     
     try(keyring::keyring_unlock(keyring="ecmwfr", password = utils.get_env('KEYRING_PASSWORD')))
     
-    ecmwfr::wf_set_key(user = utils.get_env('CDS_UID'),
-                       key = utils.get_env('CDS_API_KEY'),
+    ecmwfr::wf_set_key(user = utils.get_env('CDS_UID', error_if_not_found = T),
+                       key = utils.get_env('CDS_API_KEY', error_if_not_found = T),
                        service = "cds")
     
     ecmwfr::wf_request(user = utils.get_env('CDS_UID'),
