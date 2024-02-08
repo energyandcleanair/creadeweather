@@ -169,8 +169,10 @@ era5.process_date <- function(date){
     t <- terra::writeRaster(terra_ras, output_path, overwrite=TRUE)
     file.remove(file.path(era5.folder_era5(), fname))
   },
-  error=function(c){
-    warning(paste("Failed for date", date))
+  error=function(error){
+    #QUICKFIX try print as well
+    print(paste("Failed for date", date, error))
+    warning(paste("Failed for date", date, error))
     return(NULL)
   })
 }
