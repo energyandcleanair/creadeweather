@@ -12,16 +12,6 @@ era5.date_to_filepath <- function(date, extension='tiff'){
 era5.folder_era5 <- function(){
   dir_era5 <- utils.get_env("DIR_ERA5")
   if(dir_era5==""){
-    
-    #Hotfix waiting for DIR_ERA5 to be in Cloudrun docker image
-    #TODO Remove once DIR_ERA5 properly set up
-    dir_mnt <- utils.get_env("MNT_DIR")
-    if(dir_mnt==""){
-      stop("Missing both DIR_ERA5 & MNT_DIR folder")
-    }else{
-      return(file.path(dir_mnt, "weather", "era5"))
-    }
-    
     stop("Missing DIR_ERA5 folder")
   }
   return(dir_era5)
