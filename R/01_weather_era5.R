@@ -92,7 +92,7 @@ era5.process_date <- function(date){
                request = request,
                transfer = TRUE,
                path = era5.folder_era5(),
-               time_out=600, #shorten timeout
+               time_out=60, #shorten timeout
                verbose = TRUE) -> req
     
     layers_dict = list()
