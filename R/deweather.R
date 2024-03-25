@@ -195,6 +195,10 @@ deweather <- function(
     return(NULL)
   }
   
+  # update weather_vars based on available weather variables
+  weather_vars <- utils.update_weather_vars(weather, weather_vars)
+  
+  
   #-----------------------------------------
   # 1bis. Combine weather and measurements
   #-----------------------------------------

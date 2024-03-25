@@ -318,3 +318,18 @@ utils.get_env <- function(x, error_if_not_found=F){
   if( res=="" && error_if_not_found) stop(glue("Couldn't find environmental variable {x}"))
   res
 }
+
+
+utils.check_atmos_press <- function(weather){
+  check <- weather[['weather']][[1]] %>% filter(is.na(atmos_pres)) %>% nrow() > 
+    (nrow(weather[['weather']][[1]]) * 0.7)
+  
+  if(check) weather[['weather']][[1]] <- weather[['weather']][[1]] %>% select(-atmos_pres)
+  
+  return(weather)
+}
+
+
+utils.update_weather_vars <- function(weather, weather_vars){
+  intersect(weather[['weather']][[1]] %>% colnames(), weather_vars)
+}
