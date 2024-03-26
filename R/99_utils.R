@@ -318,3 +318,22 @@ utils.get_env <- function(x, error_if_not_found=F){
   if( res=="" && error_if_not_found) stop(glue("Couldn't find environmental variable {x}"))
   res
 }
+
+
+utils.check_atmos_press <- function(weather, threshold = 0.9){
+  check <- weather[['weather']][[1]] %>% filter(is.na(atmos_pres)) %>% nrow() > 
+    (nrow(weather[['weather']][[1]]) * threshold)
+  
+  if(check){
+    warning('Too many NAs in atmos_pres so it has been removed. 
+            weather_vars used for the model training will be updated accordingly')
+    weather[['weather']][[1]] <- weather[['weather']][[1]] %>% select(-atmos_pres)
+  }
+  
+  return(weather)
+}
+
+
+utils.update_weather_vars <- function(weather, weather_vars){
+  intersect(weather[['weather']][[1]] %>% colnames(), weather_vars)
+}

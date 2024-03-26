@@ -63,6 +63,8 @@ get_weather <- function(location_ids,
     }
   }
   
+  weather <- utils.check_atmos_press(weather)
+  
   return(weather)
 }
 
