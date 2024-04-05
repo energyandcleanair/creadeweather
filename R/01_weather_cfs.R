@@ -267,25 +267,6 @@ cfs.refresh_files <- function(dates){
   }
 }
 
- 
-# ncar.download_date <- function(date){
-#   dir_ncar <- ncar.folder()
-#   subpath <- strftime(lubridate::date(date), format="%Y/%Y%m/%Y%m%d")
-#   url <- paste0("https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-low-resolution/", subpath)
-#   cmd <- paste0("wget -nc -nH --cut-dirs=7 -np -r -l3 --accept '*sfluxgrbl*.grib2' -P ", dir_ncar, " ", url)
-#   system(cmd)
-# }
-# 
-# 
-# ncar.refresh_files <- function(years){
-#   
-#   downloaded <- ncar.downloaded_dates()
-#   downloadable <- ncar.downloadable_dates(years)
-#   to_download <- downloadable[!downloadable %in% downloaded]
-#   
-#   lapply(to_download, ncar.download_date)
-# }
-
 
 cfs.day_to_utc_hours <- function(date, timezone){
   hour_start <- lubridate::floor_date(

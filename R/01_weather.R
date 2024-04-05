@@ -70,7 +70,7 @@ get_weather <- function(location_ids,
   return(weather)
 }
 
-#' Collect weather (and atmospheric) data from various sources including NOAA & UNCAR.
+#' Collect weather (and atmospheric) data from various sources
 #'
 #' @param location_ids
 #' @param n_per_station how many NOAA stations do we fetch per AQ measurement station (default 2)
