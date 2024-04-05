@@ -23,6 +23,7 @@
 #'
 #' @examples
 fire.add_fire <- function(weather,
+                          weather_sources=NULL, # used for cache only
                           source="viirs", #or "gfas"
                           mode="trajectory",
                           met_type="gdas1",
@@ -252,6 +253,7 @@ fire.add_fire <- function(weather,
     print("Uploading weather")
     pbmapply(creafire::db.upload_weather,
                       weather=result$weather,
+                      weather_sources=weather_sources,
                       location_id=result$location_id,
                       met_type=met_type,
                       duration_hour=duration_hour,

@@ -45,7 +45,6 @@ prep_data <- function(data,
 # Filter outliers etc.
 clean_data <- function(tbl){
   
-  
   # Remove infs in all vars
   tbl <- tbl %>% dplyr::mutate_if(is.numeric, function(x) ifelse(is.infinite(x), NA, x))
   
@@ -100,7 +99,8 @@ fill_data <- function(tbl){
   
   # Treatment 3: interpolate missing values
   max_gap = 5
-  vars_interpolate <- c("sunshine", "atmos_pres", "air_temp_min", "air_temp_max", "air_temp", "ceil_hgt", "pbl_min", "pbl_max")
+  vars_interpolate <- c("sunshine", "atmos_pres", "air_temp_min", "air_temp_max",
+                        "air_temp", "ceil_hgt", "pbl_min", "pbl_max", "dewpoint_temp")
   interpolate <- function(v, date){
     zoo::na.approx(v, date, na.rm=FALSE, maxgap=max_gap)
   }
@@ -124,7 +124,6 @@ enrich_data <- function(tbl, lag, weather_vars){
     tbl <- utils.add_lag(tbl, weather_vars, group_cols=c(), day_lags, 'day')
   }
   
- 
   return(tbl)
 }
 
@@ -134,7 +133,7 @@ filter_data <- function(tbl, weather_vars){
   
   # Only keep if recent data exists
   if(max(tbl$date, na.rm=T)<'2020-01-01'){
-    warning("No measurements available in 2020. Returning NA")
+    warning("No measurements available since 2020. Returning NA")
     return(NA)
   }
   
