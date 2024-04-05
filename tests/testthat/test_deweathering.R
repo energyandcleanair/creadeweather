@@ -25,3 +25,4 @@ test_that("deweathering", {
   expect_gte(sum(complete.cases(results$normalised[[2]])), toyday) # Anomaly
   
 })
+

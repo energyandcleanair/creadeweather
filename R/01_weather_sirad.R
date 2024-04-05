@@ -1,32 +1,19 @@
-
-sirad.add_sunshine <- function(meas_w_weather){
+sirad.collect_weather <- function(location_dates) {
   
-  stations_sf <- st_as_sf(meas_w_weather %>% ungroup() %>%
-                            dplyr::select(location_id, geometry) %>%
-                            dplyr::distinct(location_id, .keep_all=T))
-  
+  locations_sf <- st_as_sf(location_dates %>% distinct(location_id, geometry))
 
   # Get hourly solar radiation at each day and hour
-  sunshine <- stations_sf %>%
-    tidyr::crossing(doy=seq(1:365)) %>%
-    mutate(longitude=purrr::map_dbl(geometry, ~sf::st_coordinates(.x)[[1]])) %>%
-    mutate(latitude=purrr::map_dbl(geometry, ~sf::st_coordinates(.x)[[2]])) %>%
-    mutate(sunshine=purrr::map2_dbl(doy, latitude, ~sirad::extrat(.x, sirad::radians(.y))$ExtraTerrestrialSolarRadiationDaily))
-
-  sunshine_nested <- sunshine %>%
-    tidyr::nest(sunshine=c(doy, sunshine)) %>%
-    dplyr::select(location_id, sunshine)
-
-  # Merge with previous weather data
-  w_sunshine <- meas_w_weather %>%
-    left_join(sunshine_nested) %>%
-    dplyr::rowwise() %>%
-    dplyr::filter(!is.null(weather)) %>%
-    mutate(weather= list(
-             weather %>% mutate(doy=lubridate::yday(date)) %>%
-             left_join(sunshine) %>% dplyr::select(-c(doy))
-           )) %>%
-    dplyr::select(-c(sunshine))
-
-  return(w_sunshine)
+  sunshine <- locations_sf %>%
+    tidyr::crossing(doy = seq(1:365)) %>%
+    mutate(longitude = purrr::map_dbl(geometry, ~ sf::st_coordinates(.x)[[1]])) %>%
+    mutate(latitude = purrr::map_dbl(geometry, ~ sf::st_coordinates(.x)[[2]])) %>%
+    mutate(sunshine = purrr::map2_dbl(doy, latitude, ~ sirad::extrat(.x, sirad::radians(.y))$ExtraTerrestrialSolarRadiationDaily))
+  
+  location_dates %>%
+    group_by(location_id) %>%
+    tidyr::crossing(date = (seq.Date(date(date_from), date(date_to), by = "1 day"))) %>%
+    mutate(doy=lubridate::yday(date)) %>%
+    left_join(sunshine) %>%
+    select(location_id, date, sunshine) %>%
+    tidyr::nest(weather=-c(location_id))
 }

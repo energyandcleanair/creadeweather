@@ -84,7 +84,8 @@ deweather <- function(
   save_weather_filename=NULL,
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
   weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres',
-                 'wd', 'ws_max', 'precip', 'RH_max', 'pbl_min', 'pbl_max'),
+                 'wd', 'ws', 'precip', 'humidity', 'pbl_min', 'pbl_max'),
+  weather_sources = c('noaa', 'era5'),
   
   
   # BIOMASS BURNING
@@ -162,6 +163,7 @@ deweather <- function(
     date_from=date_from,
     date_to=date_to,
     weather_vars=weather_vars,
+    weather_sources=weather_sources,
     read_weather_filename=read_weather_filename,
     save_weather_filename=save_weather_filename,
     years=seq(year(date_from),
@@ -196,8 +198,8 @@ deweather <- function(
   }
   
   # update weather_vars based on available weather variables
-  weather_vars <- utils.update_weather_vars(weather, weather_vars)
-  
+  weather_vars <- intersect(weather_vars, available_weather_vars(weather = weather))
+
   
   #-----------------------------------------
   # 1bis. Combine weather and measurements
@@ -210,7 +212,7 @@ deweather <- function(
   #-----------------------------------------
   if(add_fire){
     fire_vars_pattern <- ifelse(fire_source=="viirs","^fire_frp","^pm25_emission")
-    available_vars <- names(weather %>% select(weather) %>% unnest(weather))
+    available_vars <- available_weather_vars(weather = weather)
     weather_vars <- unique(c(weather_vars, grep(fire_vars_pattern, available_vars, value=T)))
   }
 
