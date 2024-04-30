@@ -92,9 +92,11 @@ era5.collect_weather <- function(location_dates,
                          as.data.frame(extracted_values) %>%
                            dplyr::select(-c(ID))) %>%
                            # K to C for temp_min and temp_max
-                            dplyr::mutate_at(vars(temp_min, temp_max), ~ . - 273.15) %>%
-                          # Pa to millibar for atmos_pres
-                          dplyr::mutate_at(vars(sp), ~ . / 1e2)
+                           dplyr::mutate_at(vars(temp_min, temp_max), ~ . - 273.15) %>%
+                           # Pa to millibar for atmos_pres
+                           dplyr::mutate_at(vars(sp), ~ . / 1e2) %>%
+                           # m to mm for precip
+                           dplyr::mutate_at(vars(total_precip), ~ . * 1e3)
       },
       error = function(error) {
         return(NULL)
@@ -167,7 +169,7 @@ era5.processable_dates <- function(dates) {
 #' @export
 #'
 #' @examples
-era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T) {
+era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_layers=24) {
   tryCatch(
     {
       era5_long_vars <- c(
@@ -183,67 +185,31 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T) {
       fname <- paste0("era5_", date, ".nc")
       fpath <- file.path(era5.folder_era5(), fname)
       
-      if(force_redownload_nc | !file.exists(fpath)){
-        year <- strsplit(as.character(date), split = "[-]")[[1]][1]
-        month <- strsplit(as.character(date), split = "[-]")[[1]][2]
-        day <- strsplit(as.character(date), split = "[-]")[[1]][3]
-        request <- list(
-          dataset_short_name = "reanalysis-era5-single-levels",
-          product_type = "reanalysis",
-          format = "netcdf",
-          variable = era5_long_vars,
-          year = year,
-          month = month,
-          day = day,
-          time = c(
-            "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00",
-            "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
-            "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
-          ),
-          # area is specified as N, W, S, E
-          area = c(90, -180, -90, 180),
-          target = paste0(fname)
-        )
-        
-        if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
-          keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
-        }
-        
-        try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
-        
-        ecmwfr::wf_set_key(
-          user = utils.get_env("CDS_UID", error_if_not_found = T),
-          key = utils.get_env("CDS_API_KEY", error_if_not_found = T),
-          service = "cds"
-        )
-        
-        ecmwfr::wf_request(
-          user = utils.get_env("CDS_UID"),
-          request = request,
-          transfer = TRUE,
-          path = era5.folder_era5(),
-          time_out = 60, # shorten timeout
-          verbose = TRUE
-        ) -> req
-      }
+      # Downlad nc file if need be
+      era5.download_nc(force=force_redownload_nc,
+                       date=date,
+                       era5_long_vars=era5_long_vars,
+                       file_path=fpath,
+                       min_layers=min_layers)
       
       layers_dict <- list()
 
       
-      calc_raster <- function(fname, var, fun) {
-        raster::calc(raster::brick(file.path(era5.folder_era5(), fname), var = var),
-          fun = fun,
-          na.rm = T
-        )
+      calc_raster <- function(fpath, var, fun) {
+        brick <-raster::brick(fpath, var = var)
+        if(raster::nlayers(brick) < min_layers){
+          stop("Not enough layers")
+        }
+        raster::calc(brick, fun = fun, na.rm = T)
       }
 
-      layers_dict["dewpoint_temp"] <- calc_raster(fname, "d2m", mean)
-      layers_dict["pbl"] <- calc_raster(fname, "blh", mean)
-      layers_dict["pbl_min"] <- calc_raster(fname, "blh", min)
-      layers_dict["pbl_max"] <- calc_raster(fname, "blh", max)
-      layers_dict["temp"] <- calc_raster(fname, "t2m", mean)
-      layers_dict["temp_max"] <- calc_raster(fname, "t2m", max)
-      layers_dict["temp_min"] <- calc_raster(fname, "t2m", min)
+      layers_dict["dewpoint_temp"] <- calc_raster(fpath, "d2m", mean)
+      layers_dict["pbl"] <- calc_raster(fpath, "blh", mean)
+      layers_dict["pbl_min"] <- calc_raster(fpath, "blh", min)
+      layers_dict["pbl_max"] <- calc_raster(fpath, "blh", max)
+      layers_dict["temp"] <- calc_raster(fpath, "t2m", mean)
+      layers_dict["temp_max"] <- calc_raster(fpath, "t2m", max)
+      layers_dict["temp_min"] <- calc_raster(fpath, "t2m", min)
 
       # Wind direction and wind speed calculation
       # We do it hour by hour and then average wd and ws
@@ -309,8 +275,8 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T) {
       # huss <- raster::calc(t2msp, humidity_fun)
       # layers_dict["humid"] <- huss
 
-      sp <- calc_raster(fname, "sp", mean)
-      tp <- calc_raster(fname, "tp", sum)
+      sp <- calc_raster(fpath, "sp", mean)
+      tp <- calc_raster(fpath, "tp", sum)
       t2m <- layers_dict["temp"]
       t2msp <- raster::stack(c(t2m, sp))
 
@@ -381,4 +347,66 @@ era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::toda
   dates_to_process <- dates[force | n_layers < 12]
   pbapply::pblapply(dates_to_process, era5.process_date, remove_nc = T)
   
+}
+
+era5.download_nc <- function(force,
+                             date,
+                             file_path,
+                             era5_long_vars,
+                             min_layers=NULL)
+{
+  
+  do_download <- force | !file.exists(file_path)
+  
+  if(!is.null(min_layers) & file.exists(file_path)){
+    n_layers <- suppressWarnings(raster::nlayers(raster::brick(file_path)))
+    if(n_layers < min_layers){
+      message(glue("Redownloading {file_path} as it seems incomplete"))
+      do_download <- TRUE
+    }
+  }
+  
+  if(do_download){
+    year <- strsplit(as.character(date), split = "[-]")[[1]][1]
+    month <- strsplit(as.character(date), split = "[-]")[[1]][2]
+    day <- strsplit(as.character(date), split = "[-]")[[1]][3]
+    request <- list(
+      dataset_short_name = "reanalysis-era5-single-levels",
+      product_type = "reanalysis",
+      format = "netcdf",
+      variable = era5_long_vars,
+      year = year,
+      month = month,
+      day = day,
+      time = c(
+        "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00",
+        "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+        "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+      ),
+      # area is specified as N, W, S, E
+      area = c(90, -180, -90, 180),
+      target = basename(file_path)
+    )
+    
+    if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
+      keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
+    }
+    
+    try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
+    
+    ecmwfr::wf_set_key(
+      user = utils.get_env("CDS_UID", error_if_not_found = T),
+      key = utils.get_env("CDS_API_KEY", error_if_not_found = T),
+      service = "cds"
+    )
+    
+    ecmwfr::wf_request(
+      user = utils.get_env("CDS_UID"),
+      request = request,
+      transfer = TRUE,
+      path = dirname(file_path),
+      time_out = 60, # shorten timeout
+      verbose = TRUE
+    )
+  }
 }

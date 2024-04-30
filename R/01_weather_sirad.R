@@ -11,7 +11,8 @@ sirad.collect_weather <- function(location_dates) {
   
   location_dates %>%
     group_by(location_id) %>%
-    tidyr::crossing(date = (seq.Date(date(date_from), date(date_to), by = "1 day"))) %>%
+    mutate(date=list(seq.Date(date(date_from), date(date_to), by = "1 day"))) %>%
+    tidyr::unnest(date) %>%
     mutate(doy=lubridate::yday(date)) %>%
     left_join(sunshine) %>%
     select(location_id, date, sunshine) %>%
