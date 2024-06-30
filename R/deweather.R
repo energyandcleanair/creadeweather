@@ -1,42 +1,42 @@
 #' Main Deweathering function
 #'
-#' @param meas 
-#' @param poll 
-#' @param source 
-#' @param country 
-#' @param location_id 
-#' @param location_type 
-#' @param process_id 
-#' @param city 
-#' @param aggregate_level 
-#' @param date_to 
-#' @param output 
-#' @param upload_results 
-#' @param years_force_refresh 
-#' @param keep_model 
-#' @param training_start_trend 
-#' @param training_end_trend 
-#' @param training_start_anomaly 
-#' @param training_end_anomaly 
-#' @param engine 
-#' @param lag 
-#' @param training.fraction 
-#' @param link 
-#' @param cv_folds 
-#' @param save_weather_filename 
-#' @param read_weather_filename 
-#' @param weather_vars 
-#' @param add_fire 
-#' @param fire_source 
-#' @param fire_mode 
-#' @param fire_split_days 
-#' @param fire_split_regions 
-#' @param fire_duration_hour 
-#' @param fire_buffer_km 
-#' @param trajs_parallel 
-#' @param trajs_height 
-#' @param use_trajs_cache 
-#' @param save_trajs_filename 
+#' @param meas
+#' @param poll
+#' @param source
+#' @param country
+#' @param location_id
+#' @param location_type
+#' @param process_id
+#' @param city
+#' @param aggregate_level
+#' @param date_to
+#' @param output
+#' @param upload_results
+#' @param years_force_refresh
+#' @param keep_model
+#' @param training_start_trend
+#' @param training_end_trend
+#' @param training_start_anomaly
+#' @param training_end_anomaly
+#' @param engine
+#' @param lag
+#' @param training.fraction
+#' @param link
+#' @param cv_folds
+#' @param save_weather_filename
+#' @param read_weather_filename
+#' @param weather_vars
+#' @param add_fire
+#' @param fire_source
+#' @param fire_mode
+#' @param fire_split_days
+#' @param fire_split_regions
+#' @param fire_duration_hour
+#' @param fire_buffer_km
+#' @param trajs_parallel
+#' @param trajs_height
+#' @param use_trajs_cache
+#' @param save_trajs_filename
 #'
 #' @return
 #' @export
@@ -113,23 +113,24 @@ deweather <- function(
   
   suppressWarnings(try(dotenv::load_dot_env(file = ".env"), silent = T))
   try(readRenviron(".Renviron"))
-  
+
   #----------------------
   # Input presets
   #----------------------
-  if(!is.null(deweather_process_id)){
+  if (!is.null(deweather_process_id)) {
     # Overwrite parameters by those specified in the process
     deweather_parameters <- process_id_to_parameters(
-      process_id=deweather_process_id,
-      key="deweather")
+      process_id = deweather_process_id,
+      key = "deweather"
+    )
 
     # Log parameters
     print("Using parameters from process_id:")
     print(deweather_parameters)
-    
+
     list2env(deweather_parameters, environment())
   }
-  
+
   #----------------------
   # 0. Get AQ measurements
   #----------------------
@@ -219,32 +220,34 @@ deweather <- function(
   # 2. Preparing data
   #----------------------
   print("2. Preparing data")
-  data <- prep_data(data=data,
-                    weather_vars=weather_vars,
-                    lag=lag)
+  data <- prep_data(
+    data = data,
+    weather_vars = weather_vars,
+    lag = lag
+  )
 
   configs <- create_configs(
-    weather_vars=weather_vars,
-    add_fire=add_fire,
-    output=output,
-    engine=engine,
-    link=link,
-    lag=lag,
-    cv_folds=cv_folds,
-    training.fraction=training.fraction,
-    training_start_anomaly=training_start_anomaly,
-    training_end_anomaly=training_end_anomaly,
-    training_start_trend=training_start_trend,
-    training_end_trend=training_end_trend,
-    keep_model=keep_model,
-    trajs_height=trajs_height,
-    trajs_hours=trajs_hours,
-    fire_source=fire_source,
-    fire_buffer_km=fire_buffer_km,
-    trajs_met_type=trajs_met_type,
-    trajs_height=trajs_height,
-    trajs_duration_hour=trajs_duration_hour,
-    trajs_hours=trajs_hours
+    weather_vars = weather_vars,
+    add_fire = add_fire,
+    output = output,
+    engine = engine,
+    link = link,
+    lag = lag,
+    cv_folds = cv_folds,
+    training.fraction = training.fraction,
+    training_start_anomaly = training_start_anomaly,
+    training_end_anomaly = training_end_anomaly,
+    training_start_trend = training_start_trend,
+    training_end_trend = training_end_trend,
+    keep_model = keep_model,
+    trajs_height = trajs_height,
+    trajs_hours = trajs_hours,
+    fire_source = fire_source,
+    fire_buffer_km = fire_buffer_km,
+    trajs_met_type = trajs_met_type,
+    trajs_height = trajs_height,
+    trajs_duration_hour = trajs_duration_hour,
+    trajs_hours = trajs_hours
   )
 
   #---------------------------
@@ -252,10 +255,12 @@ deweather <- function(
   #---------------------------
   print("3. Training models")
   print(data)
-  results <- train_configs(data=data,
-                           configs=configs)
+  results <- train_configs(
+    data = data,
+    configs = configs
+  )
 
-  if(nrow(results)==0){
+  if (nrow(results) == 0) {
     warnings("Empty results. Returning NA")
     return(NA)
   }
@@ -265,29 +270,31 @@ deweather <- function(
   # 4. Post-compute / aggregate results
   #--------------------------------------
   print("4. Post-computing")
-  results <- postcompute(results=results)
+  results <- postcompute(results = results)
 
 
   #--------------------
   # 5. Upload results
   #--------------------
-  if(upload_results){
+  if (upload_results) {
     print("5. Uploading results")
     try({
-      results <- upload_results(results, deweather_process_id=deweather_process_id)
+      results <- upload_results(results, deweather_process_id = deweather_process_id)
     })
   }
 
-  if(add_fire & upload_fire){
+  if (add_fire & upload_fire) {
     try({
-      upload_fire_results(results=results,
-                          met_type=trajs_met_type,
-                          duration_hour=trajs_duration_hour,
-                          fire_source=fire_source,
-                          fire_split_regions=fire_split_regions,
-                          trajs_hours=trajs_hours,
-                          trajs_height=trajs_height,
-                          fire_buffer_km=fire_buffer_km)
+      upload_fire_results(
+        results = results,
+        met_type = trajs_met_type,
+        duration_hour = trajs_duration_hour,
+        fire_source = fire_source,
+        fire_split_regions = fire_split_regions,
+        trajs_hours = trajs_hours,
+        trajs_height = trajs_height,
+        fire_buffer_km = fire_buffer_km
+      )
     })
   }
 

@@ -319,55 +319,6 @@ fire.add_existing_weather <- function(weather,
 }
 
 
-
-
-#' frp.geotiffs <- function(date_from, date_to, extent, ...){
-#'   
-#'   
-#'   r <- MODIStsp::MODIStsp(
-#'     gui = FALSE,
-#'     start_date = format(lubridate::date(date_from)-lubridate::days(8), "%Y.%m.%d"), #Files are every 8 days. MODISstp doesn't find any file if inbetween
-#'     end_date   = format(date_to,"%Y.%m.%d"),
-#'     out_folder = file.path(Sys.getenv("DIR_MODIS"),"modisstp","processed"),
-#'     out_folder_mod = file.path(Sys.getenv("DIR_MODIS"),"modisstp"),
-#'     spatmeth = "tiles",
-#'     # Tiles for India and Pakistan
-#'     start_x = 23,
-#'     end_x = 26,
-#'     start_y = 5,
-#'     end_y = 8,
-#'     selcat = "Land Cover Characteristics - Thermal Anomalies and Fire",
-#'     selprod = "ThermalAn_Fire_Daily_1Km (M*D14A1)",
-#'     prod_version = "6",
-#'     sensor = "Both",
-#'     bandsel = "MaxFRP",
-#'     download_server = "http",
-#'     user = Sys.getenv("EARTHDATA_USR"),
-#'     password = Sys.getenv("EARTHDATA_PWD"),
-#'     downloader = "http",
-#'     download_range = "Full",
-#'     out_projsel = "Used Defined",
-#'     output_proj = "3857",
-#'     out_res_sel = "Native",
-#'     out_res = NULL,
-#'     resampling = "max",
-#'     reprocess = F,
-#'     delete_hdf = F,
-#'     nodata_change = F,
-#'     scale_val = F,
-#'     out_format = "GTiff",
-#'     ts_format = "R RasterStack",
-#'     compress = "LZW",
-#'     n_retries = 10,
-#'     verbose = TRUE)
-#'   
-#'   
-#'   frp.utils.date_rasters(rasters)
-#' }
-#' 
-#' 
-#' 
-
 fire.split_archive <- function(file_archive, region="Global"){
   
   f <- readr::read_csv(file_archive)
