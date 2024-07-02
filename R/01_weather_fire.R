@@ -83,7 +83,7 @@ fire.add_fire <- function(weather,
     # as well as pbl for trajectory height (in case mode=='trajectory', used for height in splitr)
     rowwise() %>%
     mutate(wd_copy=wd,
-           ws_copy=ws_max,
+           ws_copy=ws,
            trajs_height=ifelse(is.null(!!trajs_height) || is.na(!!trajs_height),
                                   ifelse(all(c("pbl_min","pbl_max") %in% names(.)),
                                          (pbl_min + pbl_max)/2,
