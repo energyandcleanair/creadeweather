@@ -100,6 +100,12 @@ fire.add_fire <- function(weather,
   
   if(mode=="trajectory"){
     
+    if(!"geometry" in names(w)){
+      locations <- rcrea::locations(id=unique(w$location_id), with_source = F)
+      w <- w %>%
+        left_join(locations %>% select(location_id=id, geometry))
+    }
+    
     print(sprintf("Calculating trajs for %d dates", length(w$date)))
     wt <- w
     wt$trajs <- creatrajs::trajs.get(
