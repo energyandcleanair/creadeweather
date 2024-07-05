@@ -279,7 +279,7 @@ deweather <- function(
   if (upload_results) {
     print("5. Uploading results")
     try({
-      results <- upload_results(results, deweather_process_id = deweather_process_id)
+      upload_results(results, deweather_process_id = deweather_process_id)
     })
   }
 
