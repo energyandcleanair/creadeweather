@@ -318,3 +318,20 @@ utils.get_env <- function(x, error_if_not_found=F){
   if( res=="" && error_if_not_found) stop(glue("Couldn't find environmental variable {x}"))
   res
 }
+
+
+utils.check_env <- function(env_vars = c("CREA_DB_URL", "GIS_DIR"), stop=TRUE) {
+  missing_vars <- env_vars[!nzchar(Sys.getenv(env_vars))]
+  
+  if (length(missing_vars) > 0) {
+    msg <- paste("Missing environment variables:", paste(missing_vars, collapse=", "))
+    
+    if (stop) {
+      stop(msg)
+    } else {
+      warning(msg)
+    }
+  } else {
+    message("All environment variables are set.")
+  }
+}

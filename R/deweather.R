@@ -113,6 +113,9 @@ deweather <- function(
   
   suppressWarnings(try(dotenv::load_dot_env(file = ".env"), silent = T))
   try(readRenviron(".Renviron"))
+  
+  # Check that environment variables are set
+  utils.check_env()
 
   #----------------------
   # Input presets
