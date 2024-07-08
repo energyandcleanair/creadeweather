@@ -327,11 +327,12 @@ utils.check_env <- function(env_vars = c("CREA_DB_URL", "GIS_DIR"), stop=TRUE) {
     msg <- paste("Missing environment variables:", paste(missing_vars, collapse=", "))
     
     if (stop) {
+      print(msg)
       stop(msg)
     } else {
       warning(msg)
     }
   } else {
-    message("All environment variables are set.")
+    print("All environment variables are set.")
   }
 }
