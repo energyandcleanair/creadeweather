@@ -87,16 +87,22 @@ era5.collect_weather <- function(location_dates,
         tif <- terra::subset(tif, names(tif) %in% weather_vars_era5)
         tb <- tibble("date" = date)
         extracted_values <- terra::extract(tif, coords)
+        
+        # Determine the intersection of the specified variables and weather_vars_era5
+        temp_vars <- intersect(c("temp_min", "temp_max"), weather_vars_era5)
+        pressure_vars <- intersect(c("sp"), weather_vars_era5)
+        precip_vars <- intersect(c("total_precip"), weather_vars_era5)
+        
         dplyr::bind_cols(location_id = coords$location_id,
                          tb,
                          as.data.frame(extracted_values) %>%
                            dplyr::select(-c(ID))) %>%
                            # K to C for temp_min and temp_max
-                           dplyr::mutate_at(vars(temp_min, temp_max), ~ . - 273.15) %>%
-                           # Pa to millibar for atmos_pres
-                           dplyr::mutate_at(vars(sp), ~ . / 1e2) %>%
-                           # m to mm for precip
-                           dplyr::mutate_at(vars(total_precip), ~ . * 1e3)
+          dplyr::mutate_at(all_of(temp_vars), ~ . - 273.15) %>%
+          # Pa to millibar for atmos_pres
+          dplyr::mutate_at(all_of(pressure_vars), ~ . / 1e2) %>%
+          # m to mm for precip
+          dplyr::mutate_at(all_of(precip_vars), ~ . * 1e3)
       },
       error = function(error) {
         return(NULL)

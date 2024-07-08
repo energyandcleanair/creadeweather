@@ -257,9 +257,8 @@ fire.add_fire <- function(weather,
   
   if(upload_weather & mode=='trajectory'){
     print("Uploading weather")
-    pbmapply(creafire::db.upload_weather,
+    uploaded <- pbmapply(creafire::db.upload_weather,
                       weather=result$weather,
-                      weather_sources=weather_sources,
                       location_id=result$location_id,
                       met_type=met_type,
                       duration_hour=duration_hour,
@@ -267,8 +266,13 @@ fire.add_fire <- function(weather,
                       height=list(trajs_height),
                       fire_source=source,
                       hours=list(trajs_hours),
-                      fire_split_regions=ifelse(is.null(split_regions), creafire::NO_SPLIT_REGION, split_regions)
+                      fire_split_regions=ifelse(is.null(split_regions), creafire::NO_SPLIT_REGION, split_regions),
+                      SIMPLIFY=F
                       )
+    
+    if(length(uploaded) != nrow(result)){
+      warning("Probably failed to upload weather")
+    }
   }
   
   return(result)
