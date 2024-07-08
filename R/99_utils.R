@@ -320,7 +320,8 @@ utils.get_env <- function(x, error_if_not_found=F){
 }
 
 
-utils.check_env <- function(env_vars = c("CREA_DB_URL", "GIS_DIR"), stop=TRUE) {
+utils.check_env <- function(env_vars = c("CREA_DB_URL", "GIS_DIR", "CREA_MONGODB_URL"),
+                            stop=TRUE) {
   missing_vars <- env_vars[!nzchar(Sys.getenv(env_vars))]
   
   if (length(missing_vars) > 0) {
