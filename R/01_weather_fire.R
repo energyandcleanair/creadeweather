@@ -162,7 +162,7 @@ fire.get_fire_at_loc_dates <- function(loc_dates,
         left_join(locations %>% select(location_id=id, geometry))
     }
     
-    print(sprintf("Calculating trajs for %d dates", length(w$date)))
+    print(sprintf("Calculating trajs for %d dates", length(loc_dates$date)))
     loc_dates$trajs <- creatrajs::trajs.get(
       dates=loc_dates$date,
       location_id=loc_dates$location_id,
@@ -197,7 +197,7 @@ fire.get_fire_at_loc_dates <- function(loc_dates,
                         date=loc_dates$date)
     }
     
-    print(sprintf("Attaching fires to trajectories for %d dates", length(w$date)))
+    print(sprintf("Attaching fires to trajectories for %d dates", length(loc_dates$date)))
     loc_dates_fire <- tryCatch({
       attach_fn(loc_dates,
                 buffer_km=buffer_km,
