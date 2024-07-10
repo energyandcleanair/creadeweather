@@ -49,14 +49,6 @@ fire.add_fire <- function(weather,
     buffer_km <- switch(mode,"circular"=200, "oriented"=200, "trajectory"=10)
   }
   
-  if(source=="gfas"){
-    attach_fn <- creatrajs::gfas.attach_to_trajs
-    fire_vars_pattern <- "pm25_emission"
-  }else{
-    attach_fn <- creatrajs::fire.attach_to_trajs
-    fire_vars_pattern <- c("^fire_.*")
-  }
-  
   
  
   if(use_weather_cache){
@@ -100,16 +92,18 @@ fire.add_fire <- function(weather,
     trajs_parallel = trajs_parallel,
     trajs_cores = trajs_cores,
     buffer_km = buffer_km,
+    split_days = split_days,
     split_regions = split_regions,
     split_regions_res = split_regions_res,
-    save_trajs_filename = save_trajs_filename
+    save_trajs_filename = save_trajs_filename,
+    source=source
   )
  
   
   weather_with_fire <- fire.merge_fire_and_weather(
     weather = weather,
     loc_dates_fire = loc_dates_fire,
-    fire_vars_pattern
+    fire_vars_pattern = fire.get_fire_vars_pattern(source)
   )
   
   
@@ -149,12 +143,16 @@ fire.get_fire_at_loc_dates <- function(loc_dates,
                                    trajs_parallel,
                                    trajs_cores,
                                    buffer_km,
+                                   split_days,
                                    split_regions,
                                    split_regions_res,
-                                   save_trajs_filename
+                                   save_trajs_filename,
+                                   source
                                    ){
   
   if(nrow(loc_dates) == 0) return(tibble())
+  
+  attach_fn <- fire.get_attach_to_trajs_fn(source=source)
   
   if(mode=="trajectory"){
     
@@ -192,7 +190,7 @@ fire.get_fire_at_loc_dates <- function(loc_dates,
       pbapply::pbmapply(creatrajs::db.upload_trajs,
                         trajs=loc_dates$trajs,
                         location_id=loc_dates$location_id,
-                        hours=trajs_hours,
+                        hours=list(trajs_hours),
                         met_type=met_type,
                         duration_hour=duration_hour,
                         height=loc_dates$trajs_height,
@@ -365,6 +363,26 @@ fire.merge_fire_and_weather <- function(weather, loc_dates_fire, fire_vars_patte
     ungroup()
 }
 
+
+fire.get_fire_vars_pattern <- function(source){
+  if(source=="gfas"){
+    return("pm25_emission")
+  }else if(source=="viirs"){
+    attach_fn <- creatrajs::fire.attach_to_trajs
+    return("^fire_.*")
+  }
+  return(NULL)
+}
+
+fire.get_attach_to_trajs_fn <- function(source){
+  
+  if(source=="gfas"){
+    return(creatrajs::gfas.attach_to_trajs)
+  }else if(source=="viirs"){
+    return(creatrajs::fire.attach_to_trajs)
+  }
+  return(NULL)
+}
 
 fire.split_archive <- function(file_archive, region="Global"){
   
