@@ -324,11 +324,17 @@ fire.add_existing_weather <- function(weather,
     do.call(bind_rows, .)
   
   if(nrow(available_weathers) > 0){
+    
+    join_weather_fire <- function(weather, weather_fire){
+      if(is.null(weather_fire)) return(weather)
+      left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T)))
+    }
+    
     weather %>%
       left_join(available_weathers %>%
                   select(location_id, weather_fire=weather)) %>%
       rowwise() %>%
-      mutate(weather=list(left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T))))) %>%
+      mutate(weather=list(join_weather_fire(weather, weather_fire))) %>%
       dplyr::select(-c(weather_fire)) %>%
       ungroup()
   }else{
