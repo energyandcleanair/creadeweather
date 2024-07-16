@@ -45,7 +45,9 @@ noaa.collect_weather <- function(location_dates,
     weather_vars = weather_vars,
     years_force_refresh = years_force_refresh
   )
-
+  
+  if(is.null(locations_weather)) return(NULL)
+  
   # Ensure columns are preserved
   result <- location_dates %>%
     left_join(locations_weather)
@@ -268,7 +270,8 @@ noaa.add_weather <- function(
   }
 
   if (nrow(weather %>% rowwise() %>% filter(!is.null(weather_noaa))) == 0) {
-    stop("Failed to find weather data")
+    warning("Failed to find weather data with NOAA. Returning NULL")
+    return(NULL)
   }
 
   # Note: Certain dates have no data at all and hence raise warnings
