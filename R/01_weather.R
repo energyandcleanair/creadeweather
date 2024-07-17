@@ -121,6 +121,10 @@ collect_weather <- function(location_ids,
     distinct(location_id = id, country, geometry) %>%
     mutate(date_from = date_from, date_to = date_to)
 
+  if (nrow(location_dates) == 0) {
+    stop("no valid location_id found")
+  }
+  
   weather_noaa <- NULL
   weather_era5 <- NULL
   weather_sirad <- NULL
