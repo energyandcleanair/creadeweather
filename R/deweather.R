@@ -258,12 +258,13 @@ deweather <- function(
   #---------------------------
   print("3. Training models")
   print(data)
-  results <- train_configs(
-    data = data,
-    configs = configs
-  )
-
-  if (nrow(results) == 0) {
+  
+  results <- try({
+    results <- train_configs(data=data,
+                             configs=configs)
+  })
+  
+  if(nrow(results)==0 | is.null(results)){
     warnings("Empty results. Returning NA")
     return(NA)
   }
