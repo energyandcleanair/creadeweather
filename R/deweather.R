@@ -269,9 +269,11 @@ deweather <- function(
   print("3. Training models")
   print(data)
   
-  results <- try({
+  tryCatch({
     results <- train_configs(data=data,
                              configs=configs)
+  }, error = function(e) {
+    results <- NULL
   })
   
   if(nrow(results)==0 | is.null(results)){
