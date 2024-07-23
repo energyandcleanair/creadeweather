@@ -273,7 +273,7 @@ deweather <- function(
     results <- train_configs(data=data,
                              configs=configs)
   }, error = function(e) {
-    results <- NULL
+    return(NA)
   })
   
   if(nrow(results)==0 | is.null(results)){
