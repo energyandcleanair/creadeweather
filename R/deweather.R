@@ -263,6 +263,7 @@ deweather <- function(
     results <- train_configs(data=data,
                              configs=configs)
   }, error = function(e) {
+    print(e)
     return(NA)
   })
   
