@@ -139,7 +139,8 @@ deweather <- function(
   #----------------------
   print("0. Getting measurements")
   date_from <- min(c(anomaly=training_start_anomaly,
-                     trend=training_start_trend)[output])
+                     trend=training_start_trend,
+                     trend_yday=training_start_trend)[output])
   
   
   date_to <- min(Sys.Date(),
@@ -157,10 +158,19 @@ deweather <- function(
                            location_id=location_id,
                            location_type=location_type)
   
+  
+  
+
   #---------------------------------------------
   # 1. Get weather data (and fire if demanded)
   #---------------------------------------------
   print("1. Collecting weather")
+  
+  # We update date_from and date_to based on measurements
+  # so as not to query unncessary data
+  date_from <- min(as.Date(sapply(meas$meas, function(x) min(x$date))))
+  date_to <- max(as.Date(sapply(meas$meas, function(x) max(x$date))))
+  
   weather <- get_weather(
     location_ids=location_id,
     date_from=date_from,
