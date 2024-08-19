@@ -30,6 +30,7 @@ era5.rename_era5_to_global <- function(era5_var) {
   recode(era5_var, !!!corr_vars)
 }
 
+
 era5.rename_era5_to_global_df <- function(data) {
   data %>%
     rename_all(era5.rename_era5_to_global)
@@ -406,12 +407,20 @@ era5.download_nc <- function(force,
       service = "cds"
     )
     
+    # Timeout: short if recent date, long otherwise
+    # as it is likely to be unavailable
+    if(lubridate::today() - as.Date(date) < 3){
+      time_out = 60
+    } else {
+      time_out = 600
+    }
+ 
     ecmwfr::wf_request(
       user = utils.get_env("CDS_UID"),
       request = request,
       transfer = TRUE,
       path = dirname(file_path),
-      time_out = 60, # shorten timeout
+      time_out = time_out,
       verbose = TRUE
     )
   }
