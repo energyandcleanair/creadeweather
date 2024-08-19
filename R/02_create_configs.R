@@ -22,10 +22,10 @@ create_configs <- function(
   
   
   time_vars_output <- tibble(
-    time_vars=c(list(c('yday')), list(c()), list(c('date_unix'))),
-    output=c('anomaly_yday', 'anomaly', 'trend'),
-    training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend),
-    training_start=c(training_start_anomaly, training_start_anomaly, training_start_trend)
+    time_vars=c(list(c('yday')), list(c()), list(c('date_unix')), list(c('date_unix', 'yday'))),
+    output=c('anomaly_yday', 'anomaly', 'trend', 'trend_yday'),
+    training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend, training_end_trend),
+    training_start=c(training_start_anomaly, training_start_anomaly, training_start_trend, training_start_trend)
   ) %>%
     filter(output %in% !!output)
   
