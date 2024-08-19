@@ -30,12 +30,14 @@ postcompute_gbm <- function(model, data, config, ...){
   
   # Extract influence of time vars (e.g. trend)
   if(length(time_vars)>0){
-    data <- postcompute_gbm_trend(data=data, time_vars=time_vars, model=model,
+    data <- postcompute_gbm_trends(data=data, time_vars=time_vars, model=model,
                                   do_unlink=do_unlink)
   }
   
   # Keep only useful information
-  cols <- c('date', 'trend', 'anomaly', 'predicted', 'observed')
+  cols <- c('date', 'anomaly', 'predicted', 'observed', 'trend')
+  # Add cols starting with trend_ (though ignoring for now)
+  # cols <- c(cols, names(data)[grepl("trend_", names(data))])
   if(add_fire){
     cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
   }
@@ -116,7 +118,7 @@ postcompute_gbm_fire <- function(data, model, formula_vars, do_unlink, weather_v
 }
 
 
-postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
+postcompute_gbm_trends <- function(data, time_vars, model, do_unlink){
 
     dates <- tibble(date=lubridate::date(unique(data %>% filter(set=='training') %>% pull(date)))) %>%
       dplyr::mutate(yday_joiner=lubridate::yday(date)) %>%
@@ -140,7 +142,7 @@ postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
       mutate(date=lubridate::date(lubridate::date_decimal(date_unix))) %>%
       dplyr::select(date, date_unix=y) %>%
       dplyr::group_by(date) %>%
-      dplyr::summarize(date_unix=mean(date_unix, na.rm=T))
+      dplyr::summarize(trend=mean(date_unix, na.rm=T))
     
     dates <- dates %>% left_join(trend_trend)
   }
@@ -152,7 +154,7 @@ postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
       mutate(jday=round(yday)) %>% 
       dplyr::group_by(yday) %>%
       dplyr::summarize(y=mean(y, na.rm=T)) %>%
-      dplyr::select(yday_joiner=yday, yday=y) 
+      dplyr::select(yday_joiner=yday, trend_yday=y) 
     
     dates <- dates %>% left_join(trend_jday)
   }
@@ -161,7 +163,7 @@ postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
     trend_month <- gbm::plot.gbm(model, "month", return.grid = T) %>%
       rowwise() %>%
       mutate(y=do_unlink(y)) %>%
-      dplyr::select(month_joiner=month, month=y)
+      dplyr::select(month_joiner=month, trend_month=y)
     trend_month$month_joiner <- c(jan=1,feb=2,mar=3,apr=4,may=5,jun=6,jul=7,
                                   aug=8,sep=9,oct=10,nov=11,dec=12)[tolower(trend_month$month_joiner)]
     
@@ -172,7 +174,7 @@ postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
     trend_weekday <- gbm::plot.gbm(model, "weekday", return.grid = T) %>%
       rowwise() %>%
       mutate(y=do_unlink(y)) %>%
-      dplyr::select(wday_joiner=weekday, weekday=y)
+      dplyr::select(wday_joiner=weekday, trend_weekday=y)
     trend_weekday$wday_joiner <- c(monday=1,tuesday=2,wednesday=3,thursday=4,friday=5,
                                    saturday=6,sunday=7)[tolower(trend_weekday$wday_joiner)]
     
@@ -183,16 +185,15 @@ postcompute_gbm_trend <- function(data, time_vars, model, do_unlink){
     trend_season <- gbm::plot.gbm(model, "season", return.grid = T) %>%
       rowwise() %>%
       mutate(y=do_unlink(y)) %>%
-      dplyr::select(season_joiner=season, season=y)
+      dplyr::select(season_joiner=season, trend_season=y)
     
     dates <- dates %>% left_join(trend_season)
   }
-  
-  trend <- tibble(
-    date=dates$date,
-    trend=dates %>% dplyr::select(time_vars) %>% rowMeans(na.rm=TRUE))
+    
+  # Select date and variables starting with 'trend_'
+  trend_vars <- dates %>% dplyr::select(date, starts_with("trend"))
   
   return(
     data %>%
-      full_join(trend))
+      full_join(trend_vars))
 }
