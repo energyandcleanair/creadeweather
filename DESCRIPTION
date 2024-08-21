@@ -62,7 +62,8 @@ Remotes:
     davidcarslaw/deweather,
     rich-iannone/splitr,
     energyandcleanair/rcrea,
-    energyandcleanair/creatrajs
+    energyandcleanair/creatrajs,
+    ropensci/rnoaa
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
