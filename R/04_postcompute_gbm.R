@@ -216,3 +216,39 @@ postcompute_gbm_trends <- function(data, time_vars, model, do_unlink){
     data %>%
       full_join(trend_vars))
 }
+
+
+postcompute_gbm_trends_w_weather <- function(data, time_vars, model, do_unlink){
+  
+  size_sample <- 5000
+  sample <- data %>% sample_n(size_sample)
+
+
+  get_normalised_trend_at_date <- function(date){
+
+    date_sample <- sample
+    time_vars_df <- data %>% dplyr::filter(date==!!date) %>% select_at("date_unix")
+    # Replace time_vars in sample
+    date_sample <- date_sample %>% mutate(!!!time_vars_df)
+
+    # Run model
+    predicted <- do_unlink(predict(model, date_sample))
+
+    # Extract trend as the average of predicted
+    trend <- mean(predicted, na.rm=T)
+
+    # Return
+    return(trend)
+  }
+  
+  # take every 2 days
+  dates <- dplyr::sample_frac(data, 1) %>% pull(date) %>% unique()
+
+  trends <- pbapply::pbsapply(dates, get_normalised_trend_at_date)
+  
+  tibble(date=dates, trend=unlist(trends)) %>%
+    arrange(date) %>%
+    ggplot(aes(date, trend)) +
+    geom_line()
+  
+}
