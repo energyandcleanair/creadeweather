@@ -22,6 +22,7 @@ Imports:
     ggnewscale,
     lubridate,
     gbm,
+    rjson,
     rnoaa,
     e1071,
     standardize,
@@ -63,8 +64,8 @@ Remotes:
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
+    cran/rjson@0.2.21,
     ropensci/rnoaa
-    cran/rjson@0.2.21
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.2.3
