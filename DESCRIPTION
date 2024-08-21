@@ -22,6 +22,7 @@ Imports:
     ggnewscale,
     lubridate,
     gbm,
+    rjson,
     rnoaa,
     e1071,
     standardize,
@@ -53,8 +54,7 @@ Imports:
     terra,
     ncdf4,
     caret,
-    ecmwfr,
-    rjson
+    ecmwfr
 Depends:
     ggplot2,
     worldmet
@@ -64,8 +64,8 @@ Remotes:
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
-    ropensci/rnoaa,
-    cran/rjson@0.2.21
+    cran/rjson@0.2.21,
+    ropensci/rnoaa
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
