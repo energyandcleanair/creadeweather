@@ -176,7 +176,7 @@ era5.processable_dates <- function(dates) {
 #' @export
 #'
 #' @examples
-era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_layers=24) {
+era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_layers=24, time_out=NULL) {
   tryCatch(
     {
       era5_long_vars <- c(
@@ -197,7 +197,8 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
                        date=date,
                        era5_long_vars=era5_long_vars,
                        file_path=fpath,
-                       min_layers=min_layers)
+                       min_layers=min_layers,
+                       time_out=time_out)
       
       layers_dict <- list()
 
@@ -338,8 +339,7 @@ era5.date_to_filepaths <- function(date, dir_era5) {
 
 era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::today(), force = F){
   
-  dates <- era5.processed_dates()
-  dates <- dates[dates >= date_from & dates <= date_to]
+  dates <- seq.Date(as.Date(date_from), as.Date(date_to), by = "1 day")
   dir_era5 <- era5.folder_era5()
   
   n_layers <- pbapply::pbsapply(dates, function(date){
@@ -351,8 +351,8 @@ era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::toda
     return(length(names(tif)))
   })
 
-  dates_to_process <- dates[force | n_layers < 12]
-  pbapply::pblapply(dates_to_process, era5.process_date, remove_nc = T)
+  dates_to_process <- dates[force | n_layers < 11]
+  pbapply::pblapply(dates_to_process, era5.process_date, remove_nc = T, time_out=3600)
   
 }
 
@@ -360,7 +360,8 @@ era5.download_nc <- function(force,
                              date,
                              file_path,
                              era5_long_vars,
-                             min_layers=NULL)
+                             min_layers=NULL,
+                             time_out=NULL)
 {
   
   do_download <- force | !file.exists(file_path)
@@ -409,10 +410,12 @@ era5.download_nc <- function(force,
     
     # Timeout: short if recent date, long otherwise
     # as it is likely to be unavailable
-    if(lubridate::today() - as.Date(date) < 3){
-      time_out = 60
-    } else {
-      time_out = 600
+    if(is.null(time_out)){
+      if(lubridate::today() - as.Date(date) < 3){
+        time_out <- 60
+      } else {
+        time_out <- 600
+      }  
     }
  
     ecmwfr::wf_request(
