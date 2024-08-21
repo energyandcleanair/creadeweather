@@ -53,7 +53,8 @@ Imports:
     terra,
     ncdf4,
     caret,
-    ecmwfr
+    ecmwfr,
+    rjson
 Depends:
     ggplot2,
     worldmet
@@ -63,7 +64,8 @@ Remotes:
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
-    ropensci/rnoaa
+    ropensci/rnoaa,
+    cran/rjson@0.2.21
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1
