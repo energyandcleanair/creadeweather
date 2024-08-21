@@ -168,8 +168,8 @@ deweather <- function(
   
   # We update date_from and date_to based on measurements
   # so as not to query unncessary data
-  date_from <- min(as.Date(sapply(meas$meas, function(x) min(x$date))))
-  date_to <- max(as.Date(sapply(meas$meas, function(x) max(x$date))))
+  date_from <- meas %>% dplyr::select(meas) %>% tidyr::unnest(cols=meas) %>% pull(date) %>% min(na.rm=T)
+  date_to <- meas %>% dplyr::select(meas) %>% tidyr::unnest(cols=meas) %>% pull(date) %>% max(na.rm=T)
   
   weather <- get_weather(
     location_ids=location_id,
