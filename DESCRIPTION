@@ -1,7 +1,7 @@
 Package: creadeweather
 Type: Package
-Title: cDeweathering of air pollution
-Version: 0.2.0
+Title: Deweathering of air pollution
+Version: 0.2.1
 Author: Hubert Thieriot
 Maintainer: Hubert Thieriot <hubert@energyandcleanair.com>
 Description: A set of functions to collect and analyse air pollution and weather measurements and determine the weather-corrected values of pollutant concentrations

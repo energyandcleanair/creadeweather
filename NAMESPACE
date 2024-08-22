@@ -29,4 +29,20 @@ importFrom(dplyr,rowwise)
 importFrom(dplyr,ungroup)
 importFrom(lubridate,date)
 importFrom(magrittr,"%>%")
-importFrom(worldmet,importNOAA)
+importFrom(pbapply, "pbmapply")
+
+importFrom(sf,st_as_sf)
+importFrom(sf,st_as_sfc)
+importFrom(sf,st_buffer)
+importFrom(sf,st_centroid)
+importFrom(sf,st_coordinates)
+importFrom(sf,st_union)
+
+importFrom(tibble,tibble)
+importFrom(tidyr,nest)
+importFrom(tidyr,unnest)
+
+importFrom(raster, brick)
+importFrom(rlang, "%||%")
+
+importFrom(terra, rast)

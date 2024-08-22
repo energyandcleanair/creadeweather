@@ -48,6 +48,30 @@ test_that("train_gbm_prepare_data partitions and filters correctly", {
 })
 
 
+test_that("train_gbm_prepare_data respects training_excluded_dates", {
+  inputs <- trend_inputs_for_gbm()
+  config <- extract_trend_config(inputs)
+
+  excluded_date <- as.Date(config$training_end[[1]]) - 5
+
+  prep <- creadeweather:::train_gbm_prepare_data(
+    data = inputs$data$meas_weather[[1]],
+    training_end = config$training_end[[1]],
+    weather_vars = config$weather_vars[[1]],
+    time_vars = config$time_vars[[1]],
+    link = config$link[[1]],
+    training.fraction = config$training.fraction[[1]],
+    training_excluded_dates = excluded_date
+  )
+
+  excluded_rows <- prep$data[as.Date(prep$data$date) == excluded_date, , drop = FALSE]
+
+  expect_gt(nrow(excluded_rows), 0)
+  expect_true(all(excluded_rows$set != "training"))
+  expect_true(any(excluded_rows$set == "testing"))
+})
+
+
 test_that("train_gbm_fit_model trains a gbm model", {
   inputs <- trend_inputs_for_gbm()
   config <- extract_trend_config(inputs)

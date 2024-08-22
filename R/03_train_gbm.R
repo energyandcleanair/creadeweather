@@ -34,12 +34,14 @@ train_gbm <- function(data,
                       normalise,
                       detect_breaks,
                       samples,
-                      interaction.depth = 1,
-                      learning.rate = 0.1,
-                      link = "linear",
-                      training.fraction = 0.9,
-                      cv_folds = 3,
+                      training_excluded_dates=c(),
+                      interaction.depth=1,
+                      learning.rate=0.1,
+                      link="linear",
+                      training.fraction=0.9,
+                      cv_folds=3,
                       ...){
+
 
   prepared <- train_gbm_prepare_data(
     data = data,
@@ -47,8 +49,10 @@ train_gbm <- function(data,
     weather_vars = weather_vars,
     time_vars = time_vars,
     link = link,
-    training.fraction = training.fraction
+    training.fraction = training.fraction,
+    training_excluded_dates = training_excluded_dates
   )
+
 
   train_gbm_fit_model(
     data_prepared = prepared$data,
@@ -69,7 +73,9 @@ train_gbm_prepare_data <- function(data,
                                    time_vars,
                                    link = "linear",
                                    training.fraction = 0.9,
-                                   shuffle_seed = 42) {
+                                   shuffle_seed = 42,
+                                   training_excluded_dates = c()
+                                   ) {
   if (is.null(training_end)) {
     training_end <- "2099-01-01"
   }
@@ -114,8 +120,31 @@ train_gbm_prepare_data <- function(data,
     stop("Missing training data")
   }
 
-  training_size <- max(1, floor(training.fraction * length(i_before_cut)))
-  i_training <- sample(i_before_cut, training_size)
+  date_only <- as.Date(data_prepared$date)
+  excluded_dates <- unique(stats::na.omit(as.Date(training_excluded_dates)))
+  i_excluded <- if (length(excluded_dates) > 0) {
+    which(date_only %in% excluded_dates)
+  } else {
+    integer(0)
+  }
+
+  training_candidates <- setdiff(i_before_cut, i_excluded)
+  if (length(training_candidates) == 0) {
+    stop("Missing training data after excluding requested dates")
+  }
+
+  target_training_size <- max(1, floor(training.fraction * length(i_before_cut)))
+  training_size <- min(length(training_candidates), target_training_size)
+
+  if (training_size < target_training_size) {
+    warning(
+      "Not enough data to match training fraction after excluding dates. ",
+      "Reducing effective training fraction to ",
+      round(training_size / length(i_before_cut), 2)
+    )
+  }
+
+  i_training <- sample(training_candidates, training_size)
   i_testing <- setdiff(i_before_cut, i_training)
   i_prediction <- setdiff(seq_len(nrow(data_prepared)), i_before_cut)
 
@@ -194,6 +223,3 @@ train_gbm_fit_model <- function(data_prepared,
     data = list(data_prepared)
   )
 }
-
-
-

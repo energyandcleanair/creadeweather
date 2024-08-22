@@ -63,6 +63,7 @@ get_weather <- function(location_ids,
       save_trajs_filename = save_trajs_filename
     )
     if (!is.null(save_weather_filename)) {
+      dir.create(dirname(save_weather_filename), recursive = T, showWarnings = F)
       saveRDS(weather, save_weather_filename)
     }
   }
