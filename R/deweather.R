@@ -70,6 +70,8 @@ deweather <- function(
   training_end_trend="2099-01-01", # With trend approach, we train over the whole period
   training_start_anomaly="2015-01-01",
   training_end_anomaly="2019-12-31",
+
+  training_excluded_dates = c(), # A list of dates that MUST not be used for training
   
   # MODEL PARAMETERS
   engine="gbm",
@@ -252,6 +254,7 @@ deweather <- function(
     training_end_anomaly = training_end_anomaly,
     training_start_trend = training_start_trend,
     training_end_trend = training_end_trend,
+    training_excluded_dates = training_excluded_dates,
     keep_model = keep_model,
     trajs_height = trajs_height,
     trajs_hours = trajs_hours,
