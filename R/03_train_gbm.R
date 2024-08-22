@@ -33,6 +33,7 @@ train_gbm <- function(data,
                       normalise,
                       detect_breaks,
                       samples,
+                      training_excluded_dates=c(),
                       interaction.depth=1,
                       learning.rate=0.1,
                       link="linear",
@@ -79,10 +80,18 @@ train_gbm <- function(data,
   # Testing: before date_cut, taking a 1-training.fraction share
   # Prediction: after date_cut (typically for anomaly estimation: observed-predicted)
   i_before_data_cut <- which(data_prepared$date <= training_end)
-  i_training <- sample(i_before_data_cut, training.fraction * length(i_before_data_cut))
+  i_excluded <- which(data_prepared$date %in% as.Date(training_excluded_dates))
+  i_training <- tryCatch({
+    sample(setdiff(i_before_data_cut, i_excluded),
+           training.fraction * length(i_before_data_cut))  
+  }, error=function(e){
+    i_training <- setdiff(i_before_data_cut, i_excluded)
+    new_training_fraction <- length(i_training) / length(i_before_data_cut)
+    warning("Not enough data to train after excluding training dates. Reducing training fraction to ", round(new_training_fraction,2))
+    return(i_training)
+  })
   i_testing <- setdiff(i_before_data_cut, i_training)
   i_prediction <- which(data_prepared$date > training_end)
-  
   
   data_prepared[i_training, 'set'] <- 'training'
   data_prepared[i_testing, 'set'] <- 'testing'
