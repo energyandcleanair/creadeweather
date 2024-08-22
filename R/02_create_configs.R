@@ -11,6 +11,7 @@ create_configs <- function(
   training_start_trend,
   training_end_trend,
   training.fraction,
+  training_excluded_dates=c(),
   trees=10000,
   samples=300,
   interaction.depth=c(2),
@@ -20,29 +21,54 @@ create_configs <- function(
   keep_model=T,
   ...){
   
+
+  configs <- list(
+    list(
+      output = 'anomaly_yday',
+      time_vars = list('yday'),
+      training_end = training_end_anomaly,
+      training_start = training_start_anomaly
+    ),
+    list(
+      output = 'anomaly',
+      time_vars = list(NULL),
+      training_end = training_end_anomaly,
+      training_start = training_start_anomaly
+    ),
+    list(
+      output = 'trend',
+      time_vars = list('date_unix'),
+      training_end = training_end_trend,
+      training_start = training_start_trend
+    ),
+    list(
+      output = 'trend_yday',
+      time_vars = list(c('date_unix', 'yday')),
+      training_end = training_end_trend,
+      training_start = training_start_trend
+    )
+  )
   
-  time_vars_output <- tibble(
-    time_vars=c(list(c('yday')), list(c()), list(c('date_unix')), list(c('date_unix', 'yday'))),
-    output=c('anomaly_yday', 'anomaly', 'trend', 'trend_yday'),
-    training_end=c(training_end_anomaly, training_end_anomaly, training_end_trend, training_end_trend),
-    training_start=c(training_start_anomaly, training_start_anomaly, training_start_trend, training_start_trend)
-  ) %>%
+  # Convert list of lists into a tibble using map_dfr
+  configs <- purrr::map_dfr(configs, as_tibble) %>%
     filter(output %in% !!output)
   
-  configs <-  tibble() %>%
-    tidyr::expand(trees,
+  # Add other parameters
+  configs <-  tibble(configs) %>%
+    tidyr::crossing(trees,
                   samples,
                   lag,
                   training.fraction,
                   weather_vars=list(unique(weather_vars)),
                   add_fire,
-                  time_vars_output,
                   engine,
                   link,
                   learning.rate,
                   interaction.depth,
                   cv_folds,
-                  keep_model)
+                  keep_model,
+                  training_excluded_dates=list(training_excluded_dates)
+                  )
   
   return(configs)
 }

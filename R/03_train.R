@@ -49,6 +49,7 @@ train_models <- function(data,
                          training.fraction=0.9,
                          normalise=F,
                          detect_breaks=F,
+                         training_excluded_dates=NULL,
                          training_end,
                          ...
 ){
@@ -115,12 +116,6 @@ train_models <- function(data,
     })
   }
   
-  # train_model_unsafe <- function(index, location_id, ...){
-  #   print(paste("Training model on location", location_id))
-  #   res <- train_model(...)
-  #   res$index <- index
-  #   return(res)
-  # }
   
   data$index <- zoo::index(data)
   
@@ -136,6 +131,7 @@ train_models <- function(data,
                      detect_breaks=detect_breaks,
                      samples=samples,
                      training.fraction=training.fraction,
+                     training_excluded_dates=list(training_excluded_dates),
                      USE.NAMES=F,
                      SIMPLIFY=FALSE,
                      ...)
