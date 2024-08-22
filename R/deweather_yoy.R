@@ -12,15 +12,21 @@ deweather_yoy <- function(
     months,
     upload_results,
     deweather_process_id,
-    weather_file=NULL, #mainly used for debug/test
+    save_weather_filename = NULL,
+    read_weather_filename = NULL,
     ...) {
   
   # One weather file for all 
   keep_weather_file <- T
-  if(is.null(weather_file)){
-    weather_file <- tempfile(fileext = ".RDS")  
+  
+  if(is.null(save_weather_filename)){
+    save_weather_filename <- tempfile(fileext = ".RDS")  
     keep_weather_file <- F
   }
+  if(is.null(read_weather_filename)){
+    read_weather_filename <- save_weather_filename
+  }
+
   
   deweathered_yoys <- lapply(months, function(month) {
     # Exclude month dates and the previous year from training
@@ -31,18 +37,18 @@ deweather_yoy <- function(
       deweather_process_id=deweather_process_id,
       upload_results = F, # We'll upload after if need be
       training_excluded_dates = dates,
-      save_weather_filename = weather_file,
-      read_weather_filename = weather_file
+      save_weather_filename = save_weather_filename,
+      read_weather_filename = read_weather_filename
     )
     
-    deweathered_w_yoy <- add_yoy_changes(deweathered, month)
+    deweathered_yoy <- extract_yoy_changes(deweathered, month)
     
     if(upload_results){
-      creadeweather::upload_results(results=deweather_w_yoy,
+      creadeweather::upload_results(results=deweathered_yoy,
                                     deweather_process_id=deweather_process_id)
     }
     
-    return(deweathered_w_yoy)
+    return(deweathered_yoy)
   }) %>%
     bind_rows()
   
@@ -63,18 +69,15 @@ deweather_yoy <- function(
 #' @export
 #'
 #' @examples
-add_yoy_changes <- function(deweathered, month) {
+extract_yoy_changes <- function(deweathered, month) {
   
   new_results <- lapply(deweathered$result, function(result) {
     tryCatch(
       {
-        bind_rows(
-          result,
-          extract_yoy_changes_from_result(result, month)
-        )
+        extract_yoy_changes_from_result(result, month)
       },
       error = function(e) {
-        return(result)
+        return(NULL)
       }
     )
   })

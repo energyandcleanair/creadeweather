@@ -16,20 +16,21 @@ test_that("deweather yoy one month", {
     deweathered <- creadeweather::deweather_yoy(
         location_id=location_id,
         months = months,
-        weather_file = weather_file,
+        save_weather_filename = weather_file,
+        read_weather_filename = weather_file,
         upload_results = F,
         deweather_process_id = "default_anomaly_2018_2099",
         poll = "pm25"
     )
-    
-    
 
     # Find
     yoys <- deweathered %>%
       filter(source=="mee") %>%
       tidyr::unnest(result) %>%
-      mutate(date=as.character(date)) %>%
-      filter(grepl("yoy", variable))
+      mutate(date=as.character(date))
+    
+    # All variables should be yoy
+    expect_true(all(grepl("yoy", yoys$variable)))
     
     expect_equal(nrow(yoys), length(months) * length(location_id) * 6)
     
