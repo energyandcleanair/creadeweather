@@ -27,6 +27,7 @@ get_weather <- function(location_ids,
                         use_weather_cache = T,
                         upload_trajs = F,
                         upload_weather = F,
+                        update_era5 = T,
                         save_trajs_filename = NULL) {
   
   
@@ -60,7 +61,8 @@ get_weather <- function(location_ids,
       use_weather_cache = use_weather_cache,
       upload_trajs = upload_trajs,
       upload_weather = upload_weather,
-      save_trajs_filename = save_trajs_filename
+      save_trajs_filename = save_trajs_filename,
+      update_era5 = update_era5
     )
     if (!is.null(save_weather_filename)) {
       dir.create(dirname(save_weather_filename), recursive = T, showWarnings = F)
@@ -112,7 +114,8 @@ collect_weather <- function(location_ids,
                             use_weather_cache = T,
                             upload_trajs = F,
                             upload_weather = F,
-                            save_trajs_filename = NULL) {
+                            save_trajs_filename = NULL,
+                            update_era5 = T) {
   
   if (is.null(location_ids)) {
     stop("missing location_ids")
@@ -142,7 +145,8 @@ collect_weather <- function(location_ids,
   if ("era5" %in% weather_sources) {
     weather_era5 <- era5.collect_weather(
       location_dates = location_dates,
-      weather_vars = weather_vars
+      weather_vars = weather_vars,
+      update = update_era5
     )
   }
   

@@ -48,7 +48,8 @@ era5.rename_era5_to_global_df <- function(data) {
 #'
 #' @examples
 era5.collect_weather <- function(location_dates,
-                                 weather_vars) {
+                                 weather_vars,
+                                 update = T) {
   dates <- location_dates %>%
     as.data.frame() %>%
     group_by(location_id) %>%
@@ -58,10 +59,12 @@ era5.collect_weather <- function(location_dates,
     pull(date) %>%
     unique()
 
-  print("=== Refreshing ERA5 files ===")
-  era5.refresh_files(dates)
-  print("=== Done ===")
-
+  if(update){
+    print("=== Refreshing ERA5 files ===")
+    era5.refresh_files(dates)
+    print("=== Done ===")  
+  }
+  
   locations_sf <- st_as_sf(location_dates %>%
     ungroup() %>%
     dplyr::select(location_id, geometry) %>%
