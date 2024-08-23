@@ -1,4 +1,4 @@
-# "Deweathering" air quality measuremnets
+# "Deweathering" air quality measurements
 
 ## Introduction
 
