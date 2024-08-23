@@ -12,6 +12,7 @@ deweather_yoy <- function(
     months,
     upload_results,
     deweather_process_id,
+    keep_nonyoy_results=FALSE,
     save_weather_filename = NULL,
     read_weather_filename = NULL,
     ...) {
@@ -41,7 +42,7 @@ deweather_yoy <- function(
       read_weather_filename = read_weather_filename
     )
     
-    deweathered_yoy <- extract_yoy_changes(deweathered, month)
+    deweathered_yoy <- extract_yoy_changes(deweathered, month, keep_nonyoy_results)
     
     if(upload_results){
       creadeweather::upload_results(results=deweathered_yoy,
@@ -69,10 +70,10 @@ deweather_yoy <- function(
 #' @export
 #'
 #' @examples
-extract_yoy_changes <- function(deweathered, month) {
+extract_yoy_changes <- function(deweathered, month, keep_nonyoy_results) {
   
   new_results <- lapply(deweathered$result, function(result) {
-    tryCatch(
+    yoy_result <- tryCatch(
       {
         extract_yoy_changes_from_result(result, month)
       },
@@ -80,6 +81,12 @@ extract_yoy_changes <- function(deweathered, month) {
         return(NULL)
       }
     )
+    
+    if(keep_nonyoy_results){
+      return(bind_rows(result, yoy_result))
+    }else{
+      return(yoy_result)
+    }
   })
 
   deweathered$result <- new_results
