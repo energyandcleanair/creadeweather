@@ -80,7 +80,7 @@ train_gbm <- function(data,
   # Testing: before date_cut, taking a 1-training.fraction share
   # Prediction: after date_cut (typically for anomaly estimation: observed-predicted)
   i_before_data_cut <- which(data_prepared$date <= training_end)
-  i_excluded <- which(data_prepared$date %in% as.Date(training_excluded_dates))
+  i_excluded <- which(data_prepared$date %in% as.Date(training_excluded_dates, origin = lubridate::origin))
   i_training <- tryCatch({
     sample(setdiff(i_before_data_cut, i_excluded),
            training.fraction * length(i_before_data_cut))  
