@@ -88,6 +88,7 @@ deweather <- function(
   weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres',
                  'wd', 'ws', 'precip', 'dewpoint_temp', 'pbl_min', 'pbl_max'),
   weather_sources = c('era5'), #also available: NOAA
+  weather_update_era5 = T,
 
   # BIOMASS BURNING
   add_fire=F, #Whether to add it in the model, 
@@ -203,7 +204,8 @@ deweather <- function(
     use_weather_cache=use_weather_cache,
     upload_trajs=upload_fire,
     upload_weather=upload_weather,
-    save_trajs_filename=save_trajs_filename
+    save_trajs_filename=save_trajs_filename,
+    update_era5=weather_update_era5
     )
   
   # We might want to collect weather,
