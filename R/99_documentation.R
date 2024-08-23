@@ -173,5 +173,5 @@ document_anomaly <- function(){
   facet_wrap(~location_id)
     
 
-  ggsave("doc/figures/deweathering _bar_yoy.png", width=10, height=6, scale=1.5)
+  ggsave("doc/figures/deweathering_bar_yoy.png", width=10, height=6, scale=1.5)
 }
