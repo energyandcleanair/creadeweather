@@ -53,7 +53,7 @@ deweather_yoy <- function(
     bind_rows()
   
   
-  if(!keep_weather_file) file.remove(weather_file)
+  if(!keep_weather_file) file.remove(save_weather_filename)
 
   return(deweathered_yoys)
 }
