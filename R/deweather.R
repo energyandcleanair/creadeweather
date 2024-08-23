@@ -87,7 +87,7 @@ deweather <- function(
   read_weather_filename=NULL, # Skip weather retrieval, and use cached file instead. Also integrates measurements!
   weather_vars=c('air_temp_min','air_temp_max', 'atmos_pres',
                  'wd', 'ws', 'precip', 'dewpoint_temp', 'pbl_min', 'pbl_max'),
-  weather_sources = c('era5', 'noaa'),
+  weather_sources = c('era5'), #also available: NOAA
 
   # BIOMASS BURNING
   add_fire=F, #Whether to add it in the model, 
