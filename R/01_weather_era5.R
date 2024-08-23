@@ -69,11 +69,12 @@ era5.collect_weather <- function(location_dates,
 
 
   dir_era5 <- era5.folder_era5()
+  print(glue("Found {length(list.files(dir_era5, '\\\\.tif'))} tif files in ERA5 folder")) 
   weather_vars_era5 <- era5.rename_global_to_era5(weather_vars,
     only_keep_existing_vars = T
   )
 
-  print("=== Extracting ERA5 data at locations ===")
+  print(glue("=== Extracting ERA5 for {length(dates)} dates at {nrow(locations_sf)} locations ==="))
 
   coords <- terra::vect(locations_sf)
   era5_data <- pbmcapply::pbmclapply(dates, function(date) {
