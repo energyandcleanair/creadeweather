@@ -105,6 +105,8 @@ extract_yoy_changes <- function(deweathered, month, keep_nonyoy_results) {
 extract_yoy_changes_from_result <- function(result, month) {
   dates <- get_excluded_yoy_dates(month)
 
+  if(is.null(result)) return(NULL)
+  
   result %>%
     filter(
       date %in% dates,
