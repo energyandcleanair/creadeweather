@@ -80,7 +80,7 @@ era5.collect_weather <- function(location_dates,
   print(glue("=== Extracting ERA5 for {length(dates)} dates at {nrow(locations_sf)} locations ==="))
 
   coords <- terra::vect(locations_sf)
-  era5_data <- pbmcapply::pbmclapply(dates, function(date) {
+  era5_data <- pbapply::pblapply(dates, function(date) {
     tryCatch(
       {
         tif_file <- era5.date_to_filepaths(date, dir_era5)
@@ -113,7 +113,7 @@ era5.collect_weather <- function(location_dates,
         return(NULL)
       }
     )
-  }, mc.cores = parallel::detectCores() - 1) %>%
+  }) %>%
     bind_rows()
 
 
