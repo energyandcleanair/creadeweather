@@ -19,6 +19,7 @@ create_configs <- function(
   normalise=F,
   detect_breaks=F,
   keep_model=T,
+  ntrainings=1,
   ...){
   
 
@@ -67,7 +68,8 @@ create_configs <- function(
                   interaction.depth,
                   cv_folds,
                   keep_model,
-                  training_excluded_dates=list(training_excluded_dates)
+                  training_excluded_dates=list(training_excluded_dates),
+                  ntrainings
                   )
   
   return(configs)

@@ -31,12 +31,25 @@
 #' @param fire_mode
 #' @param fire_split_days
 #' @param fire_split_regions
-#' @param fire_duration_hour
 #' @param fire_buffer_km
 #' @param trajs_parallel
 #' @param trajs_height
 #' @param use_trajs_cache
 #' @param save_trajs_filename
+#' @param deweather_process_id 
+#' @param ntrainings Number of time models should be trained
+#' @param training_excluded_dates 
+#' @param weather_for_whole_period 
+#' @param weather_sources 
+#' @param weather_update_era5 
+#' @param fire_split_regions_res 
+#' @param upload_fire 
+#' @param upload_weather 
+#' @param trajs_cores 
+#' @param trajs_hours 
+#' @param trajs_duration_hour 
+#' @param trajs_met_type 
+#' @param use_weather_cache 
 #'
 #' @return
 #' @export
@@ -70,6 +83,7 @@ deweather <- function(
   training_end_trend="2099-01-01", # With trend approach, we train over the whole period
   training_start_anomaly="2015-01-01",
   training_end_anomaly="2019-12-31",
+  ntrainings=1,
 
   training_excluded_dates = c(), # A list of dates that MUST not be used for training
   
@@ -79,6 +93,9 @@ deweather <- function(
   training.fraction=0.9, #Used for testing
   link="linear", # 'log' or 'linear'
   cv_folds=3,
+  interaction.depth=2,
+  learning.rate=0.01,
+  trees=10000,
   
   
   # WEATHER
@@ -251,6 +268,9 @@ deweather <- function(
     link = link,
     lag = lag,
     cv_folds = cv_folds,
+    interaction.depth = interaction.depth,
+    learning.rate = learning.rate,
+    trees = trees,
     training.fraction = training.fraction,
     training_start_anomaly = training_start_anomaly,
     training_end_anomaly = training_end_anomaly,
@@ -265,7 +285,8 @@ deweather <- function(
     trajs_met_type = trajs_met_type,
     trajs_height = trajs_height,
     trajs_duration_hour = trajs_duration_hour,
-    trajs_hours = trajs_hours
+    trajs_hours = trajs_hours,
+    ntrainings = ntrainings
   )
 
   #---------------------------

@@ -14,12 +14,20 @@
 #' A prediction period which is the period for which we want to get deweathered data
 #' (when using anomaly approach)
 #'
-#' @param location_id 
 #' @param data 
-#' @param pollutant 
-#' @param unit 
+#' @param weather_vars 
+#' @param time_vars 
+#' @param trees 
+#' @param normalise 
+#' @param detect_breaks 
+#' @param samples 
+#' @param training_excluded_dates 
+#' @param interaction.depth 
+#' @param learning.rate 
+#' @param link 
+#' @param training.fraction 
+#' @param cv_folds 
 #' @param training_end
-#' @param link: either null or 'log'
 #'
 #' @return
 #' @export
@@ -39,13 +47,14 @@ train_gbm <- function(data,
                       link="linear",
                       training.fraction=0.9,
                       cv_folds=3,
+                      parallel=T,
                       ...){
   
   if(is.null(training_end)){
     training_end <- "2099-01-01"
   }
   
-  n_cores <- as.integer(future::availableCores()-1)
+  n_cores <- ifelse(parallel, as.integer(future::availableCores()-1), 1)
   
   if(!link %in% c('linear','log')){
     stop("link can only be 'linear' or 'log'")
@@ -70,7 +79,6 @@ train_gbm <- function(data,
   # Reshuffle as it seems GBM doesn't do it
   # Very important
   if(training.fraction<1){
-    set.seed(42)
     rows <- sample(nrow(data_prepared))
     data_prepared <- data_prepared[rows, ]
   }
@@ -105,7 +113,7 @@ train_gbm <- function(data,
   
   model_gbm  <- function(training_data, formula){
     print("Training gbm")
-    gbm.fit <- gbm::gbm(
+    gbm.fit <- gbm3::gbm(
       formula = formula,
       data = training_data,
       distribution='gaussian',
@@ -113,7 +121,7 @@ train_gbm <- function(data,
       shrinkage=learning.rate,
       interaction.depth=interaction.depth,
       train.fraction = 1, # We keep testing set separately
-      n.cores = 1, # nc_cores, Reaching C stack usage limit. Trying to see if this changes something
+      par.details = gbm3::gbmParallel(num_threads=n_cores),
       n.trees = trees, #This is actually the max number of trees. Will adjust after
       verbose = FALSE,
       keep.data = F
@@ -149,9 +157,15 @@ train_gbm <- function(data,
   # Optimal number of trees
   # Two options: OOB or CV
   # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
-  n.trees.opt <- gbm::gbm.perf(model, method="cv", plot.it = F)
-  print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
-  
+  if(cv_folds > 1){
+    n.trees.opt <- gbm3::gbm.perf(model, method="cv", plot.it = F)
+    print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
+    model$n.trees.opt <- n.trees.opt
+  }else{
+    n.trees.opt <- gbm3::gbm.perf(model, method="OOB", plot.it = F)
+    print(sprintf("Using %d trees (based on OOB results)", n.trees.opt))
+    model$n.trees.opt <- n.trees.opt
+  }
   
   return(
     tibble(
