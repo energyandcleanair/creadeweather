@@ -14,13 +14,25 @@
 #' A prediction period which is the period for which we want to get deweathered data
 #' (when using anomaly approach)
 #'
+<<<<<<< HEAD
 #' 
 #' @param location_id 
+=======
+>>>>>>> c87ce07 (-using gbm3)
 #' @param data 
-#' @param pollutant 
-#' @param unit 
+#' @param weather_vars 
+#' @param time_vars 
+#' @param trees 
+#' @param normalise 
+#' @param detect_breaks 
+#' @param samples 
+#' @param training_excluded_dates 
+#' @param interaction.depth 
+#' @param learning.rate 
+#' @param link 
+#' @param training.fraction 
+#' @param cv_folds 
 #' @param training_end
-#' @param link: either null or 'log'
 #'
 #' @return
 #' @export
@@ -40,7 +52,9 @@ train_gbm <- function(data,
                       link="linear",
                       training.fraction=0.9,
                       cv_folds=3,
+                      parallel=T,
                       ...){
+
 
 
   prepared <- train_gbm_prepare_data(
@@ -215,8 +229,18 @@ train_gbm_fit_model <- function(data_prepared,
   }
 
   model <- model_gbm(training_data, formula)
-  n.trees.opt <- gbm::gbm.perf(model, method = "cv", plot.it = FALSE)
-  message(sprintf("Using %d trees (based on CV results)", n.trees.opt))
+  # Optimal number of trees
+  # Two options: OOB or CV
+  # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
+  if(cv_folds > 1){
+    n.trees.opt <- gbm3::gbm.perf(model, method="cv", plot.it = F)
+    print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
+    model$n.trees.opt <- n.trees.opt
+  }else{
+    n.trees.opt <- gbm3::gbm.perf(model, method="OOB", plot.it = F)
+    print(sprintf("Using %d trees (based on OOB results)", n.trees.opt))
+    model$n.trees.opt <- n.trees.opt
+  }
 
   tibble::tibble(
     model = list(model),

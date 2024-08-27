@@ -51,9 +51,10 @@ train_models <- function(data,
                          detect_breaks=F,
                          training_excluded_dates=NULL,
                          training_end,
+                         ntrainings=1,
+                         original_seed=42,
                          ...
 ){
-  
   
   if(nrow(data)==0 || nrow(data$meas_weather[[1]])==0 || all(is.na(data$meas_weather[[1]]))){
     warning("No measurements available. Returning NA")
@@ -92,9 +93,7 @@ train_models <- function(data,
   
   
   # Train models
-  train_model <- switch(engine,
-         "gbm"=train_gbm
-  )
+  train_model <- switch(engine, "gbm"=train_gbm)
 
   train_model_safe <- function(index, location_id, ...){
     tryCatch({
@@ -103,14 +102,30 @@ train_models <- function(data,
       res$index <- index
       return(res)
     }, error=function(err){
-      warning(paste("Failed to train model:",err))
+      print(paste("Failed to train model:",err))
       return(NA)
     })
   }
+  
+
+  train_model_safe_ntimes <- function(index, location_id, ...){
+    set.seed(original_seed)
+    lapply(
+      1:ntrainings,
+      function(i) {
+        res <- train_model_safe(index, location_id, ...)
+        set.seed(runif(1))
+        return(res)}
+      # index=index,
+      # location_id=location_id,
+      # ...
+    )
+  }
 
   data$index <- zoo::index(data)
-  
-  result <- pbapply::pbmapply(train_model_safe,
+
+  result <- pbapply::pbmapply(
+                     train_model_safe_ntimes,
                      index=data$index,
                      location_id=data$location_id,
                      data=data$meas_weather,
@@ -127,17 +142,26 @@ train_models <- function(data,
                      SIMPLIFY=FALSE,
                      ...)
   
-  result <- do.call('bind_rows', result[!is.na(result)])
+  result <- bind_rows(unlist(result, recursive = FALSE) %>% na.omit)
+    
   
   if(nrow(result)==0){
     return(NA)
   }
   
-  # Re-add infos
   result <- result %>%
-    dplyr::left_join(
-      data %>% dplyr::select(-c(meas_weather)),
-      by="index") %>%
+    # Combine models, but lose additional information
+    # that may have been added to data
+    # (e.g. whether the variable was in training or testing set)
+    # It would be too memory-demanding to keep all datasets if we do a 
+    # bootstrap with say 100 models
+    group_by(index) %>%
+    summarise(models=list(model),
+              data=list(first(data))
+              ) %>%
+    ungroup() %>%
+    # Re-add infos
+    dplyr::left_join(data %>% dplyr::select(-c(meas_weather)), by="index") %>%
     dplyr::select(-c(index))
   
   return(result)
