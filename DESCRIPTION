@@ -21,7 +21,7 @@ Imports:
     zoo,
     ggnewscale,
     lubridate,
-    gbm,
+    gbm3,
     rjson,
     rnoaa,
     e1071,
@@ -65,7 +65,8 @@ Remotes:
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
     cran/rjson@0.2.21,
-    ropensci/rnoaa
+    ropensci/rnoaa,
+    gbm-developers/gbm3
 Suggests: 
 VignetteBuilder:
 RoxygenNote: 7.1.1

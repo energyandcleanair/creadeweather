@@ -90,7 +90,6 @@ train_caret <- function(data,
   # Reshuffle as it seems GBM doesn't do it
   # Very important
   if(training.fraction<1){
-    set.seed(42)
     rows <- sample(nrow(data_prepared))
     data_prepared <- data_prepared[rows, ]
   }
@@ -102,7 +101,7 @@ train_caret <- function(data,
   
   model_gbm  <- function(training_data, formula){
     print("Training gbm")
-    gbm.fit <- gbm::gbm(
+    gbm.fit <- gbm3::gbm(
       formula = formula,
       data = training_data,
       distribution='gaussian',
@@ -137,7 +136,7 @@ train_caret <- function(data,
   # Two options: OOB or CV
   # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
   # Plus we won't have OOB tree number if train.fraction=1
-  n.trees.opt <- gbm::gbm.perf(model, method="cv", plot.it = F)
+  n.trees.opt <- gbm3::gbm.perf(model, method="cv", plot.it = F)
   # n.trees.opt <- gbm::gbm.perf(model, method="OOB")
   print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
   

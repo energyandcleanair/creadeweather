@@ -12,7 +12,8 @@
 
 postcompute <- function(results){
   mapply(postcompute_one,
-         model=results$model,
+         models=results$models,
+         performances=results$performances,
          data=results$data,
          config=results$config,
          location_id=results$location_id,
@@ -28,13 +29,13 @@ postcompute <- function(results){
 
 
 
-postcompute_one <- function(model, data, config, location_id, poll, unit, source, process_id, ...){
+postcompute_one <- function(models, data, config, location_id, poll, unit, source, process_id, performances, ...){
   
   engine <- config$engine
-  keep_model <- config$keep_model
+  keep_models <- config$keep_models
   
   if(engine=='gbm'){
-    result <- postcompute_gbm(model=model, data=data, config=config, ...) %>%
+    result <- postcompute_gbm(models=models, data=data, config=config, performances=performances, ...) %>%
       mutate(location_id=location_id,
              poll=poll,
              unit=unit,
