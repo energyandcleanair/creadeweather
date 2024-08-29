@@ -167,12 +167,31 @@ train_gbm <- function(data,
     model$n.trees.opt <- n.trees.opt
   }
   
+  # Add predicted values
+  data_prepared$predicted <- predict(model, data_prepared, n.trees = n.trees.opt)
+  
   return(
     tibble(
       model=list(model),
-      data=list(data_prepared))
+      data=list(data_prepared),
+      performance=list(get_model_performance(model, data_prepared))
+    )
   )
 }
 
+get_model_performance <- function(model, data_prepared){
+  
+  perf <- lapply(split(data_prepared, data_prepared$set), function(d){
+    tibble(
+      set=unique(d$set),
+      rmse=Metrics::rmse(d$value, d$predicted),
+      rsquared=cor(d$value, d$predicted)^2
+    )
+  }) %>%
+    do.call(bind_rows, .) %>%
+    tidyr::pivot_wider(names_from=set, values_from=c(rmse, rsquared)) %>%
+    as.list()
 
+  return(perf)
+}
 

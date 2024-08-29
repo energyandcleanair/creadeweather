@@ -1,4 +1,4 @@
-postcompute_gbm <- function(models, data, config, ...) {
+postcompute_gbm <- function(models, data, config, performances, ...) {
   weather_vars <- config$weather_vars
   time_vars <- config$time_vars
   add_fire <- config$add_fire
@@ -40,6 +40,7 @@ postcompute_gbm <- function(models, data, config, ...) {
     )
 
   data <- data %>%
+    select(-c(predicted)) %>% # first model was used to predict already, in train_gbm
     left_join(predicted, by = "index")
 
   # data$predicted <- do_unlink(gbm::predict.gbm(model, data))
@@ -80,13 +81,14 @@ postcompute_gbm <- function(models, data, config, ...) {
     tidyr::gather("variable", "value", -c(date))
 
   # Build a lite version of the model for saving purposes
-  model_light <- postcompute_gbm_lighten_model(models = models, data = data)
+  models_light <- postcompute_gbm_lighten_model(models = models, data = data)
 
   return(
     tibble(
       config = list(config),
-      model = list(model_light),
-      result = list(result)
+      models = list(models_light),
+      result = list(result),
+      performances = list(performances)
     )
   )
 }
@@ -118,18 +120,22 @@ postcompute_gbm_lighten_model <- function(models, data) {
   #   modifyList(metrics)
 
   # Variable importance
-  importance <- lapply(models, function(m) summary(m, plotit = F))
+  importance <- lapply(models, function(m) summary(m, plot_it = F))
+  ntrees_opt <- lapply(models, function(m) m$n.trees.opt)
   # model_light$importance <- summary(model, plotit = F)
 
   return(
     list(
-      importance = importance
+      importance = importance,
+      ntrees_opt = ntrees_opt
     )
   )
 }
 
-postcompute_gbm_fire <- function(data, model, formula_vars, do_unlink, weather_vars) {
-  formula_vars <- model$var.names
+
+postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_vars) {
+  
+  formula_vars <- models[1]$var.names
   fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
   fire_vars <- fire_vars[!grepl("_lag[[:digit:]]*$", fire_vars)]
 
@@ -139,7 +145,7 @@ postcompute_gbm_fire <- function(data, model, formula_vars, do_unlink, weather_v
     # For lag
     data_nofire[, grepl(paste0(fire_var, "_lag[[:digit:]]*$"), names(data_nofire))] <- 0
     predicted_name <- paste0("predicted_nofire", gsub("fire_frp", "", fire_var))
-    data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire))) %>%
+    data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
       rowMeans(na.rm = T)
   }
 
@@ -148,7 +154,8 @@ postcompute_gbm_fire <- function(data, model, formula_vars, do_unlink, weather_v
   data_nofire <- data
   data_nofire[, fire_vars] <- 0
   predicted_name <- "predicted_nofire"
-  data[, predicted_name] <- do_unlink(predict(model, data_nofire))
+  data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
+    rowMeans(na.rm = T)
   return(data)
 }
 
@@ -238,44 +245,4 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
     data %>%
       full_join(trend_vars)
   )
-}
-
-
-postcompute_gbm_trends_w_weather <- function(data, time_vars, model, do_unlink) {
-  # Save variables in .Rdata to be able to develop this later
-  # save(data, time_vars, model, do_unlink, file="postcompute_gbm_trends_w_weather.Rdata")
-
-  size_sample <- 5000
-  sample <- data %>% sample_n(size_sample)
-
-
-  get_normalised_trend_at_date <- function(date) {
-    date_sample <- sample
-    time_vars_df <- data %>%
-      dplyr::filter(date == !!date) %>%
-      select_at("date_unix")
-    # Replace time_vars in sample
-    date_sample <- date_sample %>% mutate(!!!time_vars_df)
-
-    # Run model
-    predicted <- do_unlink(predict(model, date_sample))
-
-    # Extract trend as the average of predicted
-    trend <- mean(predicted, na.rm = T)
-
-    # Return
-    return(trend)
-  }
-
-  # take every 2 days
-  dates <- dplyr::sample_frac(data, 1) %>%
-    pull(date) %>%
-    unique()
-
-  trends <- pbapply::pbsapply(dates, get_normalised_trend_at_date)
-
-  tibble(date = dates, trend = unlist(trends)) %>%
-    arrange(date) %>%
-    ggplot(aes(date, trend)) +
-    geom_line()
 }

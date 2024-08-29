@@ -9,8 +9,7 @@ document_anomaly <- function(){
   library(glue)
 
 
-  location_id <- rcrea::cities(name=c("Delhi", "Mumbai", "Kolkata", "Varanasi",
-                                      "Lucknow", "Amritsar", "Noida"))$id
+  location_id <- rcrea::cities(name=c("Delhi", "Mumbai", "Kolkata", "Lucknow", "Pune"))$id
   month_yoy <- "2024-06-01"
   weather_file <- "tmp/weather_documentation.RDS"  
   weather_file_fire <- "tmp/weather_documentation_fire.RDS"  
@@ -25,20 +24,21 @@ document_anomaly <- function(){
     upload_results = F,
     save_weather_filename = weather_file,
     read_weather_filename = weather_file,
-    weather_update_era5 = F
+    weather_update_era5 = F,
+    ntrainings = 10
   )
   
-  deweathered_trend_fire <- creadeweather::deweather(
-    location_id = "delhi_ind.25_1_in",
-    deweather_process_id = "default_trend_fire_96h",
-    poll="pm25",
-    source="cpcb",
-    upload_results = F,
-    save_weather_filename = weather_file_fire,
-    read_weather_filename = weather_file_fire,
-    weather_update_era5 = F,
-    use_weather_cache = T
-  )
+  # deweathered_trend_fire <- creadeweather::deweather(
+  #   location_id = "delhi_ind.25_1_in",
+  #   deweather_process_id = "default_trend_fire_96h",
+  #   poll="pm25",
+  #   source="cpcb",
+  #   upload_results = F,
+  #   save_weather_filename = weather_file_fire,
+  #   read_weather_filename = weather_file_fire,
+  #   weather_update_era5 = F,
+  #   use_weather_cache = T
+  # )
   
 
   deweathered <- creadeweather::deweather(
@@ -66,21 +66,21 @@ document_anomaly <- function(){
     weather_update_era5 = F
   )
   
-  deweathered_yoy_fire <- creadeweather::deweather_yoy(
-    location_id = location_id,
-    months = month_yoy,
-    deweather_process_id = "default_anomaly_2018_2099_fire",
-    poll="pm25",
-    source="cpcb",
-    upload_results = F,
-    keep_nonyoy_results = T,
-    save_weather_filename = weather_file_fire,
-    read_weather_filename = weather_file_fire,
-    weather_update_era5 = F
-  )
+  # deweathered_yoy_fire <- creadeweather::deweather_yoy(
+  #   location_id = location_id,
+  #   months = month_yoy,
+  #   deweather_process_id = "default_anomaly_2018_2099_fire",
+  #   poll="pm25",
+  #   source="cpcb",
+  #   upload_results = F,
+  #   keep_nonyoy_results = T,
+  #   save_weather_filename = weather_file_fire,
+  #   read_weather_filename = weather_file_fire,
+  #   weather_update_era5 = F
+  # )
 
   # Plot trend
-  deweathered_trend_fire %>%
+  deweathered_trend %>%
     filter(source=="cpcb") %>%
     tidyr::unnest(result) %>%
     filter(date >= "2018-01-01") %>%
@@ -208,7 +208,7 @@ document_anomaly <- function(){
 
 
   # Compare the two appraoches: trend and anomaly
-  yoy_based_on_trend <- deweathered_trend_fire %>%
+  yoy_based_on_trend <- deweathered_trend %>%
   filter(source=="cpcb") %>%
   select(location_id, result) %>%
   tidyr::unnest(result) %>%
@@ -297,8 +297,8 @@ document_anomaly <- function(){
     ) +
     # scale_x_continuous(limits=c(-0,2)) +
     # hide x axis
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank()) +
+    # theme(axis.text.x = element_blank(),
+    #       axis.ticks.x = element_blank()) +
   facet_wrap(~location_id)
 
 
