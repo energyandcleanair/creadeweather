@@ -15,12 +15,12 @@ source <- c("mee", "cpcb")
 
 configs <- crossing(
   location_id=location_id,
-  interaction.depth = c(1, 3, 5, 7),
-  learning.rate = c(0.001, 0.01, 0.3),
+  interaction.depth = c(5, 7), #c(1, 3, 5, 7),
+  learning.rate = 0.01, #c(0.001, 0.01, 0.3),
   trees = 20000,
   lag = c(1), #c(1,2,3),
   cv_folds = 2,
-  ntrainings = 1,
+  ntrainings = 5,
   training.fraction=0.8
 )
 
