@@ -157,6 +157,7 @@ train_models <- function(data,
     # bootstrap with say 100 models
     group_by(index) %>%
     summarise(models=list(model),
+              performances=list(performance),
               data=list(first(data))
               ) %>%
     ungroup() %>%

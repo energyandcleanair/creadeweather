@@ -14,11 +14,6 @@
 #' A prediction period which is the period for which we want to get deweathered data
 #' (when using anomaly approach)
 #'
-<<<<<<< HEAD
-#' 
-#' @param location_id 
-=======
->>>>>>> c87ce07 (-using gbm3)
 #' @param data 
 #' @param weather_vars 
 #' @param time_vars 
@@ -242,8 +237,30 @@ train_gbm_fit_model <- function(data_prepared,
     model$n.trees.opt <- n.trees.opt
   }
 
-  tibble::tibble(
-    model = list(model),
-    data = list(data_prepared)
+  # Add predicted values
+  data_prepared$predicted <- predict(model, data_prepared, n.trees = n.trees.opt)
+  
+  return(
+    tibble(
+      model=list(model),
+      data=list(data_prepared),
+      performance=list(get_model_performance(model, data_prepared))
+    )
   )
+}
+
+get_model_performance <- function(model, data_prepared){
+  
+  perf <- lapply(split(data_prepared, data_prepared$set), function(d){
+    tibble(
+      set=unique(d$set),
+      rmse=Metrics::rmse(d$value, d$predicted),
+      rsquared=cor(d$value, d$predicted)^2
+    )
+  }) %>%
+    do.call(bind_rows, .) %>%
+    tidyr::pivot_wider(names_from=set, values_from=c(rmse, rsquared)) %>%
+    as.list()
+
+  return(perf)
 }

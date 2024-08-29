@@ -1,5 +1,5 @@
 
-postcompute_gbm <- function(models, data, config, ...) {
+postcompute_gbm <- function(models, data, config, performances, ...) {
 
   weather_vars <- config$weather_vars
   time_vars <- config$time_vars
@@ -36,6 +36,7 @@ postcompute_gbm <- function(models, data, config, ...) {
     )
 
   data <- data %>%
+    select(-c(predicted)) %>% # first model was used to predict already, in train_gbm
     left_join(predicted, by = "index")
 
   # data$predicted <- do_unlink(gbm::predict.gbm(model, data))
@@ -76,13 +77,14 @@ postcompute_gbm <- function(models, data, config, ...) {
     tidyr::gather("variable", "value", -c(date))
 
   # Build a lite version of the model for saving purposes
-  model_light <- postcompute_gbm_lighten_model(models = models, data = data)
+  models_light <- postcompute_gbm_lighten_model(models = models, data = data)
 
   return(
     tibble(
       config = list(config),
-      model = list(model_light),
-      result = list(result)
+      models = list(models_light),
+      result = list(result),
+      performances = list(performances)
     )
   )
 }
@@ -114,19 +116,22 @@ postcompute_gbm_lighten_model <- function(models, data) {
   #   modifyList(metrics)
 
   # Variable importance
-  importance <- lapply(models, function(m) summary(m, plotit = F))
+  importance <- lapply(models, function(m) summary(m, plot_it = F))
+  ntrees_opt <- lapply(models, function(m) m$n.trees.opt)
   # model_light$importance <- summary(model, plotit = F)
 
   return(
     list(
-      importance = importance
+      importance = importance,
+      ntrees_opt = ntrees_opt
     )
   )
 }
 
-postcompute_gbm_fire <- function(data, model, do_unlink, weather_vars){
+<<<<<<< HEAD
+postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars){
   
-  formula_vars <- model$var.names
+  formula_vars <- models[1]$var.names
   
   # Extract fire variables grouped by region/suffix
   fire_groups <- fire.extract_vars_by_region(formula_vars)
@@ -148,7 +153,8 @@ postcompute_gbm_fire <- function(data, model, do_unlink, weather_vars){
       paste0("predicted_nofire", suffix)
     }
     
-    data[, predicted_name] <- do_unlink(predict(model, data_nofire))
+    data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
+      rowMeans(na.rm = T)
   }
   
   # Do a general no fire (all fire variables set to 0)
@@ -158,7 +164,8 @@ postcompute_gbm_fire <- function(data, model, do_unlink, weather_vars){
   if(length(all_fire_vars) > 0){
     data_nofire <- data
     data_nofire[, all_fire_vars] <- 0
-    data[, "predicted_nofire"] <- do_unlink(predict(model, data_nofire))
+    data[, "predicted_nofire"] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
+      rowMeans(na.rm = T)
   }
   
   return(data)
@@ -251,6 +258,7 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
       full_join(trend_vars)
   )
 }
+
 
 
 postcompute_gbm_trends_w_weather <- function(data, time_vars, model, do_unlink){
