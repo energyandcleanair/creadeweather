@@ -51,6 +51,11 @@ upload_fire_results <- function(results,
 
 upload_results_one <- function(config, result, process_id, processes, poll, unit, location_id, source, deweather_process_id){
   
+  if(is.null(result)){
+    message("No result to upload")
+    return(NULL)
+  }
+  
   if(is.null(deweather_process_id)){
     deweather_process_id <- config_to_process_deweather(config=config,
                                                         process_id=process_id,
