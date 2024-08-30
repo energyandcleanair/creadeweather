@@ -321,9 +321,7 @@ deweather <- function(
   #--------------------
   if (upload_results) {
     print("5. Uploading results")
-    try({
-      upload_results(results, deweather_process_id = deweather_process_id)
-    })
+    upload_results(results, deweather_process_id = deweather_process_id)
   }
 
   if (add_fire & upload_fire) {
