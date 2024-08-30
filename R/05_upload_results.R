@@ -122,7 +122,6 @@ config_to_preferred_name <- function(config, process_id, processes){
 upload_meas <- function(result, deweather_process_id, poll, unit, location_id, source){
   
   if(is.null(result)) return(NULL)
-  if(is.na(result)) return(NA)
   
   to_upload <- result %>%
     mutate(process_id=deweather_process_id,
