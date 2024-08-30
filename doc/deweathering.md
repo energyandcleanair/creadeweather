@@ -9,12 +9,7 @@ Deweathering refers to the process of correcting for the influence of weather on
 
 ## Methodology: Deweathering Air Pollution Data
 
-Deweathering is achieved by training a machine learning morel (in our case a Gradient Boosting Machine) to predict air pollution levels based on weather-related variables. This model can be used in two ways, depending on the desired application.
-
-- **Trend analysis**: a trend term (i.e. the date) is added as a predictor in the model. The trained model is then rerun with a sample of weather conditions for each date individually. The daily average of the resulting predictions are then identified with the "weather-corrected" trend.
-
-
-- **Residual analysis**: The residuals from this model, representing the difference between the predicted and actual pollution levels, are interpreted as the component of air pollution that cannot be explained by weather conditions. This difference is assumed to be primarily driven by change in emissions.
+Deweathering is achieved by training a machine learning morel (in our case a Gradient Boosting Machine) to predict air pollution levels based on weather-related variables and a trend term.
 
 ### 1. Data Inputs
 
@@ -49,15 +44,9 @@ Trend analysis of deweathered data allows for the identification of long-term ch
 ![trendts](figures/deweathering_ts_trend.png)
 
 
-### 2. Monthly Year-over-Year (Y-o-Y) Analysis of Weather vs. Emissions
+### 2. Monthly Year-over-Year (Y-o-Y) Analysis
 
-This application relies on residual analysis: the model is trained on a dataset that excludes the months of interest i.e. the month we are interested in and the same month the prior year. The model is then used to "predict" the air quality for the two months. The change in predicted levels between the two months is attributed to weather conditions, as they were predicted using weather conditions alone. The difference with the observed change in air quality is attributed is attributed to change in emissions.
-
-
-Below is the observed, predicted and residual (i.e. observed - predicted), also called *anomaly* PM2.5 over time in Delhi, India. The orange areas represents the dates that were explicitely excluded from the training dataset (on top of the fraction dedicated to model validation and testing).
-![yoyts](figures/deweathering_ts_yoy.png)
-
-
+By comparing the value of this trend term across different periods, it is possible to estimate the part of observed changes in concentration that is due to weather and the part that is attributable to other factors (assumed to be driven by change in emissions).
 
 The respective influence of weather and emissions in the year-on-year changes of air quality are shown in the chart below.
 
@@ -66,6 +55,15 @@ The respective influence of weather and emissions in the year-on-year changes of
 From this chart, one can conclude that:
 - Delhi's observed increase of PM2.5 levels (+16%) were due to weather conditions. After correcting for these, we would expect an actual decrease of 10%.
 - Mumbai's observed decrease of PM2.5 levels (-62%) was almost entirely due to change in emissions.
+
+## Appendix
+### Model parameters
+We conducted a grid analysis of GBM hyper-parameters (e.g. interaction depth, days of lag, cv_folds, learning rate) on five Indian cities, and picked these values that minimise RMSE and maximise R2 (there was no ambiguity):
+- interaction depth: 7
+- learning rate: 0.01
+- maximum number of trees: 20,000
+- cv_folds: 2
+
 
 ## References
 Grange, S. K., & Carslaw, D. C. (2019). Using meteorological normalisation to detect interventions in air quality time series. Science of the Total Environment, 653, 578–588. https://doi.org/10.1016/j.scitotenv.2018.10.344
