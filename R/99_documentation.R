@@ -9,8 +9,8 @@ document_anomaly <- function(){
   library(glue)
 
 
-  location_id <- rcrea::cities(name=c("Delhi", "Mumbai", "Kolkata", "Lucknow", "Pune"))$id
-  month_yoy <- "2024-06-01"
+  location_id <- rcrea::cities(name=c("Delhi", "Mumbai", "Pune", "Kolkata"))$id
+  month_yoy <- "2024-07-01"
   weather_file <- "tmp/weather_documentation.RDS"  
   weather_file_fire <- "tmp/weather_documentation_fire.RDS"  
   file.remove(weather_file)
@@ -25,7 +25,7 @@ document_anomaly <- function(){
     save_weather_filename = weather_file,
     read_weather_filename = weather_file,
     weather_update_era5 = F,
-    ntrainings = 10
+    ntrainings = 1
   )
   
   # deweathered_trend_fire <- creadeweather::deweather(
@@ -41,30 +41,30 @@ document_anomaly <- function(){
   # )
   
 
-  deweathered <- creadeweather::deweather(
-    location_id = location_id,
-    deweather_process_id = "default_anomaly_2018_2099",
-    poll="pm25",
-    source="cpcb",
-    upload_results = F,
-    save_weather_filename = weather_file,
-    read_weather_filename = weather_file,
-    weather_update_era5 = F
-  )
-  
-
-  deweathered_yoy <- creadeweather::deweather_yoy(
-    location_id = location_id,
-    months = month_yoy,
-    deweather_process_id = "default_anomaly_2018_2099",
-    poll="pm25",
-    source="cpcb",
-    upload_results = F,
-    keep_nonyoy_results = T,
-    save_weather_filename = weather_file,
-    read_weather_filename = weather_file,
-    weather_update_era5 = F
-  )
+  # deweathered <- creadeweather::deweather(
+  #   location_id = location_id,
+  #   deweather_process_id = "default_anomaly_2018_2099",
+  #   poll="pm25",
+  #   source="cpcb",
+  #   upload_results = F,
+  #   save_weather_filename = weather_file,
+  #   read_weather_filename = weather_file,
+  #   weather_update_era5 = F
+  # )
+  # 
+  # 
+  # deweathered_yoy <- creadeweather::deweather_yoy(
+  #   location_id = location_id,
+  #   months = month_yoy,
+  #   deweather_process_id = "default_anomaly_2018_2099",
+  #   poll="pm25",
+  #   source="cpcb",
+  #   upload_results = F,
+  #   keep_nonyoy_results = T,
+  #   save_weather_filename = weather_file,
+  #   read_weather_filename = weather_file,
+  #   weather_update_era5 = F
+  # )
   
   # deweathered_yoy_fire <- creadeweather::deweather_yoy(
   #   location_id = location_id,
@@ -115,96 +115,96 @@ document_anomaly <- function(){
 
 
   # Plot with cut dates
-  deweathered_yoy %>%
-    filter(source=="cpcb") %>%
-    select(location_id, result) %>%
-    tidyr::unnest(result) %>%
-    rcrea::utils.running_average(30,  min_values=20) %>%
-    filter(variable %in% c("anomaly", "observed", "predicted")) -> plt_data
-    
-  ggplot(plt_data) +
-    geom_hline(yintercept=0, color="grey80") +
-    geom_line(data=plt_data, aes(x=date, y=value, color=variable)) +
-    geom_rect(
-      data=function(x) filter(x, date==max(date), variable %in% c("anomaly", "observed")),
-      aes(xmin=as.Date(month_yoy), xmax=as.Date(month_yoy) + lubridate::days_in_month(month_yoy),
-              ymin=-Inf, ymax=Inf, fill="Excluded from training"),
-              alpha=0.2) +
-    # Add same one a year before
-    geom_rect(
-      data=function(x) filter(x, date==max(date), variable %in% c("anomaly", "observed")),
-      aes(xmin=as.Date(month_yoy) - lubridate::years(1), xmax=as.Date(month_yoy) + lubridate::days_in_month(month_yoy) - lubridate::years(1),
-      ymin=-Inf, ymax=Inf, fill="Excluded from training"),
-      alpha=0.2) +
-    # scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
-    # geom_text_repel(
-    #   data = deweathered_yoy$result[[1]] %>% filter(date==max(date)),
-    #   aes(x=date, y=value, label=variable, color=variable),
-    #   nudge_x = 1,
-    #   nudge_y = 1,
-    #   size=3
-    # ) +
-    facet_wrap(case_when(variable=="anomaly"~ "Anomaly", T ~ "Observed and Predicted") ~ location_id, ncol=2) +
-    rcrea::theme_crea() +
-    theme(strip.placement = "top") +
-    labs(
-      title="Weather-based prediction of PM2.5 in Delhi",
-      subtitle="Anomaly = Observed - Predicted | 30-day running average",
-      y="PM2.5 (µg/m³)",
-      x=NULL,
-      fill=NULL,
-      color=NULL
-    ) +
-    rcrea::scale_color_crea_d()
-
-
-  ggsave("doc/figures/deweathering_ts_yoy.png", width=10, height=6, scale=1.5)
-
+  # deweathered_yoy %>%
+  #   filter(source=="cpcb") %>%
+  #   select(location_id, result) %>%
+  #   tidyr::unnest(result) %>%
+  #   rcrea::utils.running_average(30,  min_values=20) %>%
+  #   filter(variable %in% c("anomaly", "observed", "predicted")) -> plt_data
+  #   
+  # ggplot(plt_data) +
+  #   geom_hline(yintercept=0, color="grey80") +
+  #   geom_line(data=plt_data, aes(x=date, y=value, color=variable)) +
+  #   geom_rect(
+  #     data=function(x) filter(x, date==max(date), variable %in% c("anomaly", "observed")),
+  #     aes(xmin=as.Date(month_yoy), xmax=as.Date(month_yoy) + lubridate::days_in_month(month_yoy),
+  #             ymin=-Inf, ymax=Inf, fill="Excluded from training"),
+  #             alpha=0.2) +
+  #   # Add same one a year before
+  #   geom_rect(
+  #     data=function(x) filter(x, date==max(date), variable %in% c("anomaly", "observed")),
+  #     aes(xmin=as.Date(month_yoy) - lubridate::years(1), xmax=as.Date(month_yoy) + lubridate::days_in_month(month_yoy) - lubridate::years(1),
+  #     ymin=-Inf, ymax=Inf, fill="Excluded from training"),
+  #     alpha=0.2) +
+  #   # scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
+  #   # geom_text_repel(
+  #   #   data = deweathered_yoy$result[[1]] %>% filter(date==max(date)),
+  #   #   aes(x=date, y=value, label=variable, color=variable),
+  #   #   nudge_x = 1,
+  #   #   nudge_y = 1,
+  #   #   size=3
+  #   # ) +
+  #   facet_wrap(case_when(variable=="anomaly"~ "Anomaly", T ~ "Observed and Predicted") ~ location_id, ncol=2) +
+  #   rcrea::theme_crea() +
+  #   theme(strip.placement = "top") +
+  #   labs(
+  #     title="Weather-based prediction of PM2.5 in Delhi",
+  #     subtitle="Anomaly = Observed - Predicted | 30-day running average",
+  #     y="PM2.5 (µg/m³)",
+  #     x=NULL,
+  #     fill=NULL,
+  #     color=NULL
+  #   ) +
+  #   rcrea::scale_color_crea_d()
+  # 
+  # 
+  # ggsave("doc/figures/deweathering_ts_yoy.png", width=10, height=6, scale=1.5)
+  # 
 
   # Plot yoy change
-  deweathered_yoy %>%
-    filter(source=="cpcb") %>%
-   select(location_id, result) %>%
-    tidyr::unnest(result) %>%
-    filter(grepl("yoy.*_rel", variable)) %>%    
-    mutate(variable_str=case_when(
-      grepl("total", variable) ~ "Observed change yoy",
-      grepl("weather", variable) ~ "Influence of weather",
-      grepl("emission", variable) ~ "Influence of emissions"
-    )) %>%
-    ggplot(aes(y=value, x=1)) +
-    # limit width of column
-    geom_col(data=function(x) filter(x, variable != "yoy_total_rel"),
-              aes(fill=variable_str),
-              width=0.5) +
-    geom_point(data=function(x) filter(x, variable=="yoy_total_rel"), size=4) +
-    geom_text(
-      # data=function(x) filter(x, variable=="yoy_total_rel"),
-      aes(label=glue("{variable_str}: {paste0(ifelse(value>0,'+',''), round(value, 2)*100,'%')}"),
-          y=value,
-          vjust=ifelse(value>0,-1,1)*1.5),
-      # nudge_x = 0.0,
-      # nudge_y = 0.05,
-      hjust=0.5,
-      size=4
-    ) +
-    geom_hline(yintercept=0, color="grey80") +
-    rcrea::theme_crea() +
-    rcrea::scale_fill_crea_d() +
-    labs(
-      title="July 2024 year-over-year change in PM2.5 in Delhi, India",
-      subtitle="Influence of weather and emissions",
-      x=NULL, y="µg/m3",
-      fill=NULL
-    ) +
-    scale_x_continuous(limits=c(-0,2)) +
-    # hide x axis
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank()) +
-  facet_wrap(~location_id)
-    
-
-  ggsave("doc/figures/deweathering_bar_yoy.png", width=10, height=6, scale=1.5)
+  # deweathered_yoy %>%
+  #   filter(source=="cpcb") %>%
+  #  select(location_id, result) %>%
+  #   tidyr::unnest(result) %>%
+  #   filter(grepl("yoy.*_rel", variable)) %>%    
+  #   mutate(variable_str=case_when(
+  #     grepl("total", variable) ~ "Observed change yoy",
+  #     grepl("weather", variable) ~ "Influence of weather",
+  #     grepl("emission", variable) ~ "Influence of emissions"
+  #   )) %>%
+  #   ggplot(aes(y=value, x=1)) +
+  #   # limit width of column
+  #   geom_col(data=function(x) filter(x, variable != "yoy_total_rel"),
+  #             aes(fill=variable_str),
+  #             width=0.5) +
+  #   geom_point(data=function(x) filter(x, variable=="yoy_total_rel"), size=4) +
+  #   geom_text(
+  #     # data=function(x) filter(x, variable=="yoy_total_rel"),
+  #     aes(label=glue("{variable_str}: {paste0(ifelse(value>0,'+',''), round(value, 2)*100,'%')}"),
+  #         y=value,
+  #         vjust=ifelse(value>0,-1,1)*1.5),
+  #     # nudge_x = 0.0,
+  #     # nudge_y = 0.05,
+  #     hjust=0.5,
+  #     size=4
+  #   ) +
+  #   geom_hline(yintercept=0, color="grey80") +
+  #   rcrea::theme_crea() +
+  #   rcrea::scale_fill_crea_d() +
+  #   labs(
+  #     title="July 2024 year-over-year change in PM2.5 in Delhi, India",
+  #     subtitle="Influence of weather and emissions",
+  #     x=NULL, y="µg/m3",
+  #     fill=NULL
+  #   ) +
+  #   scale_x_continuous(limits=c(-0,2)) +
+  #   # hide x axis
+  #   theme(axis.text.x = element_blank(),
+  #         axis.ticks.x = element_blank()) +
+  # facet_wrap(~location_id)
+  #   
+  # 
+  # ggsave("doc/figures/deweathering_bar_yoy.png", width=10, height=6, scale=1.5)
 
 
   # Compare the two appraoches: trend and anomaly
@@ -250,28 +250,18 @@ document_anomaly <- function(){
       values_to = "value",
     ) %>%
     filter(grepl("yoy.*_rel", variable))  %>%
-    select(location_id, variable, value)
+    select(location_id, variable, value) %>%
+    mutate(variable_str=case_when(
+        grepl("total", variable) ~ "Observed change yoy",
+        grepl("weather", variable) ~ "Influence of weather",
+        grepl("emission", variable) ~ "Influence of emissions"
+      ))
 
 
-  
-  
-  yoy_based_on_anomaly <-  deweathered_yoy %>%
-    filter(source=="cpcb") %>%
-   select(location_id, result) %>%
-    tidyr::unnest(result) %>%
-    filter(grepl("yoy.*_rel", variable)) 
-
-  
-  bind_rows(
-    yoy_based_on_trend %>% mutate(approach="Trend"),
-    yoy_based_on_anomaly %>% mutate(approach="Anomaly")
-  ) %>%
-  mutate(variable_str=case_when(
-      grepl("total", variable) ~ "Observed change yoy",
-      grepl("weather", variable) ~ "Influence of weather",
-      grepl("emission", variable) ~ "Influence of emissions"
-    )) %>%
-  ggplot(aes(y=value, x=approach)) +
+  yoy_based_on_trend %>%
+    filter(grepl("delhi|mumbai", location_id)) %>%
+  ggplot(aes(y=value, x=1)) +
+    # limit width of column
     geom_col(data=function(x) filter(x, variable != "yoy_total_rel"),
               aes(fill=variable_str),
               width=0.5) +
@@ -290,16 +280,65 @@ document_anomaly <- function(){
     rcrea::theme_crea() +
     rcrea::scale_fill_crea_d() +
     labs(
-      title="July 2024 year-over-year change in PM2.5 in Delhi, India",
+      title="July 2024 year-over-year change in PM2.5 in Delhi and Mumbai, India",
       subtitle="Influence of weather and emissions",
       x=NULL, y="µg/m3",
       fill=NULL
     ) +
-    # scale_x_continuous(limits=c(-0,2)) +
+    scale_x_continuous(limits=c(-0,2)) +
     # hide x axis
-    # theme(axis.text.x = element_blank(),
-    #       axis.ticks.x = element_blank()) +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank()) +
   facet_wrap(~location_id)
+  
+  ggsave("doc/figures/deweathering_bar_yoy.png", width=10, height=6, scale=1.5)
+  
+  
+  # yoy_based_on_anomaly <-  deweathered_yoy %>%
+  #   filter(source=="cpcb") %>%
+  #  select(location_id, result) %>%
+  #   tidyr::unnest(result) %>%
+  #   filter(grepl("yoy.*_rel", variable)) 
+  # 
+  # 
+  # bind_rows(
+  #   yoy_based_on_trend %>% mutate(approach="Trend"),
+  #   yoy_based_on_anomaly %>% mutate(approach="Anomaly")
+  # ) %>%
+  # mutate(variable_str=case_when(
+  #     grepl("total", variable) ~ "Observed change yoy",
+  #     grepl("weather", variable) ~ "Influence of weather",
+  #     grepl("emission", variable) ~ "Influence of emissions"
+  #   )) %>%
+  # ggplot(aes(y=value, x=approach)) +
+  #   geom_col(data=function(x) filter(x, variable != "yoy_total_rel"),
+  #             aes(fill=variable_str),
+  #             width=0.5) +
+  #   geom_point(data=function(x) filter(x, variable=="yoy_total_rel"), size=4) +
+  #   geom_text(
+  #     # data=function(x) filter(x, variable=="yoy_total_rel"),
+  #     aes(label=glue("{variable_str}: {paste0(ifelse(value>0,'+',''), round(value, 2)*100,'%')}"),
+  #         y=value,
+  #         vjust=ifelse(value>0,-1,1)*1.5),
+  #     # nudge_x = 0.0,
+  #     # nudge_y = 0.05,
+  #     hjust=0.5,
+  #     size=4
+  #   ) +
+  #   geom_hline(yintercept=0, color="grey80") +
+  #   rcrea::theme_crea() +
+  #   rcrea::scale_fill_crea_d() +
+  #   labs(
+  #     title="July 2024 year-over-year change in PM2.5 in Delhi, India",
+  #     subtitle="Influence of weather and emissions",
+  #     x=NULL, y="µg/m3",
+  #     fill=NULL
+  #   ) +
+  #   # scale_x_continuous(limits=c(-0,2)) +
+  #   # hide x axis
+  #   # theme(axis.text.x = element_blank(),
+  #   #       axis.ticks.x = element_blank()) +
+  # facet_wrap(~location_id)
 
 
 }
