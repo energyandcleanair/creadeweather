@@ -408,8 +408,7 @@ era5.download_nc <- function(force,
     
     ecmwfr::wf_set_key(
       user = utils.get_env("CDS_UID", error_if_not_found = T),
-      key = utils.get_env("CDS_API_KEY", error_if_not_found = T),
-      service = "cds"
+      key = utils.get_env("CDS_TOKEN", error_if_not_found = T)
     )
     
     # Timeout: short if recent date, long otherwise
