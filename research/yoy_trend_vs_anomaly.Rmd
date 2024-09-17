@@ -1,0 +1,207 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Purpose
+This is a notebook to compare the different deweathering approaches to compute y-o-y changes in emissions.
+
+We'll look at the following models:
+- trend, with various time variables
+- anomaly, after excluding the months of interest from training dataset
+- anomaly, without excluding the months of interest from training dataset
+
+```{r, include=FALSE, echo=FALSE}
+
+library(tidyverse)
+library(creadeweather)
+readRenviron(".Renviron")
+
+# Use current url to collect NCAP locations
+anomalies <- read_csv("https://api.energyandcleanair.org/ncap/anomaly?pollutant=pm25&ncap_only=true&year=2024&month=8&deweather_method=default_anomaly_2018_2099,&format=csv")
+locations_ncap <- unique(anomalies$location_id)
+locations_mee <- read_csv("https://api.energyandcleanair.org/cities?country=CN&format=csv")$id
+
+# take 10 random locations
+# set seed
+set.seed(123)
+locations <- c(
+  sample(locations_ncap, 1),
+  sample(locations_mee, 1))
+weather_file <- "tmp/weather_yoy.RDS"
+# file.remove(weather_file)
+month_yoy <- "2024-07-01"
+
+```
+
+
+```{r, cache=TRUE}
+deweathered_trend <- creadeweather::deweather(
+  location_id = locations,
+  poll = c("pm25", "no2"),
+  source = c("cpcb", "mee"),
+  tree = 20000,
+  learning.rate = 0.01,
+  interaction.depth = 7,
+  training.fraction = 1,
+  lag = 1,
+  weather_vars = c("air_temp_min","air_temp_max","atmos_pres","wd","ws","precip","dewpoint_temp","pbl_min","pbl_max"),
+  time_vars = c("date_unix"),
+  upload_results = F,
+  save_weather_filename = weather_file,
+  read_weather_filename = weather_file,
+  weather_update_era5 = F
+)
+
+
+deweathered_trend_2 <- creadeweather::deweather(
+  location_id = locations,
+  tree = 20000,
+  learning.rate = 0.01,
+  interaction.depth = 7,
+  training.fraction = 1,
+  lag = 1,
+  weather_vars = c("air_temp_min","air_temp_max","atmos_pres","wd","ws","precip","dewpoint_temp","pbl_min","pbl_max"),
+  time_vars = c("date_unix", "yday"),
+  poll = c("pm25", "no2"),
+  source = c("cpcb", "mee"),
+  upload_results = F,
+  save_weather_filename = weather_file,
+  read_weather_filename = weather_file,
+  weather_update_era5 = F
+)
+
+
+deweathered_trend_3 <- creadeweather::deweather(
+  location_id = locations,
+  tree = 20000,
+  learning.rate = 0.01,
+  interaction.depth = 7,
+  training.fraction = 1,
+  lag = 1,
+  weather_vars = c("air_temp_min","air_temp_max","atmos_pres","wd","ws","precip","dewpoint_temp","pbl_min","pbl_max"),
+  time_vars = c("date_unix", "yday", "wday"),
+  poll = c("pm25", "no2"),
+  source = c("cpcb", "mee"),
+  upload_results = F,
+  save_weather_filename = weather_file,
+  read_weather_filename = weather_file,
+  weather_update_era5 = F
+)
+```
+
+Let's plot time series
+```{r}
+bind_rows(
+  deweathered_trend %>% mutate(time_vars = "date_unix"),
+  deweathered_trend_2 %>% mutate(time_vars = "date_unix + yday"),
+  deweathered_trend_3 %>% mutate(time_vars = "date_unix + yday + wday")
+) %>%
+  select(location_id, source, poll, time_vars, result) %>%
+  tidyr::unnest(result) %>%
+  filter(variable == "trend") %>%
+  ggplot(aes(date, value, color = time_vars)) +
+  geom_line() +
+  facet_wrap(~location_id + poll, scales = "free_y") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+# Comparing YOYs with anomaly approach
+
+```{r}
+deweathered_anomaly <- creadeweather::deweather(
+  location_id = locations,
+  deweather_process_id = "default_anomaly_2018_2099",
+  time_vars = c(),
+  poll = c("pm25", "no2"),
+  source = c("cpcb", "mee"),
+  upload_results = F,
+  save_weather_filename = weather_file,
+  read_weather_filename = weather_file,
+  weather_update_era5 = F
+)
+```
+
+```{r}
+extract_yoys_from_trend <- function(deweathered_trend) {
+  deweathered_trend %>%
+    select(location_id, source, poll, models, result) %>%
+    tidyr::unnest(result) %>%
+    group_by(location_id,
+             source,
+             poll,
+             models,
+             year = year(date),
+             month = month(date),
+             variable) %>%
+    summarise(value = mean(value, na.rm = T)) %>%
+    arrange(year) %>%
+    group_by(across(-c(year, value))) %>%
+    mutate(delta = value - lag(value)) %>%
+    # Add observed value of first year
+    ungroup() %>%
+    group_by(location_id, source, poll, models, month, year) %>%
+    mutate(observed_prev = value[variable == "observed"] - delta[variable == "observed"]) %>%
+    ungroup() %>%
+    filter(!is.na(delta)) %>%
+    select(-c(value)) %>%
+    tidyr::pivot_wider(
+      names_from = "variable",
+      values_from = "delta",
+      names_prefix = "yoy_"
+    ) %>%
+    rename(
+      yoy_total = yoy_observed,
+      yoy_emission = yoy_trend,
+    ) %>%
+    mutate(
+      yoy_weather = yoy_total - yoy_emission,
+      yoy_total_rel = yoy_total / observed_prev,
+      yoy_residual = yoy_anomaly / observed_prev,
+      yoy_weather_rel = yoy_weather / observed_prev,
+      yoy_emission_rel = yoy_emission / observed_prev
+    ) %>%
+    pivot_longer(
+      cols = -c(year, observed_prev, location_id, source, models, poll),
+      names_to = "variable",
+      values_to = "value",
+    ) %>%
+    filter(grepl("yoy.*_rel", variable)) %>%
+    select(location_id, source, poll, models, variable, value) %>%
+    mutate(date=month_yoy) %>%
+    group_by(location_id, source, poll, models) %>%
+    tidyr::nest() %>%
+    rename(result = data)
+}
+
+```
+
+
+```{r}
+yoys <- bind_rows(
+  extract_yoys_from_trend(deweathered_trend) %>% mutate(model = "trend"),
+  extract_yoys_from_trend(deweathered_trend_2) %>% mutate(model = "trend_2"),
+  extract_yoys_from_trend(deweathered_trend_3) %>% mutate(model = "trend_3")
+) %>%
+  unnest(result) 
+```
+
+
+Let's compare Yoys
+
+```{r}
+yoys %>%
+  group_by(location_id, source, model) %>%
+  summarise(
+    yoy_total = mean(value[variable == "yoy_total"]),
+    yoy_emission = mean(value[variable == "yoy_emission"]),
+    yoy_weather = mean(value[variable == "yoy_weather"]),
+    yoy_total_rel = mean(value[variable == "yoy_total_rel"]),
+    yoy_emission_rel = mean(value[variable == "yoy_emission_rel"]),
+    yoy_weather_rel = mean(value[variable == "yoy_weather_rel"]),
+    n = n()
+  ) %>%
+  ungroup() %>%
+  arrange(location_id, source, model)
