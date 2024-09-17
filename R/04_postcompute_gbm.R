@@ -161,7 +161,10 @@ postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_
 
 
 postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
-  dates <- tibble(date = lubridate::date(unique(data %>% filter(set == "training") %>% pull(date)))) %>%
+  
+  dates <- data %>%
+    distinct(date) %>%
+    arrange(date) %>%
     dplyr::mutate(yday_joiner = lubridate::yday(date)) %>%
     dplyr::mutate(month_joiner = lubridate::month(date)) %>%
     dplyr::mutate(wday_joiner = lubridate::wday(date, week_start = 1)) %>%
