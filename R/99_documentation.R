@@ -13,8 +13,8 @@ document_anomaly <- function(){
   month_yoy <- "2024-07-01"
   weather_file <- "tmp/weather_documentation.RDS"  
   weather_file_fire <- "tmp/weather_documentation_fire.RDS"  
-  file.remove(weather_file)
-  file.remove(weather_file_fire)
+  # file.remove(weather_file)
+  # file.remove(weather_file_fire)
 
   deweathered_trend <- creadeweather::deweather(
     location_id = location_id,
@@ -25,8 +25,40 @@ document_anomaly <- function(){
     save_weather_filename = weather_file,
     read_weather_filename = weather_file,
     weather_update_era5 = F,
-    ntrainings = 1
+    ntrainings = 5
   )
+  
+  deweathered_trend %>%
+    select(location_id, result) %>%
+    tidyr::unnest(result) %>%
+    filter(grepl("trend", variable)) %>% 
+    ggplot(aes(date, value)) +
+    geom_line(data=function(x)filter(x, variable=="trend")) +
+    geom_ribbon(inherit.aes = F,
+                data=function(x) filter(x, variable %in% c('trend_p975','trend_p025')) %>%
+                  tidyr::spread(variable, value), aes(x=date, ymin=trend_p025, ymax=trend_p975)) +
+    facet_wrap(~location_id)
+  
+  # Check yoy
+  deweathered_trend %>%
+    select(location_id, result) %>%
+    tidyr::unnest(result) %>%
+    filter(variable=="trend") %>%
+    group_by(location_id, year=year(date), month=month(date)) %>%
+    summarise(value=mean(value, na.rm=T)) %>%
+    group_by(location_id, month) %>%
+    arrange(year) %>%
+    mutate(yoy = (value - lag(value)) / lag(value)) %>%
+    ungroup() %>%
+    mutate(date = as.Date(glue("{year}-{month}-01"))) %>%
+    ggplot(aes(date, yoy)) +
+    geom_line() +
+    facet_wrap(~location_id) +
+    geom_hline(yintercept=0)
+    
+    
+  
+  
   
   # deweathered_trend_fire <- creadeweather::deweather(
   #   location_id = "delhi_ind.25_1_in",
@@ -294,7 +326,7 @@ document_anomaly <- function(){
   ggsave("doc/figures/deweathering_bar_yoy.png", width=10, height=6, scale=1.5)
   
   
-  # yoy_based_on_anomaly <-  deweathered_yoy %>%
+   # yoy_based_on_anomaly <-  deweathered_yoy %>%
   #   filter(source=="cpcb") %>%
   #  select(location_id, result) %>%
   #   tidyr::unnest(result) %>%

@@ -106,6 +106,9 @@ deweather <- function(
                  'wd', 'ws', 'precip', 'dewpoint_temp', 'pbl_min', 'pbl_max'),
   weather_sources = c('era5'), #also available: NOAA
   weather_update_era5 = T,
+  
+  # Time vars
+  time_vars = if(output=="trend") c("date_unix", "yday", "wday") else c(),
 
   # BIOMASS BURNING
   add_fire=F, #Whether to add it in the model, 
@@ -257,11 +260,13 @@ deweather <- function(
   data <- prep_data(
     data = data,
     weather_vars = weather_vars,
+    time_vars = time_vars,
     lag = lag
   )
 
   configs <- create_configs(
     weather_vars = weather_vars,
+    time_vars = time_vars,
     add_fire = add_fire,
     output = output,
     engine = engine,

@@ -1,5 +1,6 @@
 create_configs <- function(
   weather_vars,
+  time_vars,
   add_fire,
   output,
   engine,
@@ -25,26 +26,14 @@ create_configs <- function(
 
   configs <- list(
     list(
-      output = 'anomaly_yday',
-      time_vars = list('yday'),
-      training_end = training_end_anomaly,
-      training_start = training_start_anomaly
-    ),
-    list(
       output = 'anomaly',
-      time_vars = list(NULL),
+      time_vars = list(time_vars),
       training_end = training_end_anomaly,
       training_start = training_start_anomaly
     ),
     list(
       output = 'trend',
-      time_vars = list('date_unix'),
-      training_end = training_end_trend,
-      training_start = training_start_trend
-    ),
-    list(
-      output = 'trend_yday',
-      time_vars = list(c('date_unix', 'yday')),
+      time_vars = list(time_vars),
       training_end = training_end_trend,
       training_start = training_start_trend
     )

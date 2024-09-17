@@ -281,17 +281,18 @@ utils.download_file <- function(URL, fil, last_modified=NULL, overwrite=TRUE, .v
 }
 
 
-utils.add_timevars <- function(data, add = c("hour", "hour.local", "wday", "date_unix", 
-                          "week", "yday", "month"), local.tz = "UTC", lag = NULL) 
+utils.add_timevars <- function(data,
+                               add = c("hour", "hour.local", "wday", "date_unix", "week", "yday", "month"),
+                               local.tz = "UTC", lag = NULL) 
 {
   
   if (!"date" %in% names(data)) 
     stop("No date field supplied.")
+  
   if ("hour" %in% add) 
     data$hour <- as.numeric(format(data$date, "%H"))
   if ("hour.local" %in% add) 
-    data$hour.local <- as.numeric(format(as.POSIXct(format(data$date, 
-                                                             tz = local.tz)), "%H"))
+    data$hour.local <- as.numeric(format(as.POSIXct(format(data$date, tz = local.tz)), "%H"))
   if ("wday" %in% add) 
     data$wday <- as.factor(format(data$date, "%A"))
   if ("date_unix" %in% add) 

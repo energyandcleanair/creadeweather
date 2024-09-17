@@ -13,7 +13,7 @@
 #' @examples
 prep_data <- function(data,
                       weather_vars,
-                      time_vars=c('yday', 'date_unix'),
+                      time_vars,
                       lag=0){
   
   prep_meas_weather <- function(meas_weather){
