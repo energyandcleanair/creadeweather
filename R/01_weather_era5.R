@@ -225,8 +225,11 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
 
       # Wind direction and wind speed calculation
       # We do it hour by hour and then average wd and ws
-      u10_lyrs <- paste0("u10_", seq(1, 24))
-      v10_lyrs <- paste0("v10_", seq(1, 24))
+      layer_names <- terra::rast(file.path(era5.folder_era5(), fname)) %>% names()
+      
+      
+      u10_lyrs <- grep("u10_", layer_names, value=T) %>% sort()
+      v10_lyrs <- grep("v10_", layer_names, value=T) %>% sort()
   
       uvs <- terra::rast(file.path(era5.folder_era5(), fname), lyrs=c(u10_lyrs, v10_lyrs))
       
@@ -244,9 +247,10 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
 
       uvs2wdws <- function(uvs){
         
+        suffixes <- gsub("u10_", "", grep("u10_", names(uvs), value=T))
         # For each hour
-        wdwss <- pbapply::pblapply(seq(1, 24), function(i){
-          uv2wdws(uvs[[c(paste0("u10_", i), paste0("v10_", i))]])
+        wdwss <- pbapply::pblapply(suffixes, function(suffix){
+          uv2wdws(uvs[[c(paste0("u10_", suffix), paste0("v10_", suffix))]])
         })
         
         # Average per day
