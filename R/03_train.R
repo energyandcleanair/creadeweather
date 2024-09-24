@@ -13,12 +13,15 @@ train_configs <- function(data, configs){
   config_list <- lapply(split(configs, seq(nrow(configs))),
                         function(config){lapply(as.list(config), unlist)})
   
-  lapply(config_list,
-              function(x){
-                do.call(train_models,c(data=list(data), x)) %>%
-                  mutate(config=list(x))
-              }) %>%
-    do.call(bind_rows, .)
+  lapply(config_list, function(x){
+    result <- do.call(train_models,c(data=list(data), x))
+    if(is.na(result)){
+      return(NA)
+    }
+    result %>%
+      mutate(config=list(x))
+  }) %>%
+  do.call(bind_rows, .)
 } 
 
 
@@ -114,11 +117,8 @@ train_models <- function(data,
       1:ntrainings,
       function(i) {
         res <- train_model_safe(index, location_id, ...)
-        set.seed(runif(1))
+        set.seed(runif(1,1,1e6))
         return(res)}
-      # index=index,
-      # location_id=location_id,
-      # ...
     )
   }
 
@@ -141,6 +141,12 @@ train_models <- function(data,
                      USE.NAMES=F,
                      SIMPLIFY=FALSE,
                      ...)
+  
+  result <- result[!sapply(result, is.na)]
+  
+  if(length(result)==0){
+    return(NA)
+  }
   
   result <- bind_rows(unlist(result, recursive = FALSE) %>% na.omit)
     
