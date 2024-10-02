@@ -15,7 +15,7 @@ train_configs <- function(data, configs){
   
   lapply(config_list, function(x){
     result <- do.call(train_models,c(data=list(data), x))
-    if(is.na(result)){
+    if(all(is.na(result))){
       return(NA)
     }
     result %>%
@@ -148,7 +148,7 @@ train_models <- function(data,
     return(NA)
   }
   
-  result <- bind_rows(unlist(result, recursive = FALSE) %>% na.omit)
+  result <- bind_rows(unlist(result, recursive = FALSE))
     
   
   if(nrow(result)==0){
