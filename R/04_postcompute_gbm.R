@@ -160,7 +160,7 @@ postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_
 }
 
 
-postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
+postcompute_gbm_trends <- function(data, time_vars, models, do_unlink, with_normalisation = T) {
   
   dates <- data %>%
     distinct(date) %>%
@@ -194,9 +194,58 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
         trend_p975 = quantile(date_unix, 0.975, na.rm = T),
         trend_p025 = quantile(date_unix, 0.025, na.rm = T)
       )
+    
+    # ggplot(trend_trend) +
+    #   geom_line(aes(x = date, y = trend)) +
+    #   geom_ribbon(aes(x = date, ymin = trend_p025, ymax = trend_p975), alpha = 0.2) +
+    #   theme_minimal()
 
     dates <- dates %>% left_join(trend_trend)
   }
+  
+  
+  if ("date_unix" %in% time_vars && with_normalisation) {
+
+    nrows <- nrow(data)
+    nsamples <- 100
+    weather_vars <- setdiff(names(data), c(time_vars, "date", "set", "index"))
+    
+
+    # Perform normalisation using a similar logic as rmw_normalise
+    trend_trend_normalised <- pbmcapply::pbmclapply(seq_len(nsamples), function(i) {
+      
+      # Randomly sample weather variables
+      # Shuffle weather data
+      sampled_data <- data
+      idx_rows <- sample(1:nrows, replace = T)
+      sampled_data[, weather_vars] <- data[idx_rows, weather_vars]
+      
+      
+      # Predict based on the model
+      predictions <- purrr::map(models, function(model){
+        ntrees_opt <- model$n.trees.opt
+        sampled_data$predicted <- predict(model, sampled_data, n.trees = ntrees_opt)
+          return(sampled_data %>% select(date, predicted))
+        }) %>%
+        bind_rows()
+    },
+    mc.cores = parallel::detectCores()-1
+    ) %>%
+      bind_rows() %>%
+      group_by(date) %>%
+      summarise(
+        trend_normalised = mean(predicted, na.rm = TRUE),
+        trend_normalised_p975 = quantile(predicted, 0.975, na.rm = TRUE),
+        trend_normalised_p025 = quantile(predicted, 0.025, na.rm = TRUE)
+      )
+    
+    # ggplot(trend_trend_normalised) +
+    #   geom_line(aes(x = date, y = trend_normalised)) +
+    #   geom_ribbon(aes(x = date, ymin = trend_normalised_p025, ymax = trend_normalised_p975), alpha = 0.2) +
+    #   theme_minimal()
+  
+    dates <- dates %>% left_join(trend_trend_normalised)
+}
 
   # if("yday" %in% time_vars){
   #   trend_jday <- plot(model, "yday", continuous_resolution = 366, return_grid = T) %>%
