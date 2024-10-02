@@ -421,7 +421,7 @@ era5.download_nc <- function(force,
       if(lubridate::today() - as.Date(date) < 10){
         time_out <- 60
       } else {
-        time_out <- 300
+        time_out <- options::opt("era5_timeout_sec", 600)
       }  
     }
  
