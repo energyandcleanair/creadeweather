@@ -207,8 +207,9 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink, with_norm
   if ("date_unix" %in% time_vars && with_normalisation) {
 
     nrows <- nrow(data)
-    nsamples <- 100
-    weather_vars <- setdiff(names(data), c(time_vars, "date", "set", "index"))
+    nsamples <- 500
+    varnames <- models[[1]]$variables$var_names
+    resampled_vars <- setdiff(varnames, c("date_unix"))
     
 
     # Perform normalisation using a similar logic as rmw_normalise
@@ -218,7 +219,7 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink, with_norm
       # Shuffle weather data
       sampled_data <- data
       idx_rows <- sample(1:nrows, replace = T)
-      sampled_data[, weather_vars] <- data[idx_rows, weather_vars]
+      sampled_data[, resampled_vars] <- data[idx_rows, resampled_vars]
       
       
       # Predict based on the model
