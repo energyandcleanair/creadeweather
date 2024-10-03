@@ -418,8 +418,8 @@ era5.download_nc <- function(force,
     # Timeout: short if recent date, long otherwise
     # as it is likely to be unavailable
     if(is.null(time_out)){
-      if(lubridate::today() - as.Date(date) < 10){
-        time_out <- 60
+      if(lubridate::today() - as.Date(date) < 5){
+        time_out <- 300
       } else {
         time_out <- 900
       }  
