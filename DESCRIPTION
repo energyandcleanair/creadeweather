@@ -53,7 +53,8 @@ Imports:
     httr,
     terra,
     ncdf4,
-    ecmwfr,
+    caret,
+    ecmwfr (>= 2.0.2)
     options
 Depends:
     ggplot2,
