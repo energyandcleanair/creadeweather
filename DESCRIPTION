@@ -54,7 +54,7 @@ Imports:
     terra,
     ncdf4,
     caret,
-    ecmwfr,
+    ecmwfr (>= 2.0.2),
     options
 Depends:
     ggplot2,
