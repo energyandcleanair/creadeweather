@@ -73,6 +73,8 @@ deweather <- function(
   # PRESET CONFIG
   deweather_process_id=NULL,
   
+  override_params=NULL,
+  
   
   # DEWEATHERING GENERAL
   output=c("trend"), #c("trend", "anomaly")
@@ -155,6 +157,11 @@ deweather <- function(
     print(deweather_parameters)
 
     list2env(deweather_parameters, environment())
+  }
+  
+  # Override params (useful when you want to tweak preset)
+  if(!is.null(override_params)){
+    list2env(override_params, environment())
   }
 
   #----------------------
