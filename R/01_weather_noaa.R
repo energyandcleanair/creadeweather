@@ -60,37 +60,34 @@ noaa.add_close_stations <- function(location_dates, n_per_location) {
   suppressMessages(location_dates %>%
     rowwise() %>%
     mutate(noaa_station = list(
-      rnoaa::isd_stations_search(
+      worldmet::getMeta(
         lat = sf::st_coordinates(geometry)[, 2],
         lon = sf::st_coordinates(geometry)[, 1],
-        radius = 150
+        n=n_per_location,
+        plot=F
       ) %>% # radius is in km
-        dplyr::filter(end >= 20200101) %>%
-        dplyr::arrange(desc(end), distance) %>%
+        dplyr::filter(end >= "2020-01-01",
+                      dist < 100
+                      ) %>%
+        dplyr::arrange(desc(end), dist) %>%
         dplyr::slice(1:n_per_location)
-    )))
+    ))
+    )
 }
+
+
 
 noaa.available_years <- function(code) {
-  # Update cache file if from previous year (we give NOAA 10 days to update it)
-  n_days <- 10
-  f <- rnoaa::isd_cache$cache_path_get()
-  refresh <- !file.exists(f) |
-    (file.info(f)$ctime <
-      min(
-        lubridate::today(),
-        lubridate::floor_date(lubridate::today(), "year") + n_days
-      ))
-
-  d <- suppressMessages(rnoaa::isd_stations(refresh = refresh)) %>%
-    filter(paste0(usaf, "-", wban) == !!code) %>%
-    summarise(
-      begin = as.integer(min(begin / 10000)),
-      end = as.integer(max(end / 10000))
+  
+  d <- suppressMessages(worldmet::getMetaLive()) %>%
+    filter(paste0(USAF, "-", WBAN) == !!code) %>%
+    reframe(
+      years = seq(year(BEGIN), year(END))
     )
-
-  seq(d$begin, d$end)
+  
+  return(d$years)
 }
+
 
 noaa.valid_years_cached <- function(code, years, cache_folder) {
   files <- list.files(path = cache_folder, pattern = paste0(code, "_", years, ".rds", collapse = "|"), full.names = T)
@@ -234,7 +231,7 @@ noaa.add_weather <- function(
     dplyr::ungroup() %>%
     as.data.frame() %>%
     tidyr::unnest(cols = (noaa_station)) %>%
-    dplyr::distinct(location_id, usaf, wban, date_from, date_to)
+    dplyr::distinct(location_id, usaf, wban, dist, date_from, date_to)
 
   weather$code <- paste(weather$usaf, weather$wban, sep = "-")
   # print(paste("Codes:", paste(unique(stations_weather$code)), collapse=","))
@@ -283,20 +280,10 @@ noaa.add_weather <- function(
     filter(date >= unique(date_from)) %>%
     filter(date <= unique(date_to)) %>%
     group_by(location_id, date) %>%
-    summarize(
-      air_temp_min = min(air_temp_min, na.rm = T),
-      air_temp_max = max(air_temp_max, na.rm = T),
-      air_temp = mean(air_temp, na.rm = T),
-      atmos_pres = mean(atmos_pres, na.rm = T),
-      wd = mean(wd, na.rm = T),
-      ws_max = max(ws_max, na.rm = T),
-      ws = mean(ws, na.rm = T),
-      ceil_hgt = mean(ceil_hgt, na.rm = T),
-      visibility = mean(visibility, na.rm = T),
-      precip = mean(precip, na.rm = T),
-      RH = mean(RH, na.rm = T),
-      RH_min = min(RH, na.rm = T),
-      RH_max = max(RH, na.rm = T)
+    # weighted mean by 1/pmax(1,dist) 
+    summarize_at(
+      vars(air_temp_min, air_temp_max, air_temp, atmos_pres, wd, ws_max, ws, ceil_hgt, visibility, precip, RH),
+      ~ weighted.mean(.x, w=1/pmax(1,dist), na.rm = T)
     ) %>%
     noaa.rename_noaa_to_global_df() %>%
     select(c(
