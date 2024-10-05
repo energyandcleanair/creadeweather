@@ -23,7 +23,6 @@ Imports:
     lubridate,
     gbm3,
     rjson,
-    rnoaa,
     e1071,
     standardize,
     Metrics,
@@ -66,7 +65,6 @@ Remotes:
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
     cran/rjson@0.2.21,
-    ropensci/rnoaa,
     gbm-developers/gbm3
 Suggests: 
 VignetteBuilder:
