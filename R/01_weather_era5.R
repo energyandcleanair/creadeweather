@@ -192,8 +192,13 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
         "surface_pressure",
         "total_precipitation"
       )
-
-      fname <- paste0("era5_", date, ".nc")
+      
+      if(date > ymd('2024-11-05')){ # after 2024-11-05, the file extension is zip
+        fname <- paste0("era5_", date, ".zip")
+      } else {
+        fname <- paste0("era5_", date, ".nc")
+      }
+      
       fpath <- file.path(era5.folder_era5(), fname)
       
       # Downlad nc file if need be
@@ -373,10 +378,15 @@ era5.download_nc <- function(force,
 {
   
   do_download <- force | !file.exists(file_path)
-  
+
   if(!is.null(min_layers) & file.exists(file_path)){
-    n_layers <- suppressWarnings(raster::nlayers(raster::brick(file_path)))
-    if(n_layers < min_layers){
+    if(tools::file_ext(file_path) == 'zip'){
+      message(glue("Unzipping {file_path}"))
+      unzip(file_path, exdir = file.path(tempdir(), date))
+      file_paths <- list.files(file.path(tempdir(), date), full.names = T)
+    }
+    n_layers <- suppressWarnings(raster::nlayers(raster::brick(file_paths[[1]])))
+    if(n_layers < min_layers | length(file_paths) != 2){
       message(glue("Redownloading {file_path} as it seems incomplete"))
       do_download <- TRUE
     }
