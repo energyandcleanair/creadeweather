@@ -86,6 +86,7 @@ deweather <- function(
   training_start_anomaly="2015-01-01",
   training_end_anomaly="2019-12-31",
   ntrainings=1,
+  with_normalisation=F, # whether to include weather normalisation (only works if trend)
 
   training_excluded_dates = c(), # A list of dates that MUST not be used for training
   
@@ -298,7 +299,8 @@ deweather <- function(
     trajs_height = trajs_height,
     trajs_duration_hour = trajs_duration_hour,
     trajs_hours = trajs_hours,
-    ntrainings = ntrainings
+    ntrainings = ntrainings,
+    with_normalisation = with_normalisation
   )
 
   #---------------------------

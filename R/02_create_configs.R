@@ -21,6 +21,7 @@ create_configs <- function(
   detect_breaks=F,
   keep_model=T,
   ntrainings=1,
+  with_normalisation=F,
   ...){
   
 
@@ -58,7 +59,8 @@ create_configs <- function(
                   cv_folds,
                   keep_model,
                   training_excluded_dates=list(training_excluded_dates),
-                  ntrainings
+                  ntrainings,
+                  with_normalisation
                   )
   
   return(configs)

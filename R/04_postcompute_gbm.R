@@ -3,6 +3,7 @@ postcompute_gbm <- function(models, data, config, performances, ...) {
   time_vars <- config$time_vars
   add_fire <- config$add_fire
   formula_vars <- models[[1]]$var.names
+  with_normalisation <- config$with_normalisation
 
 
   if (config$link == "linear") {
@@ -60,8 +61,11 @@ postcompute_gbm <- function(models, data, config, performances, ...) {
   # Extract influence of time vars (e.g. trend)
   if (length(time_vars) > 0) {
     data <- postcompute_gbm_trends(
-      data = data, time_vars = time_vars, models = models,
-      do_unlink = do_unlink
+      data = data,
+      time_vars = time_vars,
+      models = models,
+      do_unlink = do_unlink,
+      with_normalisation = with_normalisation
     )
   }
 
@@ -160,7 +164,7 @@ postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_
 }
 
 
-postcompute_gbm_trends <- function(data, time_vars, models, do_unlink, with_normalisation = T) {
+postcompute_gbm_trends <- function(data, time_vars, models, do_unlink, with_normalisation = F) {
   
   dates <- data %>%
     distinct(date) %>%
