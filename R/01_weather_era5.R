@@ -199,16 +199,22 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
         fname <- paste0("era5_", date, ".nc")
       }
       
-      fpath <- file.path(era5.folder_era5(), fname)
+      path <- file.path(era5.folder_era5(), fname)
       
       # Downlad nc file if need be
-      era5.download_nc(force=force_redownload_nc,
+      file_ncs <- era5.download_nc(force=force_redownload_nc,
                        date=date,
                        era5_long_vars=era5_long_vars,
-                       file_path=fpath,
+                       folder=era5.folder_era5(),
                        min_layers=min_layers,
                        time_out=time_out)
       
+      
+      # file_ncs could be either one general nc or two ncs: instant and accum
+      # if two, then tp is in accum and others are in instant
+      
+      fpath_accum <- ifelse(length(file_ncs)==1, file_ncs, file_ncs[grep("accum", file_ncs)])
+      fpath_instant <- ifelse(length(file_ncs)==1, file_ncs, file_ncs[grep("instant", file_ncs)])
       layers_dict <- list()
 
       
@@ -220,23 +226,23 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
         raster::calc(brick, fun = fun, na.rm = T)
       }
 
-      layers_dict["dewpoint_temp"] <- calc_raster(fpath, "d2m", mean)
-      layers_dict["pbl"] <- calc_raster(fpath, "blh", mean)
-      layers_dict["pbl_min"] <- calc_raster(fpath, "blh", min)
-      layers_dict["pbl_max"] <- calc_raster(fpath, "blh", max)
-      layers_dict["temp"] <- calc_raster(fpath, "t2m", mean)
-      layers_dict["temp_max"] <- calc_raster(fpath, "t2m", max)
-      layers_dict["temp_min"] <- calc_raster(fpath, "t2m", min)
+      layers_dict["dewpoint_temp"] <- calc_raster(fpath_instant, "d2m", mean)
+      layers_dict["pbl"] <- calc_raster(fpath_instant, "blh", mean)
+      layers_dict["pbl_min"] <- calc_raster(fpath_instant, "blh", min)
+      layers_dict["pbl_max"] <- calc_raster(fpath_instant, "blh", max)
+      layers_dict["temp"] <- calc_raster(fpath_instant, "t2m", mean)
+      layers_dict["temp_max"] <- calc_raster(fpath_instant, "t2m", max)
+      layers_dict["temp_min"] <- calc_raster(fpath_instant, "t2m", min)
 
       # Wind direction and wind speed calculation
       # We do it hour by hour and then average wd and ws
-      layer_names <- terra::rast(file.path(era5.folder_era5(), fname)) %>% names()
+      layer_names <- terra::rast(fpath_instant) %>% names()
       
       
       u10_lyrs <- grep("u10_", layer_names, value=T) %>% sort()
       v10_lyrs <- grep("v10_", layer_names, value=T) %>% sort()
   
-      uvs <- terra::rast(file.path(era5.folder_era5(), fname), lyrs=c(u10_lyrs, v10_lyrs))
+      uvs <- terra::rast(fpath_instant, lyrs=c(u10_lyrs, v10_lyrs))
       
       uv2wdws <- function(uv) {
         degrees <- function(radians) 180 * radians / pi
@@ -296,22 +302,25 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
       # huss <- raster::calc(t2msp, humidity_fun)
       # layers_dict["humid"] <- huss
 
-      sp <- calc_raster(fpath, "sp", mean)
-      tp <- calc_raster(fpath, "tp", sum)
+      sp <- calc_raster(fpath_instant, "sp", mean)
+      tp <- calc_raster(fpath_accum, "tp", sum) 
       t2m <- layers_dict["temp"]
       t2msp <- raster::stack(c(t2m, sp))
 
       layers_dict["sp"] <- sp
       layers_dict["total_precip"] <- tp
 
-      output_path <- file.path(era5.folder_era5(), paste0(strsplit(fname, split = "[.]")[[1]][1], ".tiff"))
+      output_path <- file.path(era5.folder_era5(),
+                               paste0("era5_", date, ".tiff"))
 
       tif <- raster::stack(layers_dict)
       names(tif) <- names(layers_dict)
 
       terra_ras <- terra::rast(tif)
       t <- terra::writeRaster(terra_ras, output_path, overwrite = TRUE)
-      if(remove_nc) file.remove(file.path(era5.folder_era5(), fname))
+      if(remove_nc){
+        sapply(file_ncs, file.remove)
+      } 
     },
     error = function(error) {
       # QUICKFIX try print as well
@@ -369,27 +378,56 @@ era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::toda
   
 }
 
+
+#' Download nc file(s) from ECMWFR for a single date
+#' NOTE: it can return one or two nc files depending on the date
+#'  (they started splitting between instant and accum in November 2024)
+#'
+#' @param force 
+#' @param date 
+#' @param folder 
+#' @param era5_long_vars 
+#' @param min_layers 
+#' @param time_out 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 era5.download_nc <- function(force,
-                             date,
-                             file_path,
-                             era5_long_vars,
-                             min_layers=NULL,
-                             time_out=NULL)
+                              date,
+                              folder,
+                              era5_long_vars,
+                              min_layers=NULL,
+                              time_out=NULL
+                             )
 {
   
-  do_download <- force | !file.exists(file_path)
+  
+  # Files could take several format: one .nc or two (instant & accum) depending on the date
+  file_path_glob <- paste0("era5_", date, ".*\\.nc")
+  files_found <- list.files(folder, pattern = file_path_glob, full.names = T)
+  do_download <- force | (length(files_found)==0)
 
-  if(!is.null(min_layers) & file.exists(file_path)){
-    if(tools::file_ext(file_path) == 'zip'){
-      message(glue("Unzipping {file_path}"))
-      unzip(file_path, exdir = file.path(tempdir(), date))
-      file_paths <- list.files(file.path(tempdir(), date), full.names = T)
+  
+  # Check if existing files are complete or proper nc files (some may actually be zip)
+  if(!is.null(min_layers) & length(files_found) >0){
+    for(f in files_found){
+      tryCatch({
+        n_layers <- suppressWarnings(raster::nlayers(raster::brick(f)))
+        if(n_layers < min_layers){
+          message(glue("Redownloading {f} as it seems incomplete"))
+          do_download <- do_download | TRUE
+        }    
+      }, error=function(e){
+        message(glue("Redownloading {f} as it seems corrupted"))
+        do_download <<-TRUE
+      })
     }
-    n_layers <- suppressWarnings(raster::nlayers(raster::brick(file_paths[[1]])))
-    if(n_layers < min_layers | length(file_paths) != 2){
-      message(glue("Redownloading {file_path} as it seems incomplete"))
-      do_download <- TRUE
-    }
+  }
+  
+  if(!do_download){
+    return(files_found)
   }
   
   if(do_download){
@@ -411,7 +449,7 @@ era5.download_nc <- function(force,
       ),
       # area is specified as N, W, S, E
       area = c(90, -180, -90, 180),
-      target = basename(file_path)
+      target = paste0("era5_", date)
     )
     
     if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
@@ -435,13 +473,60 @@ era5.download_nc <- function(force,
       }  
     }
  
-    ecmwfr::wf_request(
+    file_path <- ecmwfr::wf_request(
       user = utils.get_env("CDS_UID"),
       request = request,
       transfer = TRUE,
-      path = dirname(file_path),
+      path = folder,
       time_out = time_out,
       verbose = TRUE
     )
+    
+    # Check if it is a zip
+    is_zip <- tryCatch({
+      unzip(file_path, list=T)
+      T
+    }, error=function(e){
+      return(FALSE)
+    })
+    
+    is_nc <- tryCatch({
+      ncdf4::nc_open(file_path)
+      T
+    }, error=function(e){
+      return(FALSE)
+    })
+    
+    if(!xor(is_nc, is_zip)){
+      stop("ERA5 file is neither zip or nc.")
+    }
+    
+    if(is_nc){
+      # Append .nc
+      file_path_new <- paste0(file_path, ".nc")
+      file.rename(
+        file_path,
+        file_path_new
+      )
+      return(file_path_new)
+    }
+    
+    if(is_zip){
+      # Unzip
+      file_names <- unzip(file_path, list=T)$Name
+      to_new <- function(x) gsub("data_stream-oper_stepType", paste0("era5_", date), x)
+      file_names_new <- sapply(file_names, to_new, USE.NAMES = F)
+      file_paths_new <- file.path(folder, file_names_new)
+      # file_names_new <- 
+      unzip(file_path, exdir=folder)
+      file.remove(file_path)
+      sapply(file_names, function(f){
+        file.rename(
+          file.path(folder, f),
+          file.path(folder, to_new(f))
+        )
+      })
+      return(file_paths_new)
+    }
   }
 }
