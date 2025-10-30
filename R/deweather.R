@@ -63,7 +63,7 @@ deweather <- function(
   
   # DEWEATHERING GENERAL
   output=c("trend"), #c("trend", "anomaly")
-  upload_results=T,
+  upload_results=F,
   years_force_refresh=NULL,
   keep_model=T,
   training_start_trend="2015-01-01",

@@ -5,7 +5,7 @@ Version: 0.2.0
 Author: Hubert Thieriot
 Maintainer: Hubert Thieriot <hubert@energyandcleanair.com>
 Description: A set of functions to collect and analyse air pollution and weather measurements and determine the weather-corrected values of pollutant concentrations
-License: TBC
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports:
@@ -53,8 +53,7 @@ Imports:
     terra,
     ncdf4,
     caret,
-    ecmwfr
-Depends:
+    ecmwfr,
     ggplot2,
     worldmet
 Remotes:
@@ -65,4 +64,5 @@ Remotes:
     energyandcleanair/creatrajs
 Suggests: 
 VignetteBuilder:
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
