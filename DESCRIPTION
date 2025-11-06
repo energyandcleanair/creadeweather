@@ -67,7 +67,8 @@ Remotes:
     cran/rjson@0.2.21,
     gbm-developers/gbm3
 Suggests: 
-	devtools
+	devtools,
+	testthat
 VignetteBuilder:
 RoxygenNote: 7.2.3
 Roxygen: list(markdown = TRUE)
