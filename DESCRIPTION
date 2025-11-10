@@ -53,8 +53,10 @@ Imports:
     terra,
     ncdf4,
     caret,
-    ecmwfr (>= 2.0.2)
-    options
+    ecmwfr (>= 2.0.2),
+    options,
+	  tidyverse,
+	  remotes
 Depends:
     ggplot2,
     worldmet
