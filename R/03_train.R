@@ -59,10 +59,7 @@ train_models <- function(data,
     return(NA)
   }
   
-  # Check input
-  if(!engine %in% c('gbm', 'svr', 'rmweather', 'deweather', 'caret')){
-    stop("'engine' should be either 'gbm', 'svr', 'rmweather', 'deweather', or 'caret")
-  }
+  engine <- match.arg(engine, c('gbm'))
   
   if(!is.null(lag) & lag>0){
     day_lags <- c(1:lag)
@@ -95,9 +92,8 @@ train_models <- function(data,
   
   # Train models
   train_model <- switch(engine,
-         "svr"=train_svr,               
          "gbm"=train_gbm,
-         "caret"=train_caret,
+         "svr"=train_svr,
          "rmweather"=train_rmweather,
          "deweather"=train_deweather
   )
