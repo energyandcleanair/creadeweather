@@ -54,7 +54,9 @@ Imports:
     ncdf4,
     caret,
     ecmwfr (>= 2.0.2),
-    options
+    options,
+	tidyverse,
+	remotes
 Depends:
     ggplot2,
     worldmet
