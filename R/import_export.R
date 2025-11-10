@@ -25,3 +25,9 @@ NULL
 #' @import ggplot2
 #' @importFrom worldmet importNOAA
 NULL
+
+#' @importFrom dplyr ungroup group_by rowwise mutate
+NULL
+
+#' @importFrom lubridate date
+NULL
