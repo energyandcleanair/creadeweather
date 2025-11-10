@@ -23,7 +23,6 @@ export(utils.attach_city_by_name)
 export(utils.get_cache_folder)
 export(utils.get_output_folder)
 import(ggplot2)
-
 importFrom(dplyr,group_by)
 importFrom(dplyr,mutate)
 importFrom(dplyr,rowwise)
