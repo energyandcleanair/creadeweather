@@ -1,4 +1,4 @@
-# This is a rather high-level series of tests that validate that 
+# This is a high-level series of tests that validate that 
 # our training + postcompute can capture meaningful signals from synthetic data.
 # 
 # We test the following scenarios:
