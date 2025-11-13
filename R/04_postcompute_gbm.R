@@ -1,4 +1,4 @@
-postcompute_gbm <- function(model, data, config, ...){
+ postcompute_gbm <- function(model, data, config, ...){
   
   weather_vars <- config$weather_vars
   time_vars <- config$time_vars
@@ -11,6 +11,8 @@ postcompute_gbm <- function(model, data, config, ...){
   }else if(config$link=="log"){
     do_link <- function(x){log(x)}
     do_unlink <- function(x){exp(x)}
+  }else{
+    stop("Link not supported")
   }
   
   # Predict results ---------------------------------------------------------
@@ -90,28 +92,45 @@ postcompute_gbm_lighten_model <- function(model, data){
   return(model_light)
 }
 
-postcompute_gbm_fire <- function(data, model, formula_vars, do_unlink, weather_vars){
+
+
+postcompute_gbm_fire <- function(data, model, do_unlink, weather_vars){
   
   formula_vars <- model$var.names
-  fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
-  fire_vars <- fire_vars[!grepl("_lag[[:digit:]]*$", fire_vars)]
   
-  for(fire_var in fire_vars){
+  # Extract fire variables grouped by region/suffix
+  fire_groups <- fire.extract_vars_by_region(formula_vars)
+  
+  # For each region/suffix, create a no-fire counterfactual
+  for(i in seq_len(nrow(fire_groups))){
+    suffix <- fire_groups$suffix[i]
+    fire_vars_group <- fire_groups$vars[[i]]
+    
     data_nofire <- data
-    data_nofire[, fire_var] <- 0
-    # For lag
-    data_nofire[, grepl(paste0(fire_var,"_lag[[:digit:]]*$"), names(data_nofire))] <- 0
-    predicted_name <- paste0("predicted_nofire", gsub("fire_frp","",fire_var))
-    data[, predicted_name] <- do_unlink(predict(model,
-                                                data_nofire))
+    # Set all fire variables in this group to 0 (including lags)
+    data_nofire[, fire_vars_group] <- 0
+    
+    # Create predicted name: predicted_nofire + suffix
+    # For empty suffix, just use "predicted_nofire"
+    predicted_name <- if(suffix == ""){
+      "predicted_nofire"
+    } else {
+      paste0("predicted_nofire", suffix)
+    }
+    
+    data[, predicted_name] <- do_unlink(predict(model, data_nofire))
   }
   
-  # Do a general no fire
-  fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
-  data_nofire <- data
-  data_nofire[, fire_vars] <- 0
-  predicted_name <-"predicted_nofire"
-  data[, predicted_name] <- do_unlink(predict(model, data_nofire))
+  # Do a general no fire (all fire variables set to 0)
+  # It will override the previous empty suffix if any
+  # but that is expected
+  all_fire_vars <- unlist(fire_groups$vars, use.names = FALSE)
+  if(length(all_fire_vars) > 0){
+    data_nofire <- data
+    data_nofire[, all_fire_vars] <- 0
+    data[, "predicted_nofire"] <- do_unlink(predict(model, data_nofire))
+  }
+  
   return(data)
 }
 

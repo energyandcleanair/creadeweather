@@ -116,6 +116,7 @@ test_that("anomaly scenario highlights the injected spike", {
 
 
 test_that("fire scenario reproduces the expected average uplift", {
+  
   inputs <- synthetic_train_inputs(
     include_trend = FALSE,
     include_anomaly = FALSE,
@@ -128,6 +129,7 @@ test_that("fire scenario reproduces the expected average uplift", {
     data = inputs$data,
     configs = inputs$configs
   )
+  
   post_results <- creadeweather::postcompute(results)
 
   expect_s3_class(results, "tbl_df")

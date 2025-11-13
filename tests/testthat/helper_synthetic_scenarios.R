@@ -14,7 +14,7 @@ synthetic_train_inputs <- function(
   # FIRE PARAMETERS
   include_fire = FALSE,
   fire_start_day = training_days + 1,
-  fire_length = 10,
+  fire_length = training_days * 0.1,
   fire_random = FALSE,
   fire_prediction_frac = 0.4,
   fire_magnitude = 5,
