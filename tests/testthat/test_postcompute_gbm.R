@@ -49,7 +49,6 @@ test_that("postcompute_gbm_lighten_model returns compact summary with metrics", 
 })
 
 
-
 test_that("postcompute_gbm_fire creates counterfactual predictions", {
   
   fixture <- build_gbm_fixture(

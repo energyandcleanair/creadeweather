@@ -1,9 +1,8 @@
-# Simple unit tests for train_gbm  and wrapper using synthetic scenarios.
+# Unit tests for train_gbm helpers and wrapper using synthetic scenarios.
 
 library(testthat)
 library(dplyr)
 library(lubridate)
-
 
 testthat::source_test_helpers("tests/testthat", env = globalenv())
 
@@ -46,7 +45,6 @@ test_that("train_gbm_prepare_data partitions and filters correctly", {
   expect_true(is.function(prep$do_link))
   expect_true(is.function(prep$do_unlink))
 })
-
 
 test_that("train_gbm_prepare_data respects training_excluded_dates", {
   inputs <- trend_inputs_for_gbm()

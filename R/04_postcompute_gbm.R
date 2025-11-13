@@ -6,7 +6,6 @@ postcompute_gbm <- function(models, data, config, performances, ...) {
   add_fire <- config$add_fire
   formula_vars <- models[[1]]$var.names
   
-  
   if(config$link=="linear"){
     do_link <- function(x){x}
     do_unlink <- function(x){x}
@@ -128,15 +127,13 @@ postcompute_gbm_lighten_model <- function(models, data) {
   )
 }
 
-<<<<<<< HEAD
-postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars){
+postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars) {
   
+
+
   formula_vars <- models[1]$var.names
-  
-  # Extract fire variables grouped by region/suffix
   fire_groups <- fire.extract_vars_by_region(formula_vars)
-  
-  # For each region/suffix, create a no-fire counterfactual
+
   for(i in seq_len(nrow(fire_groups))){
     suffix <- fire_groups$suffix[i]
     fire_vars_group <- fire_groups$vars[[i]]
@@ -154,9 +151,20 @@ postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars){
     }
     
     data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
+    rowMeans(na.rm = T)
+  }
+
+  # Do a general no fire (all fire variables set to 0)
+  # It will override the previous empty suffix if any
+  # CHECK: Might be redundant with the previous loop
+  all_fire_vars <- unlist(fire_groups$vars, use.names = FALSE)
+  if(length(all_fire_vars) > 0){
+    data_nofire <- data
+    data_nofire[, all_fire_vars] <- 0
+    data[, "predicted_nofire"] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
       rowMeans(na.rm = T)
   }
-  
+
   # Do a general no fire (all fire variables set to 0)
   # It will override the previous empty suffix if any
   # but that is expected
@@ -260,6 +268,7 @@ postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
     data %>%
       full_join(trend_vars)
   )
+
 }
 
 
