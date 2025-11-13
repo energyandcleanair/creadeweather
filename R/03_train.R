@@ -92,10 +92,7 @@ train_models <- function(data,
   
   # Train models
   train_model <- switch(engine,
-         "gbm"=train_gbm,
-         "svr"=train_svr,
-         "rmweather"=train_rmweather,
-         "deweather"=train_deweather
+         "gbm"=train_gbm
   )
 
   train_model_safe <- function(index, location_id, ...){
@@ -105,19 +102,11 @@ train_models <- function(data,
       res$index <- index
       return(res)
     }, error=function(err){
-      #warming(paste("Failed to train model:",err))
-      print(paste("Failed to train model:",err))
-      NA
+      warning(paste("Failed to train model:",err))
+      return(NA)
     })
   }
-  
-  # train_model_unsafe <- function(index, location_id, ...){
-  #   print(paste("Training model on location", location_id))
-  #   res <- train_model(...)
-  #   res$index <- index
-  #   return(res)
-  # }
-  
+
   data$index <- zoo::index(data)
   
   result <- pbapply::pbmapply(train_model_safe,
@@ -144,8 +133,9 @@ train_models <- function(data,
   
   # Re-add infos
   result <- result %>%
-    dplyr::left_join(data %>% dplyr::select(-c(meas_weather)),
-                                        by="index") %>%
+    dplyr::left_join(
+      data %>% dplyr::select(-c(meas_weather)),
+      by="index") %>%
     dplyr::select(-c(index))
   
   return(result)
