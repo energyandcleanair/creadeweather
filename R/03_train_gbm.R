@@ -51,7 +51,6 @@ train_gbm <- function(data,
                       ...){
 
 
-
   prepared <- train_gbm_prepare_data(
     data = data,
     training_end = training_end,
@@ -62,14 +61,14 @@ train_gbm <- function(data,
     training_excluded_dates = training_excluded_dates
   )
 
-
   train_gbm_fit_model(
     data_prepared = prepared$data,
     formula = prepared$formula,
     trees = trees,
     interaction.depth = interaction.depth,
     learning.rate = learning.rate,
-    cv_folds = cv_folds
+    cv_folds = cv_folds,
+    parallel = parallel
   )
 }
 
@@ -82,9 +81,8 @@ train_gbm_prepare_data <- function(data,
                                    time_vars,
                                    link = "linear",
                                    training.fraction = 0.9,
-                                   shuffle_seed = 42,
-                                   training_excluded_dates = c()
-                                   ) {
+                                   training_excluded_dates = c(),
+                                   shuffle_seed = 42) {
   if (is.null(training_end)) {
     training_end <- "2099-01-01"
   }
@@ -106,16 +104,19 @@ train_gbm_prepare_data <- function(data,
   }
 
   if ("geometry" %in% names(data)) {
-    data <- data[, setdiff(names(data), "geometry"), drop = FALSE]
+    data <- data %>% dplyr::select(-c(geometry))
   }
 
-  data_prepared <- data
-  data_prepared$date <- as.POSIXct(data_prepared$date)
+  # Prepare data ------------------------------------------------------------
+  data_prepared <- data %>%
+    mutate(date = as.POSIXct(date))
 
+  # Reshuffle as it seems GBM doesn't do it
+  # Very important
   if (training.fraction < 1) {
     set.seed(shuffle_seed)
     rows <- sample(nrow(data_prepared))
-    data_prepared <- data_prepared[rows, , drop = FALSE]
+    data_prepared <- data_prepared[rows, ]
   }
 
   # We separate into:
@@ -188,6 +189,7 @@ train_gbm_prepare_data <- function(data,
   )
 }
 
+
 #' @keywords internal
 train_gbm_fit_model <- function(data_prepared,
                                 formula,
@@ -224,27 +226,28 @@ train_gbm_fit_model <- function(data_prepared,
   }
 
   model <- model_gbm(training_data, formula)
+  
   # Optimal number of trees
   # Two options: OOB or CV
   # Apparently, CV is better on large datasets: https://towardsdatascience.com/understanding-gradient-boosting-machines-9be756fe76ab
-  if(cv_folds > 1){
-    n.trees.opt <- gbm3::gbm.perf(model, method="cv", plot.it = F)
+  if (cv_folds > 1) {
+    n.trees.opt <- gbm3::gbm.perf(model, method = "cv", plot.it = F)
     print(sprintf("Using %d trees (based on CV results)", n.trees.opt))
     model$n.trees.opt <- n.trees.opt
-  }else{
-    n.trees.opt <- gbm3::gbm.perf(model, method="OOB", plot.it = F)
+  } else {
+    n.trees.opt <- gbm3::gbm.perf(model, method = "OOB", plot.it = F)
     print(sprintf("Using %d trees (based on OOB results)", n.trees.opt))
     model$n.trees.opt <- n.trees.opt
   }
 
   # Add predicted values
   data_prepared$predicted <- predict(model, data_prepared, n.trees = n.trees.opt)
-  
+
   return(
     tibble(
-      model=list(model),
-      data=list(data_prepared),
-      performance=list(get_model_performance(model, data_prepared))
+      model = list(model),
+      data = list(data_prepared),
+      performance = list(get_model_performance(model, data_prepared))
     )
   )
 }
