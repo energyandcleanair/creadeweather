@@ -1,16 +1,12 @@
-# Unit tests for train_gbm helpers and wrapper using synthetic scenarios.
+# Simple unit tests for train_gbm  and wrapper using synthetic scenarios.
 
 library(testthat)
 library(dplyr)
 library(lubridate)
 
-if (!("creadeweather" %in% loadedNamespaces())) {
-  devtools::load_all(".")
-}
 
 testthat::source_test_helpers("tests/testthat", env = globalenv())
 
-suppressPackageStartupMessages(library(gbm))
 
 trend_inputs_for_gbm <- function() {
   synthetic_train_inputs(

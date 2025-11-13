@@ -11,11 +11,9 @@ library(dplyr)
 library(purrr)
 library(lubridate)
 
-if (!("creadeweather" %in% loadedNamespaces())) {
-  devtools::load_all(".")
-}
 
 testthat::source_test_helpers("tests/testthat", env = globalenv())
+
 
 test_that("trend scenario captures the synthetic long-term decline", {
   

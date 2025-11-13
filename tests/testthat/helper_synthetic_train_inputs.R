@@ -1,4 +1,4 @@
-# Helper providing synthetic_train_inputs() for integration tests
+# Helper providing synthetic_train_inputs() for training-related tests
 synthetic_train_inputs <- function(
   seed = 123,
   training_days = 335,
@@ -199,5 +199,74 @@ synthetic_train_inputs <- function(
     data = prepared_data,
     configs = configs,
     expectations = expectations
+  )
+}
+
+
+#' Generate fixture data that includes:
+#' - synthetic training and prediction data
+#' - trained GBM model
+#'
+build_gbm_fixture <- function(output,
+                              include_trend = TRUE,
+                              include_anomaly = TRUE,
+                              include_fire = FALSE,
+                              link_override = NULL,
+                              time_vars_override = NULL,
+                              training_days = 365,
+                              prediction_days = 30,
+                              trees = 80) {
+  
+  inputs <- synthetic_train_inputs( # nolint
+    training_days = training_days,
+    prediction_days = prediction_days,
+    include_trend = include_trend,
+    include_anomaly = include_anomaly,
+    include_fire = include_fire
+  )
+
+  config_row <- inputs$configs %>%
+    dplyr::filter(.data$output == output)
+
+  if (nrow(config_row) != 1) {
+    stop("Could not isolate a single configuration for output: ", output)
+  }
+
+  if (!is.null(link_override)) {
+    config_row$link[[1]] <- link_override
+  }
+
+  if (!is.null(time_vars_override)) {
+    config_row$time_vars[[1]] <- time_vars_override
+  }
+
+  prepared <- creadeweather:::train_gbm_prepare_data(
+    data = inputs$data$meas_weather[[1]],
+    training_end = config_row$training_end[[1]],
+    weather_vars = config_row$weather_vars[[1]],
+    time_vars = config_row$time_vars[[1]],
+    link = config_row$link[[1]],
+    training.fraction = config_row$training.fraction[[1]]
+  )
+
+  fit <- creadeweather:::train_gbm_fit_model(
+    data_prepared = prepared$data,
+    formula = prepared$formula,
+    trees = trees,
+    interaction.depth = config_row$interaction.depth[[1]],
+    learning.rate = config_row$learning.rate[[1]],
+    cv_folds = config_row$cv_folds[[1]]
+  )
+
+  model <- fit$model[[1]]
+  data <- fit$data[[1]]
+  do_unlink <- prepared$do_unlink
+
+  list(
+    model = model,
+    data = data,
+    config = purrr::transpose(config_row)[[1]],
+    do_unlink = do_unlink,
+    inputs = inputs
   )
 }
