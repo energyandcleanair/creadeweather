@@ -40,6 +40,8 @@ postcompute_one <- function(model, data, config, location_id, poll, unit, source
              unit=unit,
              source=source,
              process_id=process_id)
+  }else{
+    stop("Engine not supported")
   }
   return(result)
 }
