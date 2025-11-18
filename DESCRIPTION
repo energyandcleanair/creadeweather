@@ -56,7 +56,9 @@ Imports:
     ecmwfr (>= 2.0.2),
     options,
 	tidyverse,
-	remotes
+	remotes,
+	rcrea,
+	facetscales
 Depends:
     ggplot2,
     worldmet
