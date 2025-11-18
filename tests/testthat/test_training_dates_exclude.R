@@ -6,7 +6,6 @@ test_that("attaching fire", {
     # Testthat changes working directory
     # -> the embedded load_dot_env doesn't find env file
     library(tidyverse)
-    library(facetscales)
     library(ggrepel)
 
     # create temp file for weather to speedup process
