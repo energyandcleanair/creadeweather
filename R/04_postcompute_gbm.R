@@ -135,7 +135,7 @@ postcompute_gbm_lighten_model <- function(models, data) {
 
 postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_vars) {
   
-  formula_vars <- models[1]$var.names
+  formula_vars <- models[[1]]$variables$var_names
   fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
   fire_vars <- fire_vars[!grepl("_lag[[:digit:]]*$", fire_vars)]
 
