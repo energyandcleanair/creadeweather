@@ -57,8 +57,7 @@ Imports:
     options,
 	tidyverse,
 	remotes,
-	rcrea,
-	facetscales
+	rcrea
 Depends:
     ggplot2,
     worldmet
