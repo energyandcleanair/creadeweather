@@ -15,10 +15,7 @@ export(extract_yoy_changes_from_result)
 export(fire.add_existing_weather)
 export(fire.add_fire)
 export(fire.get_loc_dates_to_update)
-<<<<<<< HEAD
-=======
 export(get_excluded_yoy_dates)
->>>>>>> 4f632bf (-first rebase done and tests working)
 export(get_measurements)
 export(noaa.rename_noaa_to_global)
 export(postcompute)
@@ -44,29 +41,9 @@ importFrom(glue,glue)
 importFrom(lubridate,date)
 importFrom(lubridate,ymd)
 importFrom(magrittr,"%>%")
-<<<<<<< HEAD
-importFrom(pbapply, "pbmapply")
-
-importFrom(sf,st_as_sf)
-importFrom(sf,st_as_sfc)
-importFrom(sf,st_buffer)
-importFrom(sf,st_centroid)
-importFrom(sf,st_coordinates)
-importFrom(sf,st_union)
-
-importFrom(tibble,tibble)
-importFrom(tidyr,nest)
-importFrom(tidyr,unnest)
-
-importFrom(raster, brick)
-importFrom(rlang, "%||%")
-
-importFrom(terra, rast)
-=======
 importFrom(tidyr,complete)
 importFrom(tidyr,gather)
 importFrom(tidyr,nest)
 importFrom(tidyr,spread)
 importFrom(tidyr,unnest)
 importFrom(worldmet,importNOAA)
->>>>>>> 4f632bf (-first rebase done and tests working)

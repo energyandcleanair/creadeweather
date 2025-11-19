@@ -196,7 +196,9 @@ train_gbm_fit_model <- function(data_prepared,
                                 trees,
                                 interaction.depth = 1,
                                 learning.rate = 0.1,
-                                cv_folds = 3) {
+                                cv_folds = 3,
+                                parallel = TRUE
+                                ) {
   if (!"set" %in% names(data_prepared)) {
     stop("Prepared data must include a 'set' column")
   }
@@ -208,20 +210,22 @@ train_gbm_fit_model <- function(data_prepared,
     stop("Missing training data")
   }
 
+  n_cores <- ifelse(parallel, as.integer(future::availableCores()-1), 1)
+  
   model_gbm <- function(training_data, formula) {
     message("Training gbm")
-    gbm::gbm(
+    gbm.fit <- gbm3::gbm(
       formula = formula,
       data = training_data,
-      distribution = "gaussian",
+      distribution='gaussian',
       cv.folds = cv_folds,
-      shrinkage = learning.rate,
-      interaction.depth = interaction.depth,
-      train.fraction = 1,
-      n.cores = 1,
-      n.trees = trees,
+      shrinkage=learning.rate,
+      interaction.depth=interaction.depth,
+      train.fraction = 1, # We keep testing set separately
+      par.details = gbm3::gbmParallel(num_threads=n_cores),
+      n.trees = trees, #This is actually the max number of trees. Will adjust after
       verbose = FALSE,
-      keep.data = FALSE
+      keep.data = F
     )
   }
 
