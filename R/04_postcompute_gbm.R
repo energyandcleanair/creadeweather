@@ -68,12 +68,14 @@ postcompute_gbm <- function(models, data, config, performances, ...) {
     cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
   }
 
+  
   result <- data %>%
     ungroup() %>%
     dplyr::select_at(intersect(cols, names(data))) %>%
     mutate(date = date(date)) %>%
     arrange(date) %>%
-    tidyr::gather("variable", "value", -c(date))
+    tidyr::gather("variable", "value", -c(date)) %>%
+    suppressWarnings() # To prevent warning when some variables are missing certain dates
 
   # Build a lite version of the model for saving purposes
   models_light <- postcompute_gbm_lighten_model(models = models, data = data)
@@ -127,11 +129,13 @@ postcompute_gbm_lighten_model <- function(models, data) {
   )
 }
 
+
 postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars) {
   
-
-
-  formula_vars <- models[1]$var.names
+  # Get variable names from model
+  formula_vars <- models[[1]]$variables$var_names
+  stopifnot("Could not extract variable names from model"=!is.null(formula_vars))
+  
   fire_groups <- fire.extract_vars_by_region(formula_vars)
 
   for(i in seq_len(nrow(fire_groups))){
@@ -163,6 +167,10 @@ postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars) {
     data_nofire[, all_fire_vars] <- 0
     data[, "predicted_nofire"] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
       rowMeans(na.rm = T)
+  } else if(nrow(fire_groups) == 0 && !("predicted_nofire" %in% names(data))){
+    # If no fire variables found but add_fire is TRUE, predicted_nofire should equal predicted
+    # (no fire effect to remove)
+    data[, "predicted_nofire"] <- data$predicted
   }
 
   # Do a general no fire (all fire variables set to 0)

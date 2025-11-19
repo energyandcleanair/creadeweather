@@ -1,12 +1,14 @@
 library(testthat)
 
-
+skip("Skipping deweather yoy as it requires ERA5 download")
 
 test_that("deweather yoy one month", {
     # Testthat changes working directory
     # -> the embedded load_dot_env doesn't find env file
     
-
+    readRenviron(".Renviron")
+    readRenviron("../../.Renviron")
+    
     months <- "2024-07-01"
     # weather_file <- tempfile(fileext = ".rds")
     weather_file <- "tmp/weather_yoy.RDS"

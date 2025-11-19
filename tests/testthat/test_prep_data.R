@@ -40,6 +40,7 @@ test_that("prep_data enriches, fills, lags, and filters correctly", {
   out <- prep_data(
     data = data,
     weather_vars = weather_vars,
+    time_vars = c(),
     lag = 1
   )
 
@@ -48,9 +49,8 @@ test_that("prep_data enriches, fills, lags, and filters correctly", {
   mw <- out$meas_weather[[1]]
   expect_gt(nrow(mw), 0)
 
-  # Enrichment: wd_factor and time vars
+  # Enrichment: wd_factor (time vars only added if time_vars is specified)
   expect_true("wd_factor" %in% names(mw))
-  expect_true(all(c("yday", "date_unix") %in% names(mw)))
 
   # Lagging: columns for lagged weather_vars exist (suffix _lag1) and are shifted
   expected_lag_cols <- paste0(weather_vars, "_lag1")

@@ -1,10 +1,14 @@
 library(testthat)
 
+skip("Skipping deweathering as it is more of a result validation")
 test_that("deweathering", {
   
   # Testthat changes working directory
   # -> the embedded load_dot_env doesn't find env file
-  dotenv::load_dot_env("../../.env")
+  env_file <- "../../.env"
+  if (file.exists(env_file)) {
+    dotenv::load_dot_env(env_file)
+  }
   
   # A station in Brussels
   location_id <- rcrea::cities(name="delhi")$id

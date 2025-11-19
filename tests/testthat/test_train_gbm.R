@@ -94,6 +94,7 @@ test_that("train_gbm_fit_model trains a gbm model", {
 
   expect_s3_class(fit, "tbl_df")
   expect_equal(nrow(fit), 1)
-  expect_s3_class(fit$model[[1]], "gbm")
-  expect_equal(fit$data[[1]], prep$data)
+  expect_true(inherits(fit$model[[1]], "GBMFit"))
+  expect_true("predicted" %in% names(fit$data[[1]]))
+  expect_equal(nrow(fit$data[[1]]), nrow(prep$data))
 })

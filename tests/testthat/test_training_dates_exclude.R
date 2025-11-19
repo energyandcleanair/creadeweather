@@ -1,12 +1,17 @@
 library(testthat)
 
+# Skip if ERA5 data is not available (integration test requires external resources)
+skip_if_not(dir.exists(Sys.getenv("DIR_ERA5", "")), 
+            message = "Skipping test: DIR_ERA5 environment variable not set or directory doesn't exist")
 
 
 test_that("attaching fire", {
     # Testthat changes working directory
     # -> the embedded load_dot_env doesn't find env file
     library(tidyverse)
-    library(facetscales)
+    if (requireNamespace("facetscales", quietly = TRUE)) {
+      library(facetscales)
+    }
     library(ggrepel)
 
     # create temp file for weather to speedup process
@@ -18,6 +23,10 @@ test_that("attaching fire", {
     dates <- as.Date(seq(as.Date(date_from), as.Date(date_to), by = "day"))
     location_id <- rcrea::cities(name = "Delhi")$id
     meas <- rcrea::measurements(location_id = location_id, date_from = date_from, date_to = date_to, poll = "pm25", with_geometry = T)
+    
+    # Skip if measurements are not available
+    skip_if(is.null(meas) || nrow(meas) == 0, 
+            message = "Skipping test: No measurements available")
     
     deweathered1 <- creadeweather::deweather(
         location_id = location_id,

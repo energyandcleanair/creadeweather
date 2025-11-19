@@ -30,10 +30,8 @@ prep_data <- function(data,
       })
   }
   
-  data <- data %>%
-    dplyr::rowwise() %>%
-    mutate(meas_weather=list(prep_meas_weather(meas_weather))) %>%
-    ungroup()
+  # Process each meas_weather using lapply to avoid quosure issues
+  data$meas_weather <- lapply(data$meas_weather, prep_meas_weather)
   
   # Remove empty configurations
   data <- data[unlist(sapply(data$meas_weather, length)) > 0, ]
