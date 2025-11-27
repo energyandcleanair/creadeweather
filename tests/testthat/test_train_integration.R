@@ -7,6 +7,7 @@
 # - Anomaly: Short-term spike in pollution
 # - Fire: Fire-related pollution contribution
 # - Combined: Multiple signals together
+# - Training date exclusion: Excluding dates from training
 # =============================================================================
 
 testthat::source_test_helpers("tests/testthat", env = globalenv())
@@ -326,4 +327,103 @@ test_that("postcompute returns expected structure", {
   expect_true("date" %in% names(result_tbl))
   expect_true("variable" %in% names(result_tbl))
   expect_true("value" %in% names(result_tbl))
+})
+
+
+# =============================================================================
+# Tests for training_excluded_dates
+# =============================================================================
+
+test_that("training_excluded_dates changes model results", {
+  
+  inputs <- synthetic_train_inputs(
+    training_days = 200,
+    prediction_days = 30,
+    include_trend = TRUE,
+    include_anomaly = FALSE,
+    include_fire = FALSE
+  )
+  
+  # Get dates from the training period to exclude
+  meas_weather <- inputs$data$meas_weather[[1]]
+  training_end <- as.Date(inputs$configs$training_end[1])
+  training_dates <- as.Date(meas_weather$date[as.Date(meas_weather$date) <= training_end])
+  
+  # Exclude 10% of training dates
+  set.seed(42)
+  excluded_dates <- sample(training_dates, size = floor(length(training_dates) * 0.1))
+  
+  # Train without exclusions
+  results_full <- creadeweather::train_configs(
+    data = inputs$data,
+    configs = inputs$configs
+  )
+  
+  # Train with exclusions - modify config
+  configs_excluded <- inputs$configs
+  configs_excluded$training_excluded_dates <- list(excluded_dates)
+  
+  results_excluded <- creadeweather::train_configs(
+    data = inputs$data,
+    configs = configs_excluded
+  )
+  
+  # Both should succeed
+  expect_s3_class(results_full, "tbl_df")
+  expect_s3_class(results_excluded, "tbl_df")
+  expect_equal(nrow(results_full), 1)
+  expect_equal(nrow(results_excluded), 1)
+  
+  # Models should be different (different training data)
+  perf_full <- results_full$performances[[1]][[1]]
+  perf_excluded <- results_excluded$performances[[1]][[1]]
+  
+  # RMSE values should differ since training data is different
+  expect_false(
+    identical(perf_full$rmse_training, perf_excluded$rmse_training),
+    info = "Excluding dates should result in different model performance"
+  )
+})
+
+test_that("training_excluded_dates excludes dates from training set only", {
+  
+  inputs <- synthetic_train_inputs(
+    training_days = 100,
+    prediction_days = 20,
+    include_trend = TRUE,
+    include_anomaly = FALSE,
+    include_fire = FALSE
+  )
+  
+  # Get specific dates to exclude
+  meas_weather <- inputs$data$meas_weather[[1]]
+  training_end <- as.Date(inputs$configs$training_end[1])
+  training_dates <- as.Date(meas_weather$date[as.Date(meas_weather$date) <= training_end])
+  
+  # Exclude first 10 training dates
+  excluded_dates <- head(training_dates, 10)
+  
+  configs_excluded <- inputs$configs
+  configs_excluded$training_excluded_dates <- list(excluded_dates)
+  
+  results <- creadeweather::train_configs(
+    data = inputs$data,
+    configs = configs_excluded
+  )
+  
+  expect_s3_class(results, "tbl_df")
+  expect_equal(nrow(results), 1)
+  
+  # Check that excluded dates are in testing set, not training
+  result_data <- results$data[[1]]
+  excluded_rows <- result_data[as.Date(result_data$date) %in% excluded_dates, ]
+  
+  # Excluded dates should exist in the data
+  expect_gt(nrow(excluded_rows), 0)
+  
+  # None of the excluded dates should be in training set
+  expect_true(
+    all(excluded_rows$set != "training"),
+    info = "Excluded dates should not be in training set"
+  )
 })
