@@ -28,7 +28,7 @@ NULL
 
 #' @importFrom dplyr all_of all_vars any_vars arrange bind_rows distinct filter
 #'   filter_at first full_join group_by group_by_at left_join mutate mutate_at
-#'   mutate_if pull rowwise select starts_with summarise ungroup
+#'   mutate_if pull rowwise select starts_with summarise ungroup case_when recode rename rename_all n select_at as_tibble
 NULL
 
 #' @importFrom lubridate date ymd
@@ -50,4 +50,10 @@ NULL
 NULL
 
 #' @importFrom terra rast
+NULL
+
+#' @importFrom sf st_as_sf
+NULL
+
+#' @importFrom pbapply pbmapply
 NULL

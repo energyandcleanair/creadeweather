@@ -40,9 +40,11 @@ test_that("train_gbm_prepare_data partitions data into training/testing/predicti
   inputs <- create_gbm_test_inputs()
   config <- get_trend_config(inputs)
 
+  N_DAYS_PREDICTION <- 10
+  
   prep <- creadeweather:::train_gbm_prepare_data(
     data = inputs$data$meas_weather[[1]],
-    training_end = config$training_end[[1]],
+    training_end = max(inputs$data$meas_weather[[1]]$date) - lubridate::days(N_DAYS_PREDICTION), # Force some prediction data
     weather_vars = config$weather_vars[[1]],
     time_vars = config$time_vars[[1]],
     link = config$link[[1]],
@@ -54,7 +56,7 @@ test_that("train_gbm_prepare_data partitions data into training/testing/predicti
   expect_true(all(prep$data$set %in% c("training", "testing", "prediction")))
   expect_gt(sum(prep$data$set == "training"), 0)
   expect_gt(sum(prep$data$set == "testing"), 0)
-  expect_gt(sum(prep$data$set == "prediction"), 0)
+  expect_equal(sum(prep$data$set == "prediction"), N_DAYS_PREDICTION)
 })
 
 test_that("train_gbm_prepare_data returns formula and link functions", {
@@ -336,9 +338,10 @@ test_that("get_model_performance calculates metrics for each set", {
   inputs <- create_gbm_test_inputs()
   config <- get_trend_config(inputs)
 
+  N_DAYS_PREDICTION <- 10
   prep <- creadeweather:::train_gbm_prepare_data(
     data = inputs$data$meas_weather[[1]],
-    training_end = config$training_end[[1]],
+    training_end = max(inputs$data$meas_weather[[1]]$date) - lubridate::days(N_DAYS_PREDICTION),
     weather_vars = config$weather_vars[[1]],
     time_vars = config$time_vars[[1]]
   )
