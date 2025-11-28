@@ -1,4 +1,9 @@
-# Helper providing synthetic_train_inputs() for training-related tests
+# Helper providing synthetic_train_inputs() and build_gbm_fixture() for tests
+#
+# Used by:
+# - test_train_integration.R: Full pipeline integration tests
+# - test_train_gbm.R: Unit tests for train_gbm functions
+# - test_postcompute_gbm.R: Unit tests for postcompute_gbm functions
 synthetic_train_inputs <- function(
   seed = 123,
   training_days = 335,
@@ -14,7 +19,7 @@ synthetic_train_inputs <- function(
   # FIRE PARAMETERS
   include_fire = FALSE,
   fire_start_day = training_days + 1,
-  fire_length = 10,
+  fire_length = training_days * 0.1,
   fire_random = FALSE,
   fire_prediction_frac = 0.4,
   fire_magnitude = 5,
@@ -222,7 +227,10 @@ build_gbm_fixture <- function(output,
     prediction_days = prediction_days,
     include_trend = include_trend,
     include_anomaly = include_anomaly,
-    include_fire = include_fire
+    include_fire = include_fire,
+    # Distribute fire randomly across training+prediction so model can learn effect
+    fire_random = include_fire,
+    fire_length = if (include_fire) round(training_days * 0.15) else 10
   )
 
   config_row <- inputs$configs %>%

@@ -1,5 +1,3 @@
-devtools::load_all(".")
-
 test_that("extract_fire_vars_by_region groups variables by suffix correctly", {
   
   # Test case 1: Simple fire_frp without suffix
