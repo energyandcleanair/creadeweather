@@ -99,6 +99,19 @@ train_gbm <- function(data,
   )
 }
 
+get_model_performance <- function(model, data_prepared){
+  
+  perf <- lapply(split(data_prepared, data_prepared$set), function(d){
+    tibble(
+      set=unique(d$set),
+      rmse=Metrics::rmse(d$value, d$predicted),
+      rsquared=cor(d$value, d$predicted)^2
+    )
+  }) %>%
+    do.call(bind_rows, .) %>%
+    tidyr::pivot_wider(names_from=set, values_from=c(rmse, rsquared)) %>%
+    as.list()
+}
 
 # =============================================================================
 # Internal helper functions

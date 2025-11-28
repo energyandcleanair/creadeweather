@@ -26,7 +26,9 @@ NULL
 #' @importFrom worldmet importNOAA
 NULL
 
-#' @importFrom dplyr ungroup group_by rowwise mutate bind_rows distinct pull select
+#' @importFrom dplyr all_of all_vars any_vars arrange bind_rows distinct filter
+#'   filter_at first full_join group_by group_by_at left_join mutate mutate_at
+#'   mutate_if pull rowwise select starts_with summarise ungroup
 NULL
 
 #' @importFrom lubridate date ymd
@@ -36,4 +38,16 @@ NULL
 NULL
 
 #' @importFrom glue glue
+NULL
+
+#' @importFrom tibble tibble
+NULL
+
+#' @importFrom raster brick
+NULL
+
+#' @importFrom rlang "%||%"
+NULL
+
+#' @importFrom terra rast
 NULL

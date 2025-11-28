@@ -420,7 +420,7 @@ era5.download_nc <- function(force,
   if(!is.null(min_layers) & length(files_found) >0){
     for(f in files_found){
       tryCatch({
-        n_layers <- suppressWarnings(raster::nlayers(raster::brick(f)))
+        n_layers <- purrr::quietly(raster::nlayers(raster::brick(f)))
         if(n_layers < min_layers){
           message(glue("Redownloading {f} as it seems incomplete"))
           do_download <- do_download | TRUE
@@ -497,7 +497,7 @@ era5.download_nc <- function(force,
     })
     
     is_nc <- tryCatch({
-      ncdf4::nc_open(file_path)
+      suppressWarnings(ncdf4::nc_open(file_path))
       T
     }, error=function(e){
       return(FALSE)

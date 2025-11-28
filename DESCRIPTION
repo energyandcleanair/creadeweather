@@ -57,6 +57,8 @@ Imports:
     ecmwfr (>= 2.0.2),
     options,
 	remotes,
+	rcrea
+Depends:
     ggplot2,
     worldmet
 Remotes:
