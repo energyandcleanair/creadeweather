@@ -1,91 +1,127 @@
-#' A function that computes y-o-y changes and attributes them to either change in weather
-#' or emissions
+#' Compute year-over-year changes and attribute to weather vs emissions
 #'
-#' It basically runs deweathering while excluding each month and the previous one
-#' from training, and computing fchanges
+#' Runs deweathering while excluding specific months from training to compute
+#' unbiased year-over-year (YoY) changes. Attributes total change to weather
+#' effects vs emission changes.
 #'
-#' @return
+#' @section Use Case:
+#' This function is used by CREA's monthly snapshot products to track pollution
+#' trends and attribute changes to weather patterns vs actual emission reductions.
+#'
+#' @section Methodology:
+#' For each month, the function:
+#' 1. Excludes the target month and the same month from the previous year from training
+#' 2. Trains a deweathering model on remaining data
+#' 3. Computes predicted (weather-driven) and observed values for both months
+#' 4. Calculates YoY changes and attributes them to weather vs emissions
+#'
+#' @param months Character vector of months to analyze (format: "YYYY-MM-01").
+#' @param upload_results Logical. Whether to upload results to the database.
+#' @param deweather_process_id Character. Process ID for deweathering configuration.
+#' @param keep_nonyoy_results Logical. Whether to keep original results alongside
+#'   YoY results. Default is FALSE.
+#' @param save_weather_filename Optional path to save weather data for reuse.
+#' @param read_weather_filename Optional path to read cached weather data.
+#' @param ... Additional arguments passed to [deweather()].
+#'
+#' @return A tibble with YoY results for each month, containing variables:
+#'   - `yoy_total`: Absolute change in observed pollution
+#'   - `yoy_weather`: Weather-driven change (from model predictions)
+#'   - `yoy_emission`: Emission-driven change (total - weather)
+#'   - `yoy_total_rel`, `yoy_weather_rel`, `yoy_emission_rel`: Relative changes
+#'
 #' @export
 #'
 #' @examples
-deweather_yoy <- function(
-    months,
-    upload_results,
-    deweather_process_id,
-    keep_nonyoy_results=FALSE,
-    save_weather_filename = NULL,
-    read_weather_filename = NULL,
-    ...) {
-  
-  # One weather file for all 
-  keep_weather_file <- T
-  
-  if(is.null(save_weather_filename)){
-    save_weather_filename <- tempfile(fileext = ".RDS")  
-    keep_weather_file <- F
+#' \dontrun{
+#' # Analyze July 2024 for Beijing
+#' yoy_results <- deweather_yoy(
+#'   months = "2024-07-01",
+#'   location_id = "beijing_chn.2_1_cn",
+#'   poll = "pm25",
+#'   deweather_process_id = "default_anomaly_2018_2099",
+#'   upload_results = FALSE
+#' )
+#' }
+deweather_yoy <- function(months,
+                          upload_results,
+                          deweather_process_id,
+                          keep_nonyoy_results = FALSE,
+                          save_weather_filename = NULL,
+                          read_weather_filename = NULL,
+                          ...) {
+
+  # Setup weather file caching
+  keep_weather_file <- !is.null(save_weather_filename)
+
+  if (is.null(save_weather_filename)) {
+    save_weather_filename <- tempfile(fileext = ".RDS")
   }
-  if(is.null(read_weather_filename)){
+
+  if (is.null(read_weather_filename)) {
     read_weather_filename <- save_weather_filename
   }
 
-  
-  deweathered_yoys <- lapply(months, function(month) {
-    # Exclude month dates and the previous year from training
-    dates <- get_excluded_yoy_dates(month)
-    
+  # Process each month
+ deweathered_yoys <- lapply(months, function(month) {
+    # Exclude target month and same month from previous year
+    excluded_dates <- get_excluded_yoy_dates(month)
+
     deweathered <- creadeweather::deweather(
       ...,
-      deweather_process_id=deweather_process_id,
-      upload_results = F, # We'll upload after if need be
-      training_excluded_dates = dates,
+      deweather_process_id = deweather_process_id,
+      upload_results = FALSE,  # Upload after YoY extraction if needed
+      training_excluded_dates = excluded_dates,
       save_weather_filename = save_weather_filename,
       read_weather_filename = read_weather_filename
     )
-    
+
     deweathered_yoy <- extract_yoy_changes(deweathered, month, keep_nonyoy_results)
-    
-    if(upload_results){
-      creadeweather::upload_results(results=deweathered_yoy,
-                                    deweather_process_id=deweather_process_id)
+
+    if (upload_results) {
+      creadeweather::upload_results(
+        results = deweathered_yoy,
+        deweather_process_id = deweather_process_id
+      )
     }
-    
+
     return(deweathered_yoy)
   }) %>%
     bind_rows()
-  
-  
-  if(!keep_weather_file) file.remove(save_weather_filename)
+
+  # Cleanup temporary weather file
+  if (!keep_weather_file) {
+    file.remove(save_weather_filename)
+  }
 
   return(deweathered_yoys)
 }
 
 
-#' For each config, add yoy and yoy_rel variables
-#' to the result
+#' Extract YoY changes from deweathered results
 #'
-#' @param deweathered
-#' @param month
+#' Applies [extract_yoy_changes_from_result()] to each result in the
+#' deweathered data structure.
 #'
-#' @return
+#' @param deweathered Tibble with `result` list-column from [deweather()].
+#' @param month Target month (format: "YYYY-MM-01").
+#' @param keep_nonyoy_results Whether to keep original results.
+#'
+#' @return Modified deweathered tibble with YoY results.
+#'
 #' @export
-#'
-#' @examples
 extract_yoy_changes <- function(deweathered, month, keep_nonyoy_results) {
-  
+
   new_results <- lapply(deweathered$result, function(result) {
     yoy_result <- tryCatch(
-      {
-        extract_yoy_changes_from_result(result, month)
-      },
-      error = function(e) {
-        return(NULL)
-      }
+      extract_yoy_changes_from_result(result, month),
+      error = function(e) NULL
     )
-    
-    if(keep_nonyoy_results){
-      return(bind_rows(result, yoy_result))
-    }else{
-      return(yoy_result)
+
+    if (keep_nonyoy_results && !is.null(result)) {
+      bind_rows(result, yoy_result)
+    } else {
+      yoy_result
     }
   })
 
@@ -93,80 +129,138 @@ extract_yoy_changes <- function(deweathered, month, keep_nonyoy_results) {
   return(deweathered)
 }
 
-#' Extract yoy change from a result df
+
+#' Calculate YoY changes from a result dataframe
 #'
-#' @param result df with date, variable, value columns
-#' @param month
+#' Computes year-over-year changes in pollution and attributes them to
+#' weather effects vs emission changes.
 #'
-#' @return df with date, variable, value columns
+#' @section Output Variables:
+#' - `yoy_total`: Total observed change (this year - last year)
+#' - `yoy_weather`: Weather-driven change (predicted this year - predicted last year)
+#' - `yoy_emission`: Emission change (yoy_total - yoy_weather)
+#' - `*_rel`: Relative changes (divided by previous year's observed value)
+#'
+#' @param result Dataframe with columns: `date`, `variable`, `value`.
+#'   Must contain "observed" and "predicted" variables.
+#' @param month Target month (format: "YYYY-MM-01").
+#'
+#' @return Dataframe with columns: `date`, `variable`, `value` containing
+#'   the 6 YoY metrics.
+#'
 #' @export
 #'
 #' @examples
+#' \dontrun
+#' # Create synthetic result data
+#' result <- data.frame(
+#'   date = rep(c(as.Date("2023-07-01"), as.Date("2024-07-01")), each = 2),
+#'   variable = rep(c("observed", "predicted"), 2),
+#'   value = c(50, 45, 55, 48)  # Last year: obs=50, pred=45; This year: obs=55, pred=48
+#' )
+#' yoy <- extract_yoy_changes_from_result(result, "2024-07-01")
+#' # yoy_total = 5, yoy_weather = 3, yoy_emission = 2
+#' }
 extract_yoy_changes_from_result <- function(result, month) {
-  dates <- get_excluded_yoy_dates(month)
 
-  if(is.null(result)) return(NULL)
-  
-  result %>%
-    filter(
-      date %in% dates,
+  if (is.null(result)) return(NULL)
+
+  excluded_dates <- get_excluded_yoy_dates(month)
+
+  # Filter to relevant dates and variables
+  filtered <- result %>%
+    dplyr::filter(
+      date %in% excluded_dates,
       variable %in% c("observed", "predicted")
-    ) %>%
-    mutate(year = year(date)) %>%
-    group_by(variable, year) %>%
-    summarise(value = mean(value, na.rm = T)) %>%
-    arrange(year) %>%
-    group_by(across(-c(year, value))) %>%
-    mutate(delta = value - lag(value)) %>%
-    # Add observed value of first year
-    ungroup() %>%
-    mutate(observed_prev = value[year == min(year) & variable == "observed"]) %>%
-    ungroup() %>%
-    filter(!is.na(delta)) %>%
-    select(-c(value)) %>%
-    tidyr::pivot_wider(
-      names_from = "variable",
-      values_from = "delta",
-      names_prefix = "yoy_"
-    ) %>%
-    rename(
+    )
+
+  if (nrow(filtered) == 0) return(NULL)
+
+  # Calculate yearly averages
+  yearly_means <- filtered %>%
+    dplyr::mutate(year = lubridate::year(date)) %>%
+    dplyr::group_by(variable, year) %>%
+    dplyr::summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(year)
+
+  # Need exactly 2 years of data
+  years <- unique(yearly_means$year)
+  if (length(years) != 2) return(NULL)
+
+  # Get baseline (previous year's observed value) for relative calculations
+  observed_prev <- yearly_means %>%
+    dplyr::filter(year == min(year), variable == "observed") %>%
+    dplyr::pull(value)
+
+  if (length(observed_prev) == 0 || is.na(observed_prev)) return(NULL)
+
+  # Calculate year-over-year deltas
+  yoy_deltas <- yearly_means %>%
+    dplyr::group_by(variable) %>%
+    dplyr::mutate(delta = value - dplyr::lag(value)) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(!is.na(delta)) %>%
+    dplyr::select(variable, delta) %>%
+    tidyr::pivot_wider(names_from = variable, values_from = delta, names_prefix = "yoy_")
+
+  if (nrow(yoy_deltas) == 0) return(NULL)
+
+  # Rename and calculate derived metrics
+  yoy_metrics <- yoy_deltas %>%
+    dplyr::rename(
       yoy_total = yoy_observed,
       yoy_weather = yoy_predicted
     ) %>%
-    mutate(
+    dplyr::mutate(
       yoy_emission = yoy_total - yoy_weather,
       yoy_total_rel = yoy_total / observed_prev,
       yoy_weather_rel = yoy_weather / observed_prev,
       yoy_emission_rel = yoy_emission / observed_prev
-    ) %>%
-    pivot_longer(
-      cols = -c(year, observed_prev),
+    )
+
+  # Reshape to long format
+  yoy_metrics %>%
+    tidyr::pivot_longer(
+      cols = dplyr::everything(),
       names_to = "variable",
-      values_to = "value",
+      values_to = "value"
     ) %>%
-    # add month to variable
-    mutate(date = as.Date(month)) %>%
-    select(date, variable, value)
+    dplyr::mutate(date = as.Date(month)) %>%
+    dplyr::select(date, variable, value)
 }
 
 
-
-#' For a given month, return the dates that need to be removed from training
-#' i.e. dates in this month and the same month the year before
+#' Get dates to exclude from training for YoY analysis
 #'
-#' @param month
+#' Returns all days in the target month and the same month from the previous
+#' year. These dates are excluded from model training to ensure unbiased
+#' YoY comparisons.
 #'
-#' @return
+#' @param month Target month (format: "YYYY-MM-01" or any date in the month).
+#'
+#' @return Date vector containing all days in both months.
+#'
 #' @export
 #'
 #' @examples
+#' dates <- get_excluded_yoy_dates("2024-07-01")
+#' # Returns all days in July 2023 and July 2024
 get_excluded_yoy_dates <- function(month) {
-  month_f <- as.Date(month)
-  month_i <- month_f - lubridate::years(1)
+  month_current <- as.Date(month)
+  month_previous <- month_current - lubridate::years(1)
 
-  # Get all days in month_f
-  days_f <- seq.Date(as.Date(month_f), as.Date(month_f) + lubridate::days_in_month(month_f) - 1, by = "day")
-  days_i <- seq.Date(as.Date(month_i), as.Date(month_i) + lubridate::days_in_month(month_i) - 1, by = "day")
+  # Get all days in both months
+  days_current <- seq.Date(
+    from = month_current,
+    to = month_current + lubridate::days_in_month(month_current) - 1,
+    by = "day"
+  )
 
-  c(days_i, days_f)
+  days_previous <- seq.Date(
+    from = month_previous,
+    to = month_previous + lubridate::days_in_month(month_previous) - 1,
+    by = "day"
+  )
+
+  c(days_previous, days_current)
 }

@@ -11,12 +11,41 @@ See an example application [here](https://energyandcleanair.org/weather-correcti
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
-graph TD;
-    A[AQ measurements from CREA Database] --> C
-    B[Download Weather from ERA5, NOAA ISD] --> C[Gradient Boosting Machine]
-    C --> E[Upload to CREA Database]
-    C --> D[Export Weather-Corrected Measurements]
-    
+flowchart LR
+
+  %% Data sources and sinks
+  CREA[(CREA DB)]
+  ERA5[ERA5]
+  NOAA[NOAA ISD]
+  SIRAD[SIRAD]
+  VIIRS[VIIRS Fires]
+
+  %% Steps
+  A[Get measurements]
+  B[Get weather]
+  C[Combine measurements + weather]
+  D[Prepare data]
+  E[Train model]
+  F[Post-compute results]
+  G[Export results]
+  H[Upload to CREA DB]
+
+  %% Arrows to/from data
+  CREA --- A
+  ERA5 --- B
+  NOAA --- B
+  SIRAD -. optional .- B
+  VIIRS -. optional .- B
+
+  %% Pipeline
+  A --> C
+  B --> C
+  C --> D --> E --> F --> G
+  F --> H
+
+  %% Notes
+  classDef opt stroke-dasharray: 3 3
+  class SIRAD,VIIRS opt
 ```
 
 ## Installation

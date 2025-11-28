@@ -117,6 +117,12 @@ era5.collect_weather <- function(location_dates,
     bind_rows()
 
 
+  # Handle case where no data was extracted
+  if (nrow(era5_data) == 0) {
+    warning("No ERA5 data extracted. Returning empty weather data frame.")
+    return(tibble::tibble(location_id = character(0), weather = list()))
+  }
+  
   weather <- era5_data %>%
     era5.rename_era5_to_global_df() %>%
     select(c(
