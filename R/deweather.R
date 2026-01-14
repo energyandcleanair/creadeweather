@@ -154,7 +154,7 @@ deweather <- function(
 
     # Log parameters
     print("Using parameters from process_id:")
-    print(deweather_parameters)
+    # print(deweather_parameters)
     print("DONE PRINTING PARAMETERS")
     list2env(deweather_parameters, environment())
   }
