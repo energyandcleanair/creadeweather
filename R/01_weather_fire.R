@@ -439,3 +439,89 @@ fire.split_archive <- function(file_archive, region="Global"){
 #'   }
 #'   pbapply::pblapply(dates, write_date, d=d, f=f)
 #' }
+#' 
+
+#' Extract fire variables grouped by region/suffix
+#'
+#' Groups fire-related variables by their suffix (region identifier).
+#' For example, fire_frp_MYS and fire_frp_MYS_lag1 would be grouped under "_MYS".
+#' Variables without a suffix (like fire_frp) are grouped under "" (empty string).
+#' This will be used to create counterfactual predictions in postcompute.
+#'
+#' @param var_names Character vector of variable names from the model
+#' @param prefixes Character string with pipe-separated prefixes to match (e.g., "fire_frp|fire_count|pm25_emission")
+#' @return A tibble with columns `suffix` (character) and `vars` (list of character vectors). 
+#'   The `suffix` column contains region identifiers (or "" for variables without a suffix).
+#'   The `vars` column contains the variable names grouped by suffix.
+#' @keywords internal
+fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_count|pm25_emission"){
+  
+  # Find all variables matching the prefixes
+  pattern <- paste0("^(", prefixes, ")")
+  fire_vars <- var_names[grepl(pattern, var_names)]
+  
+  if(length(fire_vars) == 0){
+    return(tibble::tibble(suffix = character(0), vars = list()))
+  }
+  
+  # Split prefixes
+  prefix_list <- strsplit(prefixes, "\\|")[[1]]
+  
+  # Group by suffix (region identifier)
+  # Use a list to store variables by suffix (including "" for no suffix)
+  # We'll use integer indices to avoid issues with empty string keys
+  result_list <- list()
+  suffix_keys <- character(0)
+  
+  for(var in fire_vars){
+    # Find which prefix matches (use the longest match to handle overlapping prefixes)
+    matched_prefix <- NULL
+    matched_length <- 0
+    for(prefix in prefix_list){
+      if(grepl(paste0("^", prefix), var)){
+        if(nchar(prefix) > matched_length){
+          matched_prefix <- prefix
+          matched_length <- nchar(prefix)
+        }
+      }
+    }
+    
+    if(is.null(matched_prefix)) next
+    
+    # Extract suffix: everything after the prefix, excluding _lag* at the end
+    # Remove the prefix
+    remainder <- sub(paste0("^", matched_prefix), "", var)
+    # Remove _lag* suffix if present
+    remainder <- sub("_lag[[:digit:]]*$", "", remainder)
+    
+    # The suffix is what remains (could be empty string)
+    suffix <- remainder
+    
+    # Find or create index for this suffix
+    suffix_idx <- match(suffix, suffix_keys)
+    if(is.na(suffix_idx)){
+      suffix_keys <- c(suffix_keys, suffix)
+      suffix_idx <- length(suffix_keys)
+      result_list[[suffix_idx]] <- character(0)
+    }
+    
+    # Add this variable to the group
+    result_list[[suffix_idx]] <- c(result_list[[suffix_idx]], var)
+  }
+  
+  # Sort variables within each group (base vars first, then lags)
+  result_list <- lapply(result_list, function(vars){
+    # Sort: non-lag vars first, then lag vars
+    non_lag <- vars[!grepl("_lag[[:digit:]]*$", vars)]
+    lag_vars <- vars[grepl("_lag[[:digit:]]*$", vars)]
+    c(sort(non_lag), sort(lag_vars))
+  })
+  
+  # Convert to tibble
+  result <- tibble::tibble(
+    suffix = suffix_keys,
+    vars = result_list
+  )
+  
+  return(result)
+}

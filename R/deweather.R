@@ -78,13 +78,13 @@ deweather <- function(
   
   # DEWEATHERING GENERAL
   output=c("trend"), #c("trend", "anomaly")
-  upload_results=T,
+  upload_results=F,
   years_force_refresh=NULL,
   keep_model=T,
   training_start_trend="2015-01-01",
   training_end_trend="2099-01-01", # With trend approach, we train over the whole period
   training_start_anomaly="2015-01-01",
-  training_end_anomaly="2019-12-31",
+  training_end_anomaly="2024-12-31",
   ntrainings=1,
 
   training_excluded_dates = c(), # A list of dates that MUST not be used for training

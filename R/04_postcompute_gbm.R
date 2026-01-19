@@ -1,251 +1,327 @@
+#' Post-process GBM training results
+#'
+#' Transforms raw GBM training outputs into tidy results with predictions,
+#' anomalies, trends, and fire counterfactuals. Handles multiple bootstrap
+#' models by averaging predictions.
+#'
+#' @section Output Variables:
+#' - `observed`: Original pollution values (inverse-transformed if log link)
+#' - `predicted`: Model predictions (averaged across bootstrap models)
+#' - `anomaly`: Difference between observed and predicted
+#' - `trend`: Time trend from partial dependence (if time_vars specified)
+#' - `predicted_nofire`: Counterfactual without fire effect (if add_fire=TRUE)
+#'
+#' @param models List of trained GBM model objects.
+#' @param data Data frame with predictors and response variable.
+#' @param config List containing training configuration:
+#'   - `weather_vars`: Weather variable names
+#'   - `time_vars`: Time variable names
+#'   - `add_fire`: Whether to compute fire counterfactual
+#'   - `link`: Link function ("linear" or "log")
+#' @param performances List of performance metrics from training.
+#' @param ... Additional arguments (unused).
+#'
+#' @return A tibble with columns:
+#'   - `config`: The configuration used
+#'   - `models`: Lightened model summary (importance, optimal trees)
+#'   - `result`: Long-format results with date, variable, value
+#'   - `performances`: Performance metrics
+#'
+#' @keywords internal
 postcompute_gbm <- function(models, data, config, performances, ...) {
+
   weather_vars <- config$weather_vars
   time_vars <- config$time_vars
   add_fire <- config$add_fire
-  formula_vars <- models[[1]]$var.names
 
-
+  # Setup link functions
   if (config$link == "linear") {
-    do_link <- function(x) {
-      x
-    }
-    do_unlink <- function(x) {
-      x
-    }
+    do_link <- identity
+    do_unlink <- identity
   } else if (config$link == "log") {
-    do_link <- function(x) {
-      log(x)
-    }
-    do_unlink <- function(x) {
-      exp(x)
-    }
+    do_link <- log
+    do_unlink <- exp
+  } else {
+    stop("Link function must be 'linear' or 'log'")
   }
 
-  # Predict results ---------------------------------------------------------
-  # Each dataset can have multiple models if ntrainings > 1
-  # Add an index to simplify
+  # Generate predictions (average across bootstrap models)
   data$index <- zoo::index(data)
+
   predicted <- lapply(models, function(model) {
-      tibble(
-        index = data$index,
-        predicted = do_unlink(predict(model, data, n.trees = model$n.trees.opt))
-      )
-    }) %>%
+    tibble(
+      index = data$index,
+      predicted = do_unlink(predict(model, data, n.trees = model$n.trees.opt))
+    )
+  }) %>%
     bind_rows() %>%
-    group_by(index) %>%
-    summarise(
+    dplyr::group_by(index) %>%
+    dplyr::summarise(
       predicted = mean(predicted),
       predicted_p975 = quantile(predicted, 0.975),
       predicted_p025 = quantile(predicted, 0.025)
     )
 
   data <- data %>%
-    select(-c(predicted)) %>% # first model was used to predict already, in train_gbm
-    left_join(predicted, by = "index")
+    dplyr::select(-c(predicted)) %>%
+    dplyr::left_join(predicted, by = "index")
 
-  # data$predicted <- do_unlink(gbm::predict.gbm(model, data))
+  # Inverse-transform response and compute anomaly
   data$value <- do_unlink(data$value)
   data$observed <- data$value
   data$anomaly <- data$observed - data$predicted
 
-
-  # If fire, we create a no_fire counterfactual
+  # Compute fire counterfactual if requested
   if (add_fire) {
     data <- postcompute_gbm_fire(
-      data = data, models = models, do_unlink = do_unlink,
+      data = data,
+      models = models,
+      do_unlink = do_unlink,
       weather_vars = weather_vars
     )
   }
 
-  # Extract influence of time vars (e.g. trend)
+  # Extract time trend partial dependencies
   if (length(time_vars) > 0) {
     data <- postcompute_gbm_trends(
-      data = data, time_vars = time_vars, models = models,
+      data = data,
+      time_vars = time_vars,
+      models = models,
       do_unlink = do_unlink
     )
   }
 
-  # Keep only useful information
-  cols <- c("date", "anomaly", "predicted", "observed", "trend")
-  # Add cols starting with trend_ (though ignoring for now)
-  cols <- c(cols, names(data)[grepl("trend_", names(data))])
+  # Select output columns
+  output_cols <- c("date", "anomaly", "predicted", "observed", "trend")
+  output_cols <- c(output_cols, names(data)[grepl("trend_", names(data))])
+
   if (add_fire) {
-    cols <- c(cols, names(data)[grepl("predicted_nofire", names(data))])
+    output_cols <- c(output_cols, names(data)[grepl("predicted_nofire", names(data))])
   }
 
+  # Reshape to long format
   result <- data %>%
-    ungroup() %>%
-    dplyr::select_at(intersect(cols, names(data))) %>%
-    mutate(date = date(date)) %>%
-    arrange(date) %>%
-    tidyr::gather("variable", "value", -c(date))
+    dplyr::ungroup() %>%
+    dplyr::select(dplyr::any_of(output_cols)) %>%
+    dplyr::mutate(date = lubridate::date(date)) %>%
+    dplyr::arrange(date) %>%
+    tidyr::gather("variable", "value", -c(date)) %>%
+    suppressWarnings()
 
-  # Build a lite version of the model for saving purposes
+  # Create lightweight model summary
   models_light <- postcompute_gbm_lighten_model(models = models, data = data)
 
-  return(
-    tibble(
-      config = list(config),
-      models = list(models_light),
-      result = list(result),
-      performances = list(performances)
-    )
+  tibble(
+    config = list(config),
+    models = list(models_light),
+    result = list(result),
+    performances = list(performances)
   )
 }
 
 
+#' Create lightweight model summary for storage
+#'
+#' Extracts only essential information from GBM models to reduce storage size.
+#' Full models can be several MB each; this reduces to a few KB.
+#'
+#' @param models List of trained GBM model objects.
+#' @param data Data frame (unused, kept for API consistency).
+#'
+#' @return List containing:
+#'   - `importance`: Variable importance from each model
+#'   - `ntrees_opt`: Optimal tree count for each model
+#'
+#' @keywords internal
 postcompute_gbm_lighten_model <- function(models, data) {
-  #-------------------------------------
-  # Add model details and performance
-  #-------------------------------------
 
-  # We only keep 'useful' information to save space
-  # Can take several MB per model otherwise
-  # model_light <- model[c("shrinkage",
-  #                        "train.fraction",
-  #                        "cv.folds")]
-
-  # metrics <- lapply(split(data, data$set), function(d){
-  #   tibble(
-  #     set=unique(d$set),
-  #     rmse=Metrics::rmse(d$value, d$predicted),
-  #     rsquared=cor(d$value, d$predicted)^2
-  #   )
-  # }) %>%
-  #   do.call(bind_rows, .) %>%
-  #   tidyr::pivot_wider(names_from=set, values_from=c(rmse, rsquared)) %>%
-  #   as.list()
-  #
-  # model_light <- model_light %>%
-  #   modifyList(metrics)
-
-  # Variable importance
-  importance <- lapply(models, function(m) summary(m, plot_it = F))
+  importance <- lapply(models, function(m) summary(m, plot_it = FALSE))
   ntrees_opt <- lapply(models, function(m) m$n.trees.opt)
-  # model_light$importance <- summary(model, plotit = F)
 
-  return(
-    list(
-      importance = importance,
-      ntrees_opt = ntrees_opt
-    )
+  list(
+    importance = importance,
+    ntrees_opt = ntrees_opt
   )
 }
 
 
-postcompute_gbm_fire <- function(data, models, formula_vars, do_unlink, weather_vars) {
-  
-  formula_vars <- models[[1]]$variables$var_names
-  fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
-  fire_vars <- fire_vars[!grepl("_lag[[:digit:]]*$", fire_vars)]
+#' Compute fire counterfactual predictions
+#'
+#' Creates predictions for a counterfactual scenario where fire variables
+#' are set to zero. This allows attributing pollution to fire vs other factors.
+#'
+#' @section Fire Variable Detection:
+#' Uses [fire.extract_vars_by_region()] to identify fire variables and group
+#' them by region suffix (e.g., `fire_frp`, `fire_frp_IDN`, `fire_frp_MYS`).
+#'
+#' @param data Data frame with predictions and fire variables.
+#' @param models List of trained GBM model objects.
+#' @param do_unlink Inverse link function.
+#' @param weather_vars Weather variable names (unused, kept for API consistency).
+#'
+#' @return Data frame with additional `predicted_nofire*` columns.
+#'
+#' @keywords internal
+postcompute_gbm_fire <- function(data, models, do_unlink, weather_vars) {
 
-  for (fire_var in fire_vars) {
+  # Get variable names from model
+  formula_vars <- models[[1]]$variables$var_names
+  stopifnot("Could not extract variable names from model" = !is.null(formula_vars))
+
+  fire_groups <- fire.extract_vars_by_region(formula_vars)
+
+  # Create counterfactual for each fire region group
+  for (i in seq_len(nrow(fire_groups))) {
+    suffix <- fire_groups$suffix[i]
+    fire_vars_group <- fire_groups$vars[[i]]
+
     data_nofire <- data
-    data_nofire[, fire_var] <- 0
-    # For lag
-    data_nofire[, grepl(paste0(fire_var, "_lag[[:digit:]]*$"), names(data_nofire))] <- 0
-    predicted_name <- paste0("predicted_nofire", gsub("fire_frp", "", fire_var))
-    data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
-      rowMeans(na.rm = T)
+    data_nofire[, fire_vars_group] <- 0
+
+    # Name: predicted_nofire or predicted_nofire_XXX
+    predicted_name <- if (suffix == "") {
+      "predicted_nofire"
+    } else {
+      paste0("predicted_nofire", suffix)
+    }
+
+    data[, predicted_name] <- sapply(
+      models,
+      function(model) do_unlink(predict(model, data_nofire, n.trees = model$n.trees.opt))
+    ) %>%
+      rowMeans(na.rm = TRUE)
   }
 
-  # Do a general no fire
-  fire_vars <- formula_vars[grepl("fire|pm25_emission", formula_vars)]
-  data_nofire <- data
-  data_nofire[, fire_vars] <- 0
-  predicted_name <- "predicted_nofire"
-  data[, predicted_name] <- sapply(models, function(model) do_unlink(predict(model, data_nofire, n.trees=model$n.trees.opt))) %>%
-    rowMeans(na.rm = T)
+  # Create overall no-fire counterfactual (all fire vars = 0)
+  all_fire_vars <- unlist(fire_groups$vars, use.names = FALSE)
+
+  if (length(all_fire_vars) > 0) {
+    data_nofire <- data
+    data_nofire[, all_fire_vars] <- 0
+
+    data[, "predicted_nofire"] <- sapply(
+      models,
+      function(model) do_unlink(predict(model, data_nofire, n.trees = model$n.trees.opt))
+    ) %>%
+      rowMeans(na.rm = TRUE)
+  } else if (!("predicted_nofire" %in% names(data))) {
+    # No fire variables found but add_fire=TRUE: use predicted as counterfactual
+    data[, "predicted_nofire"] <- data$predicted
+  }
+
   return(data)
 }
 
 
+#' Extract time trend from partial dependence
+#'
+#' Computes the partial dependence of the model on time variables to extract
+#' the underlying trend. Currently supports `date_unix` as the time variable.
+#'
+#' @param data Data frame with date column.
+#' @param time_vars Character vector of time variable names.
+#' @param models List of trained GBM model objects.
+#' @param do_unlink Inverse link function.
+#'
+#' @return Data frame with additional `trend` column.
+#'
+#' @keywords internal
 postcompute_gbm_trends <- function(data, time_vars, models, do_unlink) {
-  
+
   dates <- data %>%
-    distinct(date) %>%
-    arrange(date) %>%
-    dplyr::mutate(yday_joiner = lubridate::yday(date)) %>%
-    dplyr::mutate(month_joiner = lubridate::month(date)) %>%
-    dplyr::mutate(wday_joiner = lubridate::wday(date, week_start = 1)) %>%
-    dplyr::mutate(season_joiner = forcats::fct_collapse(
-      .f = factor(lubridate::month(date)),
-      Spring = c("3", "4", "5"),
-      Summer = c("6", "7", "8"),
-      Autumn = c("9", "10", "11"),
-      Winter = c("12", "1", "2")
-    ))
+    dplyr::distinct(date) %>%
+    dplyr::arrange(date) %>%
+    dplyr::mutate(
+      yday_joiner = lubridate::yday(date),
+      month_joiner = lubridate::month(date),
+      wday_joiner = lubridate::wday(date, week_start = 1),
+      season_joiner = forcats::fct_collapse(
+        .f = factor(lubridate::month(date)),
+        Spring = c("3", "4", "5"),
+        Summer = c("6", "7", "8"),
+        Autumn = c("9", "10", "11"),
+        Winter = c("12", "1", "2")
+      )
+    )
 
-
+  # Extract trend from date_unix partial dependence
   if ("date_unix" %in% time_vars) {
     ndays <- as.numeric(max(dates$date) - min(dates$date), units = "days")
-    
-    trend_trend <- lapply(models, function(model) plot(model, "date_unix", 
-                                                       continuous_resolution =ndays, return_grid = T)) %>%
+
+    trend_data <- lapply(models, function(model) {
+      plot(model, "date_unix", continuous_resolution = ndays, return_grid = TRUE)
+    }) %>%
       bind_rows() %>%
-      rowwise() %>%
-      mutate(y = do_unlink(y)) %>%
-      ungroup() %>%
-      mutate(date = lubridate::date(lubridate::date_decimal(date_unix))) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(y = do_unlink(y)) %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(date = lubridate::date(lubridate::date_decimal(date_unix))) %>%
       dplyr::select(date, date_unix = y) %>%
       dplyr::group_by(date) %>%
       dplyr::summarize(
-        trend = mean(date_unix, na.rm = T),
-        trend_p975 = quantile(date_unix, 0.975, na.rm = T),
-        trend_p025 = quantile(date_unix, 0.025, na.rm = T)
+        trend = mean(date_unix, na.rm = TRUE),
+        trend_p975 = quantile(date_unix, 0.975, na.rm = TRUE),
+        trend_p025 = quantile(date_unix, 0.025, na.rm = TRUE),
+        .groups = "drop"
       )
 
-    dates <- dates %>% left_join(trend_trend)
+    dates <- dates %>% dplyr::left_join(trend_data, by = "date")
   }
 
-  # if("yday" %in% time_vars){
-  #   trend_jday <- plot(model, "yday", continuous_resolution = 366, return_grid = T) %>%
-  #     rowwise() %>%
-  #     mutate(y=do_unlink(y)) %>%
-  #     mutate(jday=round(yday)) %>%
-  #     dplyr::group_by(yday) %>%
-  #     dplyr::summarize(y=mean(y, na.rm=T)) %>%
-  #     dplyr::select(yday_joiner=yday, trend_yday=y)
+  # Select trend columns and join back to data
+  trend_vars <- dates %>%
+    dplyr::select(date, dplyr::starts_with("trend"))
 
-  #   dates <- dates %>% left_join(trend_jday)
-  # }
+  data %>%
+    dplyr::full_join(trend_vars, by = "date")
+}
 
-  # if("month" %in% time_vars){
-  #   trend_month <- plot(model, "month", return_grid = T) %>%
-  #     rowwise() %>%
-  #     mutate(y=do_unlink(y)) %>%
-  #     dplyr::select(month_joiner=month, trend_month=y)
-  #   trend_month$month_joiner <- c(jan=1,feb=2,mar=3,apr=4,may=5,jun=6,jul=7,
-  #                                 aug=8,sep=9,oct=10,nov=11,dec=12)[tolower(trend_month$month_joiner)]
 
-  #   dates <- dates %>% left_join(trend_month)
-  # }
+#' Extract weather-normalized trend (EXPERIMENTAL)
+#'
+#' @description
+#' `r lifecycle::badge("experimental")`
+#'
+#' Alternative method to extract trend by averaging predictions over sampled
 
-  # if("weekday" %in% time_vars){
-  #   trend_weekday <- plot(model, "weekday", return_grid = T) %>%
-  #     rowwise() %>%
-  #     mutate(y=do_unlink(y)) %>%
-  #     dplyr::select(wday_joiner=weekday, trend_weekday=y)
-  #   trend_weekday$wday_joiner <- c(monday=1,tuesday=2,wednesday=3,thursday=4,friday=5,
-  #                                  saturday=6,sunday=7)[tolower(trend_weekday$wday_joiner)]
+#' weather conditions. This approach normalizes out weather variation but is
+#' computationally expensive.
+#'
+#' @param data Data frame with date and weather columns.
+#' @param time_vars Character vector of time variable names.
+#' @param model Single trained GBM model object.
+#' @param do_unlink Inverse link function.
+#'
+#' @return A ggplot object showing the trend (for visual inspection).
+#'
+#' @keywords internal
+postcompute_gbm_trends_w_weather <- function(data, time_vars, model, do_unlink) {
 
-  #   dates <- dates %>% left_join(trend_weekday)
-  # }
+  size_sample <- 5000
+  weather_sample <- data %>% dplyr::sample_n(size_sample)
 
-  # if("season" %in% time_vars){
-  #   trend_season <- plot(model, "season", return_grid = T) %>%
-  #     rowwise() %>%
-  #     mutate(y=do_unlink(y)) %>%
-  #     dplyr::select(season_joiner=season, trend_season=y)
+  get_normalised_trend_at_date <- function(target_date) {
+    # Get time vars for target date
+    time_vars_df <- data %>%
+      dplyr::filter(date == !!target_date) %>%
+      dplyr::select(dplyr::any_of("date_unix"))
 
-  #   dates <- dates %>% left_join(trend_season)
-  # }
+    # Apply to weather sample
+    date_sample <- weather_sample %>%
+      dplyr::mutate(!!!time_vars_df)
 
-  # Select date and variables starting with 'trend_'
-  trend_vars <- dates %>% dplyr::select(date, starts_with("trend"))
+    # Predict and average
+    predicted <- do_unlink(predict(model, date_sample))
+    mean(predicted, na.rm = TRUE)
+  }
 
-  return(
-    data %>%
-      full_join(trend_vars)
-  )
+  # Compute trend for each unique date
+  unique_dates <- unique(data$date)
+  trends <- pbapply::pbsapply(unique_dates, get_normalised_trend_at_date)
+
+  # Return plot for visual inspection
+  tibble::tibble(date = unique_dates, trend = unlist(trends)) %>%
+    dplyr::arrange(date) %>%
+    ggplot2::ggplot(ggplot2::aes(date, trend)) +
+    ggplot2::geom_line()
 }
