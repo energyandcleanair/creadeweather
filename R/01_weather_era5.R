@@ -480,7 +480,7 @@ era5.download_nc <- function(force,
     }
  
     file_path <- ecmwfr::wf_request(
-      user = utils.get_env("CDS_UID"),
+      user = "99855",
       request = request,
       transfer = TRUE,
       path = folder,
