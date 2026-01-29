@@ -458,15 +458,15 @@ era5.download_nc <- function(force,
       target = paste0("era5_", date)
     )
     
-    if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
-      keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
-    }
-    
-    try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
+    # if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
+    #   keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
+    # }
+    # 
+    # try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
     
     ecmwfr::wf_set_key(
-      user = utils.get_env("CDS_UID", error_if_not_found = T),
-      key = utils.get_env("CDS_TOKEN", error_if_not_found = T)
+      user = "99855",
+      key = "92eaff04-c590-41b4-937a-d0026fce8aac"
     )
     
     # Timeout: short if recent date, long otherwise
