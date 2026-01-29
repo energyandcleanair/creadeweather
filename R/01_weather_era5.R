@@ -465,8 +465,8 @@ era5.download_nc <- function(force,
     # try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
     
     ecmwfr::wf_set_key(
-      user = "99855",
-      key = "92eaff04-c590-41b4-937a-d0026fce8aac"
+      user = utils.get_env("CDS_UID"),
+      key = utils.get_env("CDS_TOKEN")
     )
     
     # Timeout: short if recent date, long otherwise
@@ -480,7 +480,7 @@ era5.download_nc <- function(force,
     }
  
     file_path <- ecmwfr::wf_request(
-      user = "99855",
+      user = utils.get_env("CDS_UID"),
       request = request,
       transfer = TRUE,
       path = folder,
