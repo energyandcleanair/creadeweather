@@ -16,7 +16,7 @@ document_anomaly <- function(){
   # file.remove(weather_file)
   # file.remove(weather_file_fire)
 
-  deweathered_trend <- creadeweather::deweather(
+  deweathered_trend <- deweather(
     location_id = location_id,
     deweather_process_id = "default_trend",
     poll="pm25",

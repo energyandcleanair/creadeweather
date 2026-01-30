@@ -67,7 +67,7 @@ deweather_yoy <- function(months,
     # Exclude target month and same month from previous year
     excluded_dates <- get_excluded_yoy_dates(month)
 
-    deweathered <- creadeweather::deweather(
+    deweathered <- deweather(
       ...,
       deweather_process_id = deweather_process_id,
       upload_results = FALSE,  # Upload after YoY extraction if needed
@@ -79,7 +79,7 @@ deweather_yoy <- function(months,
     deweathered_yoy <- extract_yoy_changes(deweathered, month, keep_nonyoy_results)
 
     if (upload_results) {
-      creadeweather::upload_results(
+      upload_results(
         results = deweathered_yoy,
         deweather_process_id = deweather_process_id
       )
