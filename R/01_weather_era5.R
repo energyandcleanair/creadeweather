@@ -459,11 +459,13 @@ era5.download_nc <- function(force,
     )
     
     if (nzchar(Sys.getenv("K_SERVICE"))) {
+      print("Using keyring ====")
       if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
         keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
       }
       
       try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
+      print("=== Keyring end ===")
     }
     
     ecmwfr::wf_set_key(
