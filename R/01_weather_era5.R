@@ -458,6 +458,14 @@ era5.download_nc <- function(force,
       target = paste0("era5_", date)
     )
     
+    if (nzchar(Sys.getenv("K_SERVICE"))) {
+      if (!"ecmwfr" %in% keyring::keyring_list()$keyring) {
+        keyring::keyring_create(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD"))
+      }
+      
+      try(keyring::keyring_unlock(keyring = "ecmwfr", password = utils.get_env("KEYRING_PASSWORD")))
+    }
+    
     ecmwfr::wf_set_key(
       user = utils.get_env("CDS_UID"),
       key = utils.get_env("CDS_TOKEN")
