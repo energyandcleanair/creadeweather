@@ -1,35 +1,36 @@
-get_weather <- function(location_ids,
-                        date_from,
-                        date_to,
-                        weather_vars,
-                        weather_sources = c("era5"),
-                        read_weather_filename = NULL,
-                        save_weather_filename = NULL,
-                        n_per_location = 4,
-                        years = seq(2015, 2020),
-                        years_force_refresh = NULL,
-                        add_pbl = T,
-                        add_sunshine = T,
-                        add_fire = F,
-                        fire_source = "viirs",
-                        fire_mode = "oriented",
-                        fire_buffer_km = NULL,
-                        fire_split_days = F,
-                        fire_split_regions = NULL,
-                        fire_split_regions_res = "low",
-                        trajs_parallel = T,
-                        trajs_cores = parallel::detectCores() - 1,
-                        trajs_height = NULL,
-                        trajs_hours = seq(0, 23, 4),
-                        trajs_duration_hour = 72,
-                        trajs_met_type = "gdas1",
-                        use_trajs_cache = T,
-                        use_weather_cache = T,
-                        upload_trajs = F,
-                        upload_weather = F,
-                        update_era5 = T,
-                        save_trajs_filename = NULL) {
-  
+get_weather <- function(
+  location_ids,
+  date_from,
+  date_to,
+  weather_vars,
+  weather_sources = c("era5"),
+  read_weather_filename = NULL,
+  save_weather_filename = NULL,
+  n_per_location = 4,
+  years = seq(2015, 2020),
+  years_force_refresh = NULL,
+  add_pbl = TRUE,
+  add_sunshine = TRUE,
+  add_fire = FALSE,
+  fire_source = "viirs",
+  fire_mode = "oriented",
+  fire_buffer_km = NULL,
+  fire_split_days = FALSE,
+  fire_split_regions = NULL,
+  fire_split_regions_res = "low",
+  trajs_parallel = TRUE,
+  trajs_cores = parallel::detectCores() - 1,
+  trajs_height = NULL,
+  trajs_hours = seq(0, 23, 4),
+  trajs_duration_hour = 72,
+  trajs_met_type = "gdas1",
+  use_trajs_cache = TRUE,
+  use_weather_cache = TRUE,
+  upload_trajs = FALSE,
+  upload_weather = FALSE,
+  update_era5 = TRUE,
+  save_trajs_filename = NULL
+) {
   
   if (!is.null(read_weather_filename) && file.exists(read_weather_filename)) {
     weather <- read_weather(read_weather_filename)
@@ -43,7 +44,7 @@ get_weather <- function(location_ids,
       years = years,
       years_force_refresh = years_force_refresh,
       n_per_location = n_per_location,
-      add_sunshine = F,
+      add_sunshine = FALSE,
       add_fire = add_fire,
       fire_source = fire_source,
       fire_mode = fire_mode,
@@ -65,11 +66,11 @@ get_weather <- function(location_ids,
       update_era5 = update_era5
     )
     if (!is.null(save_weather_filename)) {
-      dir.create(dirname(save_weather_filename), recursive = T, showWarnings = F)
+      dir.create(dirname(save_weather_filename), recursive = TRUE, showWarnings = FALSE)
       saveRDS(weather, save_weather_filename)
     }
   }
-
+  
   return(weather)
 }
 
@@ -87,44 +88,46 @@ get_weather <- function(location_ids,
 #' @export
 #'
 #' @examples
-collect_weather <- function(location_ids,
-                            date_from,
-                            date_to,
-                            weather_vars,
-                            weather_sources = c("era5", "noaa"),
-                            n_per_location = 4,
-                            years = seq(2015, 2020),
-                            years_force_refresh = year(today()),
-                            add_pbl = T,
-                            add_sunshine = T,
-                            add_fire = F,
-                            fire_source = "viirs",
-                            fire_mode = "trajectory",
-                            fire_buffer_km = NULL,
-                            fire_split_days = F,
-                            fire_split_regions = NULL,
-                            fire_split_regions_res = "low",
-                            trajs_parallel = T,
-                            trajs_cores = parallel::detectCores() - 1,
-                            trajs_hours = seq(0, 23, 4),
-                            trajs_duration_hour = 120,
-                            trajs_height = NULL,
-                            trajs_met_type = "gdas1",
-                            use_trajs_cache = T,
-                            use_weather_cache = T,
-                            upload_trajs = F,
-                            upload_weather = F,
-                            save_trajs_filename = NULL,
-                            update_era5 = T) {
+collect_weather <- function(
+  location_ids,
+  date_from,
+  date_to,
+  weather_vars,
+  weather_sources = c("era5", "noaa"),
+  n_per_location = 4,
+  years = seq(2015, 2020),
+  years_force_refresh = lubridate::year(lubridate::today()),
+  add_pbl = TRUE,
+  add_sunshine = TRUE,
+  add_fire = FALSE,
+  fire_source = "viirs",
+  fire_mode = "trajectory",
+  fire_buffer_km = NULL,
+  fire_split_days = FALSE,
+  fire_split_regions = NULL,
+  fire_split_regions_res = "low",
+  trajs_parallel = TRUE,
+  trajs_cores = parallel::detectCores() - 1,
+  trajs_hours = seq(0, 23, 4),
+  trajs_duration_hour = 120,
+  trajs_height = NULL,
+  trajs_met_type = "gdas1",
+  use_trajs_cache = TRUE,
+  use_weather_cache = TRUE,
+  upload_trajs = FALSE,
+  upload_weather = FALSE,
+  save_trajs_filename = NULL,
+  update_era5 = TRUE
+) {
   
   if (is.null(location_ids)) {
     stop("missing location_ids")
   }
-
-  location_dates <- rcrea::locations(id = location_ids, with_source = F) %>%
+  
+  location_dates <- rcrea::locations(id = location_ids, with_source = FALSE) %>%
     distinct(location_id = id, country, geometry) %>%
     mutate(date_from = date_from, date_to = date_to)
-
+  
   if (nrow(location_dates) == 0) {
     stop("no valid location_id found")
   }
@@ -132,7 +135,7 @@ collect_weather <- function(location_ids,
   weather_noaa <- NULL
   weather_era5 <- NULL
   weather_sirad <- NULL
-
+  
   if ("noaa" %in% weather_sources) {
     weather_noaa <- noaa.collect_weather(
       location_dates = location_dates,
@@ -141,7 +144,7 @@ collect_weather <- function(location_ids,
       years_force_refresh = years_force_refresh
     )
   }
-
+  
   if ("era5" %in% weather_sources) {
     weather_era5 <- era5.collect_weather(
       location_dates = location_dates,
@@ -150,14 +153,14 @@ collect_weather <- function(location_ids,
     )
   }
   
-  if (add_sunshine){
+  if (add_sunshine) {
     weather_vars <- unique(c(weather_vars, "sunshine"))
     weather_sources <- unique(c(weather_sources, "sirad"))
     weather_sirad <- sirad.collect_weather(
       location_dates = location_dates
-      )
+    )
   }
-
+  
   weather <- combine_weathers(
     weathers = list(
       "noaa" = weather_noaa,
@@ -166,11 +169,12 @@ collect_weather <- function(location_ids,
     ),
     weather_sources = weather_sources
   )
-
+  
   # Add fire radiative power
   if (add_fire) {
     print("Getting Fire Radiative Power (will compute trajectories if required)")
-    weather <- fire.add_fire(weather,
+    weather <- fire.add_fire(
+      weather,
       source = fire_source,
       mode = fire_mode,
       duration_hour = trajs_duration_hour,
@@ -190,12 +194,12 @@ collect_weather <- function(location_ids,
       save_trajs_filename = save_trajs_filename
     )
   }
-
+  
   return(weather)
 }
 
 
-available_weather_vars <- function(weather){
+available_weather_vars <- function(weather) {
   setdiff(names(ungroup(weather) %>% select(weather) %>% unnest(weather)), "date")
 }
 
@@ -213,9 +217,10 @@ available_weather_vars <- function(weather){
 #'
 #' @examples
 combine_weathers <- function(
-    weathers,
-    weather_sources=names(weathers),
-    min_share_available = 0.5) {
+  weathers,
+  weather_sources = names(weathers),
+  min_share_available = 0.5
+) {
   
   w <- lapply(weather_sources, function(weather_source) {
     w <- weathers[[weather_source]]
@@ -229,30 +234,34 @@ combine_weathers <- function(
       mutate(source = weather_source)
   }) %>%
     bind_rows()
-
+  
   selected <- w %>%
     ungroup() %>%
-    tidyr::complete(location_id, date, tidyr::nesting(weather_var, source),
-                    fill=list(value=NA)) %>%
+    tidyr::complete(
+      location_id, date, 
+      tidyr::nesting(weather_var, source), fill = list(value = NA)
+    ) %>%
     group_by(location_id, weather_var, source) %>%
-    summarise(n_nonna = sum(!is.na(value)),
-              n_total=n(),
-              share_available = n_nonna / n_total) %>%
-  # Arrange based on weather_sources
-  mutate(source = factor(source, levels = weather_sources, ordered=T)) %>%
-  # Pick first one above min_pct
-  filter(share_available >= min_share_available) %>%
-  select(-c(n_nonna, n_total, share_available)) %>%
-  arrange(source) %>%
-  dplyr::slice_head(n=1)
+    summarise(
+      n_nonna = sum(!is.na(value)),
+      n_total = n(),
+      share_available = n_nonna / n_total
+    ) %>%
+    # Arrange based on weather_sources
+    mutate(source = factor(source, levels = weather_sources, ordered = TRUE)) %>%
+    # Pick first one above min_pct
+    filter(share_available >= min_share_available) %>%
+    select(-c(n_nonna, n_total, share_available)) %>%
+    arrange(source) %>%
+    dplyr::slice_head(n = 1)
   
   selected %>%
-     left_join(w) %>%
+    left_join(w) %>%
     select(-c(source)) %>%
     tidyr::spread(weather_var, value) %>%
     group_by(location_id) %>%
     tidyr::nest() %>%
-    rename(weather=data)
+    rename(weather = data)
 }
 
 

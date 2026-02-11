@@ -7,79 +7,90 @@
 #' Add fire related information to weather data
 #'
 #' @param weather the dataframe to add fire information to
-#' @param source should we use FIRMS active fire data or GFAS emission data (either "gfas" or "viirs")
-#' @param mode should we consider a simple buffer around geometry, a wind oriented buffer, or calculate trajectories.
-#' attach_mode can be "circular", "oriented" or "trajectory"
-#' @param buffer_km buffer around geometry or trajectories. Default 200km for `circular` and `oriented`, 10km for `trajectory`
-#' @param met_type met_type used for hysplit (if mode=="trajectory" or mode=="dispersion")
+#' @param source should we use FIRMS active fire data or GFAS emission data 
+#' (either "gfas" or "viirs")
+#' @param mode should we consider a simple buffer around geometry, a wind oriented buffer, or 
+#' calculate trajectories. attach_mode can be "circular", "oriented" or "trajectory"
+#' @param buffer_km buffer around geometry or trajectories. Default 200km for `circular` and 
+#' `oriented`, 10km for `trajectory`
+#' @param met_type met_type used for hysplit (if mode == "trajectory" or mode == "dispersion")
 #' @param height height used for hysplit (if mode=="trajectory")
-#' @param duration_hour duration in hours used for hysplit (if mode=="trajectory" or mode=="dispersion")
-#' @param trajs_height receptor height for trajectories in meter.
-#' If null or NA, pbl average will be considered.
-#' @param upload_weather upload weather data to our MongoDB to be used in the biomass burning dashboard
+#' @param duration_hour duration in hours used for hysplit (if mode == "trajectory" or 
+#' mode == "dispersion")
+#' @param trajs_height receptor height for trajectories in meter. If null or NA, pbl average will 
+#' be considered.
+#' @param upload_weather upload weather data to our MongoDB to be used in the biomass burning 
+#' dashboard
 #'
 #' @return
 #' @export
 #'
 #' @examples
-fire.add_fire <- function(weather,
-                          weather_sources=NULL, # used for cache only
-                          source="viirs", #or "gfas"
-                          mode="trajectory",
-                          met_type="gdas1",
-                          duration_hour=120,
-                          delay_hour=24,
-                          buffer_km=NULL,
-                          split_days=F,
-                          split_regions=NULL,
-                          split_regions_res='low',
-                          trajs_height=NULL,
-                          trajs_parallel=T,
-                          trajs_cores=parallel::detectCores() - 1,
-                          trajs_height_default=10,
-                          trajs_hours=seq(0,23,4),# To make it faster, we don't calculate trajectories every hour
-                          use_trajs_cache=T,
-                          use_weather_cache=T,
-                          upload_trajs=F,
-                          save_trajs_filename=NULL,
-                          upload_weather=F){
+fire.add_fire <- function(
+  weather,
+  weather_sources = NULL, # used for cache only
+  source = "viirs", #or "gfas"
+  mode = "trajectory",
+  met_type = "gdas1",
+  duration_hour = 120,
+  delay_hour = 24,
+  buffer_km = NULL,
+  split_days = FALSE,
+  split_regions = NULL,
+  split_regions_res = "low",
+  trajs_height = NULL,
+  trajs_parallel = TRUE,
+  trajs_cores = parallel::detectCores() - 1,
+  trajs_height_default = 10,
+  trajs_hours = seq(0, 23, 4), # To make it faster, we don't calculate trajectories every hour
+  use_trajs_cache = TRUE,
+  use_weather_cache = TRUE,
+  upload_trajs = FALSE,
+  save_trajs_filename = NULL,
+  upload_weather = FALSE
+) {
   
   
-  if(is.null(buffer_km)){
-    buffer_km <- switch(mode,"circular"=200, "oriented"=200, "trajectory"=10)
+  if (is.null(buffer_km)) {
+    buffer_km <- switch(mode, "circular" = 200, "oriented" = 200, "trajectory" = 10)
   }
   
   
  
-  if(use_weather_cache){
+  if (use_weather_cache) {
     # Add existing fire data (that is stored in MongoDB)
-    weather <- fire.add_existing_weather(weather=weather,
-                                         source=source,
-                                         mode=mode,
-                                         met_type=met_type,
-                                         duration_hour=duration_hour,
-                                         delay_hour=delay_hour,
-                                         buffer_km=buffer_km,
-                                         split_days=split_days,
-                                         split_regions=split_regions,
-                                         trajs_height=trajs_height,
-                                         trajs_hours=trajs_hours)
+    weather <- fire.add_existing_weather(
+      weather = weather,
+      source = source,
+      mode = mode,
+      met_type = met_type,
+      duration_hour = duration_hour,
+      delay_hour = delay_hour,
+      buffer_km = buffer_km,
+      split_days = split_days,
+      split_regions = split_regions,
+      trajs_height = trajs_height,
+      trajs_hours = trajs_hours
+    )
   }
   
   
-  loc_dates <- fire.get_loc_dates_to_update(weather = weather,
-                                         trajs_height = trajs_height,
-                                         trajs_height_default = trajs_height_default)
+  loc_dates <- fire.get_loc_dates_to_update(
+    weather = weather,
+    trajs_height = trajs_height,
+    trajs_height_default = trajs_height_default
+  )
   
   
   
-  print(sprintf("Found %d weather rows. Need to update fire data for %d of them",
-               nrow(tibble(weather) %>%
-                      tidyr::unnest(weather)),
-               nrow(loc_dates)))
+  print(sprintf(
+    "Found %d weather rows. Need to update fire data for %d of them",
+    nrow(tibble(weather) %>% tidyr::unnest(weather)),
+    nrow(loc_dates)
+  ))
   
   # If no need to add fire, move on
-  if(nrow(loc_dates) == 0) return(weather)
+  if (nrow(loc_dates) == 0) return(weather)
   
   loc_dates_fire <- fire.get_fire_at_loc_dates(
     loc_dates = loc_dates,
@@ -96,7 +107,7 @@ fire.add_fire <- function(weather,
     split_regions = split_regions,
     split_regions_res = split_regions_res,
     save_trajs_filename = save_trajs_filename,
-    source=source
+    source = source
   )
  
   
@@ -107,22 +118,23 @@ fire.add_fire <- function(weather,
   )
   
   
-  if(upload_weather & mode=='trajectory'){
+  if (upload_weather & mode == "trajectory") {
     print("Uploading weather")
-    uploaded <- pbmapply(creafire::db.upload_weather,
-                      weather=weather_with_fire$weather,
-                      location_id=weather_with_fire$location_id,
-                      met_type=met_type,
-                      duration_hour=duration_hour,
-                      buffer_km=buffer_km,
-                      height=list(trajs_height),
-                      fire_source=source,
-                      hours=list(trajs_hours),
-                      fire_split_regions=ifelse(is.null(split_regions), creafire::NO_SPLIT_REGION, split_regions),
-                      SIMPLIFY=F
-                      )
+    uploaded <- pbmapply(
+      creafire::db.upload_weather,
+      weather = weather_with_fire$weather,
+      location_id = weather_with_fire$location_id,
+      met_type = met_type,
+      duration_hour = duration_hour,
+      buffer_km = buffer_km,
+      height = list(trajs_height),
+      fire_source = source,
+      hours = list(trajs_hours),
+      fire_split_regions = ifelse(is.null(split_regions), creafire::NO_SPLIT_REGION, split_regions),
+      SIMPLIFY = FALSE
+    )
     
-    if(length(uploaded) != nrow(weather_with_fire)){
+    if (length(uploaded) != nrow(weather_with_fire)) {
       warning("Probably failed to upload weather")
     }
   }
@@ -133,125 +145,131 @@ fire.add_fire <- function(weather,
 
 
 
-fire.get_fire_at_loc_dates <- function(loc_dates,
-                                   mode,
-                                   met_type,
-                                   duration_hour,
-                                   trajs_hours,
-                                   use_trajs_cache,
-                                   upload_trajs,
-                                   trajs_parallel,
-                                   trajs_cores,
-                                   buffer_km,
-                                   split_days,
-                                   split_regions,
-                                   split_regions_res,
-                                   save_trajs_filename,
-                                   source
-                                   ){
+fire.get_fire_at_loc_dates <- function(
+  loc_dates,
+  mode,
+  met_type,
+  duration_hour,
+  trajs_hours,
+  use_trajs_cache,
+  upload_trajs,
+  trajs_parallel,
+  trajs_cores,
+  buffer_km,
+  split_days,
+  split_regions,
+  split_regions_res,
+  save_trajs_filename,
+  source
+) {
   
-  if(nrow(loc_dates) == 0) return(tibble())
+  if (nrow(loc_dates) == 0) return(tibble())
   
-  attach_fn <- fire.get_attach_to_trajs_fn(source=source)
+  attach_fn <- fire.get_attach_to_trajs_fn(source = source)
   
-  if(mode=="trajectory"){
+  if (mode == "trajectory") {
     
-    if(!"geometry" %in% names(loc_dates)){
-      locations <- rcrea::locations(id=unique(loc_dates$location_id), with_source = F)
-      loc_dates <- loc_dates %>%
-        left_join(locations %>% select(location_id=id, geometry))
+    if (!"geometry" %in% names(loc_dates)) {
+      locations <- rcrea::locations(id = unique(loc_dates$location_id), with_source = FALSE)
+      loc_dates <- loc_dates %>% left_join(locations %>% select(location_id = id, geometry))
     }
     
     print(sprintf("Calculating trajs for %d dates", length(loc_dates$date)))
     loc_dates$trajs <- creatrajs::trajs.get(
-      dates=loc_dates$date,
-      location_id=loc_dates$location_id,
-      geometry=loc_dates$geometry,
-      met_type=met_type,
-      height=loc_dates$trajs_height,
-      duration_hour=duration_hour,
-      hours=trajs_hours, 
-      timezone=unique(loc_dates$timezone),
-      use_cache=use_trajs_cache,
-      parallel=trajs_parallel,
+      dates = loc_dates$date,
+      location_id = loc_dates$location_id,
+      geometry = loc_dates$geometry,
+      met_type = met_type,
+      height = loc_dates$trajs_height,
+      duration_hour = duration_hour,
+      hours = trajs_hours, 
+      timezone = unique(loc_dates$timezone),
+      use_cache = use_trajs_cache,
+      parallel = trajs_parallel,
       mc.cores = trajs_cores
     )
     names(loc_dates$trajs) <- NULL
     print("Done")
     
-    if(!is.null(save_trajs_filename)){
+    if (!is.null(save_trajs_filename)) {
       print(paste("Exporting trajectories to ", save_trajs_filename))
       saveRDS(loc_dates, save_trajs_filename)
       print("Done")
     }
     
-    if(upload_trajs){
+    if (upload_trajs) {
       print("Uploading trajs")
-      pbapply::pbmapply(creatrajs::db.upload_trajs,
-                        trajs=loc_dates$trajs,
-                        location_id=loc_dates$location_id,
-                        hours=list(trajs_hours),
-                        met_type=met_type,
-                        duration_hour=duration_hour,
-                        height=loc_dates$trajs_height,
-                        date=loc_dates$date)
+      pbapply::pbmapply(
+        creatrajs::db.upload_trajs,
+        trajs = loc_dates$trajs,
+        location_id = loc_dates$location_id,
+        hours = list(trajs_hours),
+        met_type = met_type,
+        duration_hour = duration_hour,
+        height = loc_dates$trajs_height,
+        date = loc_dates$date
+      )
     }
     
     print(sprintf("Attaching fires to trajectories for %d dates", length(loc_dates$date)))
     loc_dates_fire <- tryCatch({
-      attach_fn(loc_dates,
-                buffer_km=buffer_km,
-                parallel=trajs_parallel,
-                mc.cores=max(round(parallel::detectCores()-2), 1),
-                split_days=split_days,
-                split_regions=split_regions,
-                adm_res=split_regions_res)
-    }, error=function(e){
+      attach_fn(
+        loc_dates,
+        buffer_km = buffer_km,
+        parallel = trajs_parallel,
+        mc.cores = max(round(parallel::detectCores() - 2), 1),
+        split_days = split_days,
+        split_regions = split_regions,
+        adm_res = split_regions_res
+      )
+    }, error = function(e) {
       print(sprintf("Failed to attach fires. Adding NAs instead, Error: %s", e))
-      return(loc_dates %>%
-               rowwise() %>%
-               mutate(fires=list(tibble(fire_frp=NA, fire_count=NA))) %>%
-               ungroup())
+      loc_dates %>%
+        rowwise() %>%
+        mutate(fires = list(tibble(fire_frp = NA, fire_count = NA))) %>%
+        ungroup()
+      
     })
     print("Done")
     
-  }else if(mode=="oriented"){
-    if(source=="gfas"){
+  } else if (mode == "oriented") {
+    if (source == "gfas") {
       stop("GFAS not yet supported with oriented extent")
     }
     print("Calculating extents")
     loc_dates <- loc_dates %>%
       rowwise() %>%
-      rename(date_meas=date) %>%
-      mutate(extent=creatrajs::trajs.oriented_extent(geometry,
-                                                     duration_hour=duration_hour,
-                                                     ws=ws_copy,
-                                                     wd=wd_copy))
+      rename(date_meas = date) %>%
+      mutate(extent = creatrajs::trajs.oriented_extent(
+        geometry,
+        duration_hour = duration_hour,
+        ws = ws_copy,
+        wd = wd_copy
+      ))
     print("Done")
     
     print("Attaching fires to extents")
-    loc_dates_fire <- creatrajs::fire.attach_to_extents(loc_dates, delay_hour=duration_hour)
+    loc_dates_fire <- creatrajs::fire.attach_to_extents(loc_dates, delay_hour = duration_hour)
     print("Done")
     
-  }else if(mode=="circular"){
+  } else if (mode == "circular") {
     print("Calculating extents")
-    if(source=="gfas"){
+    if (source == "gfas") {
       stop("GFAS not yet supported with circular extent")
     }
     
     loc_dates <- loc_dates %>%
       rowwise() %>%
-      rename(date_meas=date) %>%
-      mutate(extent=creatrajs::trajs.circular_extent(geometry,
-                                                     buffer_km=buffer_km))
+      rename(date_meas = date) %>%
+      mutate(extent = creatrajs::trajs.circular_extent(geometry, buffer_km = buffer_km))
     print("Done")
     
     print("Attaching fires to extents")
-    loc_dates_fire <- creatrajs::fire.attach_to_extents(loc_dates, delay_hour=duration_hour)
+    loc_dates_fire <- creatrajs::fire.attach_to_extents(loc_dates, delay_hour = duration_hour)
     print("Done")
   }
   
-  return(loc_dates_fire)
+  loc_dates_fire
 }
 
 
@@ -265,25 +283,31 @@ fire.get_fire_at_loc_dates <- function(loc_dates,
 #' @export
 #'
 #' @examples
-fire.get_loc_dates_to_update <- function(weather, trajs_height, trajs_height_default){
+fire.get_loc_dates_to_update <- function(weather, trajs_height, trajs_height_default) {
   
   cols <- setdiff(c(names(weather), "date", "trajs_height", "wd_copy", "ws_copy"), "weather")
   
   tibble(weather) %>%
     tidyr::unnest(weather) %>%
-    filter(if('fire_frp' %in% names(.)) is.na(fire_frp) else T) %>%
+    filter(if ("fire_frp" %in% names(.)) is.na(fire_frp) else TRUE) %>%
     # We keep wind information (in case mode=='oriented')
     # as well as pbl for trajectory height (in case mode=='trajectory', used for height in splitr)
     rowwise() %>%
-    mutate(wd_copy=wd,
-           ws_copy=ws,
-           trajs_height=ifelse(is.null(!!trajs_height) || is.na(!!trajs_height),
-                               ifelse(all(c("pbl_min","pbl_max") %in% names(.)),
-                                      (pbl_min + pbl_max)/2,
-                                      trajs_height_default),
-                               !!trajs_height)) %>%
-    mutate(trajs_height=tidyr::replace_na(trajs_height, trajs_height_default)) %>%
-    tidyr::nest(weather=!cols)
+    mutate(
+      wd_copy = wd,
+      ws_copy = ws,
+      trajs_height = ifelse(
+        is.null(!!trajs_height) || is.na(!!trajs_height),
+        ifelse(
+          all(c("pbl_min", "pbl_max") %in% names(.)), 
+          (pbl_min + pbl_max) / 2, 
+          trajs_height_default
+        ),
+        !!trajs_height
+      )
+    ) %>%
+    mutate(trajs_height = tidyr::replace_na(trajs_height, trajs_height_default)) %>%
+    tidyr::nest(weather = !cols)
   
 }
 
@@ -294,121 +318,117 @@ fire.get_loc_dates_to_update <- function(weather, trajs_height, trajs_height_def
 #' @export
 #'
 #' @examples
-fire.add_existing_weather <- function(weather,
-                                      source,
-                                      mode,
-                                      met_type,
-                                      duration_hour,
-                                      delay_hour,
-                                      buffer_km,
-                                      split_days,
-                                      split_regions,
-                                      trajs_height,
-                                      trajs_hours){
+fire.add_existing_weather <- function(
+  weather,
+  source,
+  mode,
+  met_type,
+  duration_hour,
+  delay_hour,
+  buffer_km,
+  split_days,
+  split_regions,
+  trajs_height,
+  trajs_hours
+) {
   
-  if(mode != 'trajectory'){return(weather)}
+  if (mode != "trajectory") return(weather)
   
   split_regions <- ifelse(is.null(split_regions), creafire::NO_SPLIT_REGION, split_regions)
   location_ids <- unique(weather$location_id)
   
-  available_weathers <- lapply(location_ids, function(location_id){
-    creafire::db.download_weather(location_id=location_id,
-                                  duration_hour=duration_hour,
-                                  height=trajs_height,
-                                  met_type=met_type,
-                                  buffer_km=buffer_km,
-                                  fire_source=source,
-                                  fire_split_regions=split_regions,
-                                  hours=paste0(trajs_hours, collapse=","))  
+  available_weathers <- lapply(location_ids, function(location_id) {
+    creafire::db.download_weather(
+      location_id = location_id,
+      duration_hour = duration_hour,
+      height = trajs_height,
+      met_type = met_type,
+      buffer_km = buffer_km,
+      fire_source = source,
+      fire_split_regions = split_regions,
+      hours = paste0(trajs_hours, collapse = ",")
+    )  
   }) %>%
     do.call(bind_rows, .)
   
-  if(nrow(available_weathers) > 0){
+  if (nrow(available_weathers) > 0) {
     
-    join_weather_fire <- function(weather, weather_fire){
-      if(is.null(weather_fire)) return(weather)
-      left_join(weather, weather_fire %>% select_at(grep('date|fire', names(.), value=T)))
+    join_weather_fire <- function(weather, weather_fire) {
+      if (is.null(weather_fire)) return(weather)
+      left_join(weather, weather_fire %>% select_at(grep("date|fire", names(.), value = TRUE)))
     }
     
     weather %>%
-      left_join(available_weathers %>%
-                  select(location_id, weather_fire=weather)) %>%
+      left_join(available_weathers %>% select(location_id, weather_fire = weather)) %>%
       rowwise() %>%
-      mutate(weather=list(join_weather_fire(weather, weather_fire))) %>%
+      mutate(weather = list(join_weather_fire(weather, weather_fire))) %>%
       dplyr::select(-c(weather_fire)) %>%
       ungroup()
-  }else{
+  } else {
     weather
   }
 }
 
 
 # Adding new fire data to weather
-fire.merge_fire_and_weather <- function(weather, loc_dates_fire, fire_vars_pattern){
+fire.merge_fire_and_weather <- function(weather, loc_dates_fire, fire_vars_pattern) {
   
-  if(nrow(loc_dates_fire) == 0) return(weather)
+  if (nrow(loc_dates_fire) == 0) return(weather)
   
   loc_dates_fire_long <- loc_dates_fire %>%
     unnest(fires) %>%
-    select_at(c("location_id", "date",
-                grep(fire_vars_pattern, names(.), value=T)))
+    select_at(c("location_id", "date", grep(fire_vars_pattern, names(.), value = TRUE)))
     
-  fire_vars <- grep(fire_vars_pattern, names(loc_dates_fire_long), value=T)
+  fire_vars <- grep(fire_vars_pattern, names(loc_dates_fire_long), value = TRUE)
   
   results <- weather %>%
-    left_join(loc_dates_fire_long %>%
-                ungroup() %>%
-                nest(fires=-c(location_id))) %>%
+    left_join(loc_dates_fire_long %>% ungroup() %>% nest(fires = -c(location_id))) %>%
     rowwise() %>%
-    mutate(weather=list(creahelpers::fill_df1_with_df2(weather,
-                                                       fires,
-                                                       join_cols=c("date"),
-                                                       value_cols=fire_vars
-                                                       ))) %>%
+    mutate(weather = list(
+      creahelpers::fill_df1_with_df2(weather, fires, join_cols = c("date"), value_cols = fire_vars)
+    )) %>%
     dplyr::select(-c(fires)) %>%
     ungroup()
 }
 
 
-fire.get_fire_vars_pattern <- function(source){
-  if(source=="gfas"){
+fire.get_fire_vars_pattern <- function(source) {
+  if (source == "gfas") {
     return("pm25_emission")
-  }else if(source=="viirs"){
+  } else if (source == "viirs") {
     attach_fn <- creatrajs::fire.attach_to_trajs
     return("^fire_.*")
   }
-  return(NULL)
+  NULL
 }
 
-fire.get_attach_to_trajs_fn <- function(source){
+fire.get_attach_to_trajs_fn <- function(source) {
   
-  if(source=="gfas"){
+  if (source == "gfas") {
     return(creatrajs::gfas.attach_to_trajs)
-  }else if(source=="viirs"){
+  } else if (source == "viirs") {
     return(creatrajs::fire.attach_to_trajs)
   }
-  return(NULL)
+  NULL
 }
 
-fire.split_archive <- function(file_archive, region="Global"){
+fire.split_archive <- function(file_archive, region = "Global") {
   
   f <- readr::read_csv(file_archive)
   fs <- split(f, f$acq_date)
   
-  folder <- file.path(creatrajs::utils.get_firms_folder(),
-                      "suomi-npp-viirs-c2",
-                      region)
+  folder <- file.path(creatrajs::utils.get_firms_folder(), "suomi-npp-viirs-c2", region)
   
-  lapply(fs, function(f){
+  lapply(fs, function(f) {
     date <- unique(f$acq_date)
-    file_day <- file.path(folder,
-                          sprintf("fire_archive_global_%s.txt",
-                                  strftime(date, "%Y%j")))
+    file_day <- file.path(folder, sprintf("fire_archive_global_%s.txt", strftime(date, "%Y%j")))
     
     # Remove existing file at that date
-    existing_files <- list.files(path=folder,
-                                 pattern=sprintf("%s.[txt|csv]", strftime(date, "%Y%j")),
-                                 full.names = T)
+    existing_files <- list.files(
+      path = folder,
+      pattern = sprintf("%s.[txt|csv]", strftime(date, "%Y%j")),
+      full.names = TRUE
+    )
     lapply(existing_files, file.remove)
     
     # Export
@@ -454,13 +474,13 @@ fire.split_archive <- function(file_archive, region="Global"){
 #'   The `suffix` column contains region identifiers (or "" for variables without a suffix).
 #'   The `vars` column contains the variable names grouped by suffix.
 #' @keywords internal
-fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_count|pm25_emission"){
+fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_count|pm25_emission") {
   
   # Find all variables matching the prefixes
   pattern <- paste0("^(", prefixes, ")")
   fire_vars <- var_names[grepl(pattern, var_names)]
   
-  if(length(fire_vars) == 0){
+  if (length(fire_vars) == 0) {
     return(tibble::tibble(suffix = character(0), vars = list()))
   }
   
@@ -473,20 +493,20 @@ fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_cou
   result_list <- list()
   suffix_keys <- character(0)
   
-  for(var in fire_vars){
+  for (var in fire_vars) {
     # Find which prefix matches (use the longest match to handle overlapping prefixes)
     matched_prefix <- NULL
     matched_length <- 0
-    for(prefix in prefix_list){
-      if(grepl(paste0("^", prefix), var)){
-        if(nchar(prefix) > matched_length){
+    for (prefix in prefix_list) {
+      if (grepl(paste0("^", prefix), var)) {
+        if (nchar(prefix) > matched_length) {
           matched_prefix <- prefix
           matched_length <- nchar(prefix)
         }
       }
     }
     
-    if(is.null(matched_prefix)) next
+    if (is.null(matched_prefix)) next
     
     # Extract suffix: everything after the prefix, excluding _lag* at the end
     # Remove the prefix
@@ -499,7 +519,7 @@ fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_cou
     
     # Find or create index for this suffix
     suffix_idx <- match(suffix, suffix_keys)
-    if(is.na(suffix_idx)){
+    if (is.na(suffix_idx)) {
       suffix_keys <- c(suffix_keys, suffix)
       suffix_idx <- length(suffix_keys)
       result_list[[suffix_idx]] <- character(0)
@@ -510,7 +530,7 @@ fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_cou
   }
   
   # Sort variables within each group (base vars first, then lags)
-  result_list <- lapply(result_list, function(vars){
+  result_list <- lapply(result_list, function(vars) {
     # Sort: non-lag vars first, then lag vars
     non_lag <- vars[!grepl("_lag[[:digit:]]*$", vars)]
     lag_vars <- vars[grepl("_lag[[:digit:]]*$", vars)]

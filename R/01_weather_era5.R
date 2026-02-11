@@ -15,8 +15,10 @@ era5.corr_weather_vars <- function() {
 }
 
 
-era5.rename_global_to_era5 <- function(global_var,
-                                       only_keep_existing_vars = F) {
+era5.rename_global_to_era5 <- function(
+  global_var,
+  only_keep_existing_vars = FALSE
+) {
   corr <- era5.corr_weather_vars()
   corr_reverse <- as.list(setNames(names(corr), corr))
   x <- recode(global_var, !!!corr_reverse)
@@ -47,9 +49,7 @@ era5.rename_era5_to_global_df <- function(data) {
 #' @export
 #'
 #' @examples
-era5.collect_weather <- function(location_dates,
-                                 weather_vars,
-                                 update = T) {
+era5.collect_weather <- function(location_dates, weather_vars, update = TRUE) {
   dates <- location_dates %>%
     as.data.frame() %>%
     group_by(location_id) %>%
@@ -58,27 +58,30 @@ era5.collect_weather <- function(location_dates,
     tidyr::unnest(date) %>%
     pull(date) %>%
     unique()
-
-  if(update){
+  
+  if (update) {
     print("=== Refreshing ERA5 files ===")
     era5.refresh_files(dates)
     print("=== Done ===")  
   }
   
-  locations_sf <- st_as_sf(location_dates %>%
-    ungroup() %>%
-    dplyr::select(location_id, geometry) %>%
-    dplyr::distinct(location_id, .keep_all = T))
-
-
+  locations_sf <- st_as_sf(
+    location_dates %>%
+      ungroup() %>%
+      dplyr::select(location_id, geometry) %>%
+      dplyr::distinct(location_id, .keep_all = TRUE)
+  )
+  
+  
   dir_era5 <- era5.folder_era5()
   print(glue("Found {length(list.files(dir_era5, '\\\\.tif'))} tif files in ERA5 folder")) 
-  weather_vars_era5 <- era5.rename_global_to_era5(weather_vars,
-    only_keep_existing_vars = T
+  weather_vars_era5 <- era5.rename_global_to_era5(
+    weather_vars,
+    only_keep_existing_vars = TRUE
   )
-
+  
   print(glue("=== Extracting ERA5 for {length(dates)} dates at {nrow(locations_sf)} locations ==="))
-
+  
   coords <- terra::vect(locations_sf)
   era5_data <- pbapply::pblapply(dates, function(date) {
     tryCatch(
@@ -98,29 +101,30 @@ era5.collect_weather <- function(location_dates,
         pressure_vars <- intersect(c("sp"), weather_vars_era5)
         precip_vars <- intersect(c("total_precip"), weather_vars_era5)
         
-        dplyr::bind_cols(location_id = coords$location_id,
-                         tb,
-                         as.data.frame(extracted_values) %>%
-                           dplyr::select(-c(ID))) %>%
-                           # K to C for temp_min and temp_max
+        dplyr::bind_cols(
+          location_id = coords$location_id,
+          tb,
+          as.data.frame(extracted_values) %>%
+            dplyr::select(-c(ID))
+        ) %>%
+          # K to C for temp_min and temp_max
           dplyr::mutate_at(all_of(temp_vars), ~ . - 273.15) %>%
           # Pa to millibar for atmos_pres
           dplyr::mutate_at(all_of(pressure_vars), ~ . / 1e2) %>%
           # m to mm for precip
           dplyr::mutate_at(all_of(precip_vars), ~ . * 1e3)
-      },
-      error = function(error) {
-        return(NULL)
+      }, error = function(error) {
+        NULL
       }
     )
   }) %>%
     bind_rows()
-
-
+  
+  
   # Handle case where no data was extracted
   if (nrow(era5_data) == 0) {
     warning("No ERA5 data extracted. Returning empty weather data frame.")
-    return(tibble::tibble(location_id = character(0), weather = list()))
+    tibble::tibble(location_id = character(0), weather = list())
   }
   
   weather <- era5_data %>%
@@ -133,7 +137,7 @@ era5.collect_weather <- function(location_dates,
     tidyr::nest() %>%
     rename(weather = data)
   print("=== Done ===")
-
+  
   return(weather)
 }
 
@@ -148,11 +152,11 @@ era5.folder_era5 <- function() {
   if (dir_era5 == "") {
     stop("Missing DIR_ERA5 folder")
   }
-  return(dir_era5)
+  dir_era5
 }
 
 extract_date <- function(fname) {
-  return(strsplit(strsplit(fname, split = "[_]")[[1]][2], split = "[.]")[[1]][1])
+  strsplit(strsplit(fname, split = "[_]")[[1]][2], split = "[.]")[[1]][1]
 }
 
 era5.processed_dates <- function() {
@@ -160,19 +164,19 @@ era5.processed_dates <- function() {
   ds <- list.files(
     path = dir_era5,
     pattern = "*.tif",
-    full.names = F,
+    full.names = FALSE,
     recursive = TRUE
   )
   dates <- unique(lubridate::ymd(lapply(as.list(ds), extract_date)))
   # dates <- unique(lapply(as.list(ds), extract_date))
   date <- dates[!is.na(dates)]
-  return(c(date))
+  c(date)
 }
 
 era5.processable_dates <- function(dates) {
   # Returns list of dates (in dates argument) that are available on CDS
   # All dates are available on CDS (few exceptions, but no easy way to get in advance)
-  return(dates[dates < lubridate::today() - 3])
+  dates[dates < lubridate::today() - 3]
 }
 
 
@@ -186,7 +190,13 @@ era5.processable_dates <- function(dates) {
 #' @export
 #'
 #' @examples
-era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_layers=24, time_out=NULL) {
+era5.process_date <- function(
+  date, 
+  force_redownload_nc = FALSE, 
+  remove_nc = TRUE, 
+  min_layers = 24, 
+  time_out = NULL
+) {
   tryCatch(
     {
       era5_long_vars <- c(
@@ -199,7 +209,7 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
         "total_precipitation"
       )
       
-      if(date > ymd('2024-11-05')){ # after 2024-11-05, the file extension is zip
+      if (date > ymd("2024-11-05")) { # after 2024-11-05, the file extension is zip
         fname <- paste0("era5_", date, ".zip")
       } else {
         fname <- paste0("era5_", date, ".nc")
@@ -208,30 +218,32 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
       path <- file.path(era5.folder_era5(), fname)
       
       # Downlad nc file if need be
-      file_ncs <- era5.download_nc(force=force_redownload_nc,
-                       date=date,
-                       era5_long_vars=era5_long_vars,
-                       folder=era5.folder_era5(),
-                       min_layers=min_layers,
-                       time_out=time_out)
+      file_ncs <- era5.download_nc(
+        force = force_redownload_nc,
+        date = date,
+        era5_long_vars = era5_long_vars,
+        folder = era5.folder_era5(),
+        min_layers = min_layers,
+        time_out = time_out
+      )
       
       
       # file_ncs could be either one general nc or two ncs: instant and accum
       # if two, then tp is in accum and others are in instant
       
-      fpath_accum <- ifelse(length(file_ncs)==1, file_ncs, file_ncs[grep("accum", file_ncs)])
-      fpath_instant <- ifelse(length(file_ncs)==1, file_ncs, file_ncs[grep("instant", file_ncs)])
+      fpath_accum <- ifelse(length(file_ncs) == 1, file_ncs, file_ncs[grep("accum", file_ncs)])
+      fpath_instant <- ifelse(length(file_ncs) == 1, file_ncs, file_ncs[grep("instant", file_ncs)])
       layers_dict <- list()
-
+      
       
       calc_raster <- function(fpath, var, fun) {
-        brick <-raster::brick(fpath, var = var)
-        if(raster::nlayers(brick) < min_layers){
+        brick <- raster::brick(fpath, var = var)
+        if (raster::nlayers(brick) < min_layers) {
           stop("Not enough layers")
         }
-        raster::calc(brick, fun = fun, na.rm = T)
+        raster::calc(brick, fun = fun, na.rm = TRUE)
       }
-
+      
       layers_dict["dewpoint_temp"] <- calc_raster(fpath_instant, "d2m", mean)
       layers_dict["pbl"] <- calc_raster(fpath_instant, "blh", mean)
       layers_dict["pbl_min"] <- calc_raster(fpath_instant, "blh", min)
@@ -239,52 +251,54 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
       layers_dict["temp"] <- calc_raster(fpath_instant, "t2m", mean)
       layers_dict["temp_max"] <- calc_raster(fpath_instant, "t2m", max)
       layers_dict["temp_min"] <- calc_raster(fpath_instant, "t2m", min)
-
+      
       # Wind direction and wind speed calculation
       # We do it hour by hour and then average wd and ws
       layer_names <- terra::rast(fpath_instant) %>% names()
       
       
-      u10_lyrs <- grep("u10_", layer_names, value=T) %>% sort()
-      v10_lyrs <- grep("v10_", layer_names, value=T) %>% sort()
-  
-      uvs <- terra::rast(fpath_instant, lyrs=c(u10_lyrs, v10_lyrs))
+      u10_lyrs <- grep("u10_", layer_names, value = TRUE) %>% sort()
+      v10_lyrs <- grep("v10_", layer_names, value = TRUE) %>% sort()
+      
+      uvs <- terra::rast(fpath_instant, lyrs = c(u10_lyrs, v10_lyrs))
       
       uv2wdws <- function(uv) {
         degrees <- function(radians) 180 * radians / pi
         mathdegs <- degrees(atan2(uv[[2]][], uv[[1]][]))
-        wdcalc <- case_when(mathdegs > 0 ~ mathdegs, T ~mathdegs + 360)
-        wd <- case_when(wdcalc < 270 ~ 270 - wdcalc, T ~270 - wdcalc + 360)
-        ws <- sqrt(uv[[1]][]^2 + uv[[2]][]^2)
+        wdcalc <- case_when(mathdegs > 0 ~ mathdegs, TRUE ~ mathdegs + 360)
+        wd <- case_when(wdcalc < 270 ~ 270 - wdcalc, TRUE ~ 270 - wdcalc + 360)
+        ws <- sqrt(uv[[1]][] ^ 2 + uv[[2]][] ^ 2)
         
         uv[] <- cbind(wd, ws)
-        names(uv) <- c('wd' ,'ws')
-        return(uv)
+        names(uv) <- c("wd", "ws")
+        uv
       }
-
-      uvs2wdws <- function(uvs){
+      
+      uvs2wdws <- function(uvs) {
         
-        suffixes <- gsub("u10_", "", grep("u10_", names(uvs), value=T))
+        suffixes <- gsub("u10_", "", grep("u10_", names(uvs), value = TRUE))
         # For each hour
-        wdwss <- pbapply::pblapply(suffixes, function(suffix){
+        wdwss <- pbapply::pblapply(suffixes, function(suffix) {
           uv2wdws(uvs[[c(paste0("u10_", suffix), paste0("v10_", suffix))]])
         })
         
         # Average per day
-        wdwss = terra::rast(wdwss)
-        ws <- terra::app(wdwss['^ws$'], mean)
+        wdwss <- terra::rast(wdwss)
+        ws <- terra::app(wdwss["^ws$"], mean)
         
         # For wind direction, we sum u and v across all hours and take the resulting direction
-        wd <- uv2wdws(terra::rast(list(terra::app(uvs['u10'], sum), terra::app(uvs['v10'], sum))))['wd']
+        wd <- uv2wdws(terra::rast(
+          list(terra::app(uvs["u10"], sum), terra::app(uvs["v10"], sum))
+        ))["wd"]
         
-        return(list(wd=wd, ws=ws))
+        list(wd = wd, ws = ws)
       }
       
       wdws <- uvs2wdws(uvs)
-
+      
       layers_dict["wd"] <- raster::raster(wdws$wd)
       layers_dict["ws"] <- raster::raster(wdws$ws)
-
+      
       # # Humidity calculation: https://confluence.ecmwf.int/pages/viewpage.action?pageId=171411214
       # Rdry <- 287.0597 # Constant for dry air J kg−1 K−1
       # Rvap <- 461.5250 # Constant for water vapor J kg−1 K−1
@@ -307,24 +321,23 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
       # }
       # huss <- raster::calc(t2msp, humidity_fun)
       # layers_dict["humid"] <- huss
-
+      
       sp <- calc_raster(fpath_instant, "sp", mean)
       tp <- calc_raster(fpath_accum, "tp", sum) 
       t2m <- layers_dict["temp"]
       t2msp <- raster::stack(c(t2m, sp))
-
+      
       layers_dict["sp"] <- sp
       layers_dict["total_precip"] <- tp
-
-      output_path <- file.path(era5.folder_era5(),
-                               paste0("era5_", date, ".tiff"))
-
+      
+      output_path <- file.path(era5.folder_era5(), paste0("era5_", date, ".tiff"))
+      
       tif <- raster::stack(layers_dict)
       names(tif) <- names(layers_dict)
-
+      
       terra_ras <- terra::rast(tif)
       t <- terra::writeRaster(terra_ras, output_path, overwrite = TRUE)
-      if(remove_nc){
+      if (remove_nc) {
         sapply(file_ncs, file.remove)
       } 
     },
@@ -332,7 +345,7 @@ era5.process_date <- function(date, force_redownload_nc = F, remove_nc = T, min_
       # QUICKFIX try print as well
       print(paste("Failed for date", date, error))
       warning(paste("Failed for date", date, error))
-      return(NULL)
+      NULL
     }
   )
 }
@@ -351,7 +364,7 @@ era5.refresh_files <- function(dates) {
   processed <- era5.processed_dates()
   processable <- era5.processable_dates(dates)
   to_process <- processable[!processable %in% processed]
-
+  
   cache_rs <- NULL
   for (i in seq_along(to_process)) {
     d <- to_process[i]
@@ -362,25 +375,29 @@ era5.refresh_files <- function(dates) {
 
 era5.date_to_filepaths <- function(date, dir_era5) {
   # returns the path to the daily file for date `date`
-  return(file.path(dir_era5, paste0("era5_", date, ".tiff")))
+  file.path(dir_era5, paste0("era5_", date, ".tiff"))
 }
 
-era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::today(), force = F){
+era5.reprocess_files <- function(
+  date_from = "2015-01-01", 
+  date_to = lubridate::today(),
+  force = FALSE
+) {
   
   dates <- seq.Date(as.Date(date_from), as.Date(date_to), by = "1 day")
   dir_era5 <- era5.folder_era5()
   
-  n_layers <- pbapply::pbsapply(dates, function(date){
+  n_layers <- pbapply::pbsapply(dates, function(date) {
     tif_file <- era5.date_to_filepaths(date, dir_era5)
     if (!file.exists(tif_file)) {
       return(0)
     }
     tif <- terra::rast(tif_file)
-    return(length(names(tif)))
+    length(names(tif))
   })
-
+  
   dates_to_process <- dates[force | n_layers < 11]
-  pbapply::pblapply(dates_to_process, era5.process_date, remove_nc = T, time_out=3600)
+  pbapply::pblapply(dates_to_process, era5.process_date, remove_nc = TRUE, time_out = 3600)
   
 }
 
@@ -400,43 +417,43 @@ era5.reprocess_files <- function(date_from='2015-01-01', date_to=lubridate::toda
 #' @export
 #'
 #' @examples
-era5.download_nc <- function(force,
-                              date,
-                              folder,
-                              era5_long_vars,
-                              min_layers=NULL,
-                              time_out=NULL
-                             )
-{
+era5.download_nc <- function(
+  force,
+  date,
+  folder,
+  era5_long_vars,
+  min_layers = NULL,
+  time_out = NULL
+) {
   
   
   # Files could take several format: one .nc or two (instant & accum) depending on the date
   file_path_glob <- paste0("era5_", date, ".*\\.nc")
-  files_found <- list.files(folder, pattern = file_path_glob, full.names = T)
-  do_download <- force | (length(files_found)==0)
-
+  files_found <- list.files(folder, pattern = file_path_glob, full.names = TRUE)
+  do_download <- force | (length(files_found) == 0)
+  
   
   # Check if existing files are complete or proper nc files (some may actually be zip)
-  if(!is.null(min_layers) & length(files_found) >0){
-    for(f in files_found){
+  if (!is.null(min_layers) & length(files_found) > 0) {
+    for (f in files_found) {
       tryCatch({
         n_layers <- purrr::quietly(raster::nlayers(raster::brick(f)))
-        if(n_layers < min_layers){
+        if (n_layers < min_layers) {
           message(glue("Redownloading {f} as it seems incomplete"))
           do_download <- do_download | TRUE
         }    
-      }, error=function(e){
+      }, error = function(e) {
         message(glue("Redownloading {f} as it seems corrupted"))
-        do_download <<-TRUE
+        do_download <<- TRUE
       })
     }
   }
   
-  if(!do_download){
+  if (!do_download) {
     return(files_found)
   }
   
-  if(do_download){
+  if (do_download) {
     year <- strsplit(as.character(date), split = "[-]")[[1]][1]
     month <- strsplit(as.character(date), split = "[-]")[[1]][2]
     day <- strsplit(as.character(date), split = "[-]")[[1]][3]
@@ -475,14 +492,14 @@ era5.download_nc <- function(force,
     
     # Timeout: short if recent date, long otherwise
     # as it is likely to be unavailable
-    if(is.null(time_out)){
-      if(lubridate::today() - as.Date(date) < 5){
+    if (is.null(time_out)) {
+      if (lubridate::today() - as.Date(date) < 5) {
         time_out <- 300
       } else {
         time_out <- 900
       }  
     }
- 
+    
     file_path <- ecmwfr::wf_request(
       user = utils.get_env("CDS_UID"),
       request = request,
@@ -494,47 +511,40 @@ era5.download_nc <- function(force,
     
     # Check if it is a zip
     is_zip <- tryCatch({
-      unzip(file_path, list=T)
-      T
-    }, error=function(e){
-      return(FALSE)
+      unzip(file_path, list = TRUE)
+      TRUE
+    }, error = function(e) {
+      FALSE
     })
     
     is_nc <- tryCatch({
       suppressWarnings(ncdf4::nc_open(file_path))
-      T
-    }, error=function(e){
-      return(FALSE)
+      TRUE
+    }, error = function(e) {
+      FALSE
     })
     
-    if(!xor(is_nc, is_zip)){
+    if (!xor(is_nc, is_zip)) {
       stop("ERA5 file is neither zip or nc.")
     }
     
-    if(is_nc){
+    if (is_nc) {
       # Append .nc
       file_path_new <- paste0(file_path, ".nc")
-      file.rename(
-        file_path,
-        file_path_new
-      )
+      file.rename(file_path, file_path_new)
       return(file_path_new)
     }
     
-    if(is_zip){
+    if (is_zip) {
       # Unzip
-      file_names <- unzip(file_path, list=T)$Name
+      file_names <- unzip(file_path, list = TRUE)$Name
       to_new <- function(x) gsub("data_stream-oper_stepType", paste0("era5_", date), x)
-      file_names_new <- sapply(file_names, to_new, USE.NAMES = F)
+      file_names_new <- sapply(file_names, to_new, USE.NAMES = FALSE)
       file_paths_new <- file.path(folder, file_names_new)
-      # file_names_new <- 
-      unzip(file_path, exdir=folder)
+      unzip(file_path, exdir = folder)
       file.remove(file_path)
-      sapply(file_names, function(f){
-        file.rename(
-          file.path(folder, f),
-          file.path(folder, to_new(f))
-        )
+      sapply(file_names, function(f) {
+        file.rename(file.path(folder, f), file.path(folder, to_new(f)))
       })
       return(file_paths_new)
     }
