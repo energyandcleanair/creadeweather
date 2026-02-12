@@ -34,7 +34,7 @@ upload_fire_results <- function(results,
     group_by(location_id) %>%
     tidyr::nest()
   
-  mapply(creafire::db.upload_meas,
+  mapply(db.upload_meas,
          meas=results_list$data,
          location_id=results_list$location_id,
          met_type=met_type,
@@ -44,7 +44,7 @@ upload_fire_results <- function(results,
          height=list(trajs_height),
          fire_source=fire_source,
          fire_split_regions=list(ifelse(is.null(fire_split_regions),
-                                        creafire::NO_SPLIT_REGION,
+                                        NO_SPLIT_REGION,
                                         fire_split_regions)))
 }
 
