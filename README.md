@@ -66,6 +66,7 @@ Ensure you have the following variables set up in your `.Renviron` file:
 
 ```
 CREA_DB_URL=
+CREA_MONGODB_URL=
 DIR_ERA5=
 ```
 

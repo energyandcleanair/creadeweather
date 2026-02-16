@@ -51,6 +51,8 @@ Imports:
     fuzzyjoin,
     stringi,
     httr,
+    mongolite,
+    jsonlite,
     terra,
     ncdf4,
     caret,
