@@ -44,6 +44,7 @@ db.get_unique_columns_meas <- function(){
 }
 
 #' Extract metadata from all files in a GridFS collection
+#' @export
 db.available_metadata <- function(fs, col_names){
   found <- fs$find()
   if(nrow(found)==0){
@@ -63,6 +64,7 @@ db.available_metadata <- function(fs, col_names){
 }
 
 #' List all available cached weather metadata
+#' @export
 db.available_weather <- function(){
   db.available_metadata(fs=db.get_gridfs_weather(),
                         col_names=db.get_unique_columns_weather())
@@ -70,6 +72,7 @@ db.available_weather <- function(){
 
 
 #' List all available cached measurement metadata
+#' @export
 db.available_meas <- function(){
   db.available_metadata(fs=db.get_gridfs_meas(),
                         col_names=db.get_unique_columns_meas())
@@ -196,6 +199,7 @@ db.upload_meas <- function(meas, location_id, met_type, height, duration_hour, h
 
 
 #' Query weather GridFS by metadata filters
+#' @export
 db.find_weather <- function(location_id,
                             met_type=NULL,
                             height=NULL,
@@ -231,6 +235,7 @@ db.find_weather <- function(location_id,
 
 
 #' Query measurement GridFS by metadata filters
+#' @export
 db.find_meas <- function(location_id,
                          met_type=NULL,
                          height=NULL,
