@@ -30,7 +30,6 @@ get_measurements <- function(meas=NULL,
   
   
   if(is.null(meas)){
-    
     meas <- rcrea::measurements(poll=poll,
                                 country=country,
                                 location_id=location_id,
@@ -60,8 +59,7 @@ get_measurements <- function(meas=NULL,
     dplyr::summarise(value=mean(value, na.rm=T))
   
   if(nrow(meas)==0){
-    warning("No measurement found")
-    return(NULL)
+    stop(glue("No measurement found for location {location_id} and source {source}"))
   }
   
   if(nest_and_sf){
