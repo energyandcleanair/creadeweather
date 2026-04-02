@@ -497,7 +497,7 @@ era5.download_nc <- function(force,
     })
     
     is_nc <- tryCatch({
-      suppressWarnings(ncdf4::nc_open(file_path))
+      purrr::quietly(ncdf4::nc_open(file_path))
       T
     }, error=function(e){
       return(FALSE)

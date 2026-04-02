@@ -417,43 +417,20 @@ fire.split_archive <- function(file_archive, region="Global"){
   
   file.remove(file_archive)
 }
-#' 
-#' #' Archive active fire files were downloaded one year by one year
-#' #' which creates memory issues. We split them in more digestible ones.
-#' #' Should only be run once, manually on downloaded files.
-#' #'
-#' #' @return
-#' #' @export
-#' #'
-#' #' @examples
-#' frp.split_yearly_activefire_by_date <- function(f){
-#' 
-#'   d <- data.table::fread(f)
-#'   dates <- unique(d$acq_date)
-#' 
-#'   write_date <- function(date, d, f){
-#'     f_date <- file.path(dirname(f),
-#'                         gsub("[0-9]{4}", strftime(date, "%Y%j"),
-#'                              gsub("csv", "txt", basename(f))))
-#'     write.csv(d[d$acq_date==date], f_date, row.names=FALSE)
-#'   }
-#'   pbapply::pblapply(dates, write_date, d=d, f=f)
-#' }
-#' 
+
 
 #' Extract fire variables grouped by region/suffix
 #'
 #' Groups fire-related variables by their suffix (region identifier).
 #' For example, fire_frp_MYS and fire_frp_MYS_lag1 would be grouped under "_MYS".
 #' Variables without a suffix (like fire_frp) are grouped under "" (empty string).
-#' This will be used to create counterfactual predictions in postcompute.
+#' This will be used to create general and country-specific counterfactual predictions in postcompute.
 #'
 #' @param var_names Character vector of variable names from the model
 #' @param prefixes Character string with pipe-separated prefixes to match (e.g., "fire_frp|fire_count|pm25_emission")
 #' @return A tibble with columns `suffix` (character) and `vars` (list of character vectors). 
 #'   The `suffix` column contains region identifiers (or "" for variables without a suffix).
 #'   The `vars` column contains the variable names grouped by suffix.
-#' @keywords internal
 fire.extract_vars_by_region <- function(var_names, prefixes = "fire_frp|fire_count|pm25_emission"){
   
   # Find all variables matching the prefixes
