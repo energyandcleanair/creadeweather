@@ -264,11 +264,11 @@ era5.process_date <- function(
       
       uv2wdws <- function(uv) {
         degrees <- function(radians) 180 * radians / pi
-        u <- as.vector(uv[[1]][])
-        v <- as.vector(uv[[2]][])
+        u <- as.numeric(uv[[1]][])
+        v <- as.numeric(uv[[2]][])
         mathdegs <- degrees(atan2(v, u))
-        wdcalc <- case_when(mathdegs > 0 ~ mathdegs, TRUE ~ mathdegs + 360)
-        wd <- case_when(wdcalc < 270 ~ 270 - wdcalc, TRUE ~ 270 - wdcalc + 360)
+        wdcalc <- ifelse(mathdegs > 0, mathdegs, mathdegs + 360)
+        wd <- ifelse(wdcalc < 270, 270 - wdcalc, 270 - wdcalc + 360)
         ws <- sqrt(u ^ 2 + v ^ 2)
         
         uv[] <- cbind(wd, ws)
