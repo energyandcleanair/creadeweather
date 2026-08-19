@@ -51,6 +51,8 @@ Imports:
     fuzzyjoin,
     stringi,
     httr,
+    mongolite,
+    jsonlite,
     terra,
     ncdf4,
     caret,
@@ -67,6 +69,7 @@ Remotes:
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
+    dgrtwo/fuzzyjoin,
     cran/rjson@0.2.21,
     gbm-developers/gbm3
 Suggests: 
