@@ -123,3 +123,67 @@ test_that("parallel training gives identical results to serial training", {
   expect_identical(predictions(serial), predictions(parallel_res))
   expect_identical(opt_trees(serial), opt_trees(parallel_res))
 })
+
+
+test_that("dw_split_cores reports the budget it resolved", {
+  s <- creadeweather:::dw_split_cores(n_items = 93, n_cores = 6)
+  expect_equal(s$n_cores, 6L)
+  expect_equal(s$requested, 6)
+
+  # With no explicit budget it falls back to availableCores(), and records
+  # that the value was auto-detected rather than asked for.
+  s <- creadeweather:::dw_split_cores(n_items = 93, n_cores = NULL)
+  expect_null(s$requested)
+  expect_gte(s$n_cores, 1L)
+})
+
+
+test_that("dw_describe_cores reports usage and both core counts", {
+  cores <- creadeweather:::dw_split_cores(n_items = 93, n_cores = 4)
+  msg <- creadeweather:::dw_describe_cores(93, cores)
+
+  expect_match(msg, "Training 93 model\\(s\\)")
+  expect_match(msg, "using 4 of 4 core\\(s\\)")
+  expect_match(msg, "4 worker\\(s\\) x 1 gbm thread\\(s\\)")
+  # Both counts are present so a container's CPU limit detection is auditable.
+  expect_match(msg, "detectCores=")
+  expect_match(msg, "availableCores=")
+  expect_match(msg, "n_cores=4")
+
+  # Leftover cores go to threads, and are still counted as used.
+  cores <- creadeweather:::dw_split_cores(n_items = 3, n_cores = 8)
+  expect_match(creadeweather:::dw_describe_cores(3, cores), "using 6 of 8 core\\(s\\)")
+  expect_match(creadeweather:::dw_describe_cores(3, cores), "n_cores=8")
+
+  # Auto-detected budget is labelled as such.
+  cores <- creadeweather:::dw_split_cores(n_items = 2, n_cores = NULL)
+  expect_match(creadeweather:::dw_describe_cores(2, cores), "n_cores=auto")
+})
+
+
+test_that("train_models logs the cores it uses", {
+  weather_vars <- c(
+    "air_temp_min", "air_temp_max", "atmos_pres", "wd", "ws",
+    "precip", "dewpoint_temp", "pbl_min", "pbl_max"
+  )
+  data <- tibble::tibble(
+    location_id = "city_1",
+    poll = "pm25",
+    unit = "ug/m3",
+    source = "test",
+    process_id = "test_process",
+    meas_weather = list(synthetic_train_inputs(seed = 7)$data$meas_weather[[1]])
+  )
+
+  msgs <- testthat::capture_messages(
+    creadeweather::train_models(
+      data = data, engine = "gbm", trees = 50, weather_vars = weather_vars,
+      time_vars = c(), training_end = "2099-01-01", training.fraction = 1,
+      lag = 0, interaction.depth = 7, learning.rate = 0.01, cv_folds = 3,
+      link = "linear", n_cores = 2
+    )
+  )
+
+  expect_true(any(grepl("using .* core\\(s\\)", msgs)))
+  expect_true(any(grepl("availableCores=", msgs)))
+})

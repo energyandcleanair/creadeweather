@@ -178,12 +178,9 @@ train_models <- function(data,
   backend <- dw_parallel_backend(cores$workers)
   on.exit(backend$close(), add = TRUE)
 
-  if (cores$workers > 1L) {
-    message(sprintf(
-      "Training %d model(s) on %d worker(s) x %d gbm thread(s)",
-      nrow(data), cores$workers, cores$threads
-    ))
-  }
+  # Always logged, including in the serial case, so a job's logs alone are
+  # enough to confirm how much of its CPU allocation was actually engaged.
+  message(dw_describe_cores(nrow(data), cores))
 
   extra_args <- list(...)
 

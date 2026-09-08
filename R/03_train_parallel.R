@@ -29,6 +29,8 @@
 #'
 #' @keywords internal
 dw_split_cores <- function(n_items, n_cores = NULL) {
+  requested <- n_cores
+
   if (is.null(n_cores)) {
     n_cores <- tryCatch(
       as.integer(future::availableCores()),
@@ -41,7 +43,51 @@ dw_split_cores <- function(n_items, n_cores = NULL) {
   workers <- min(n_cores, n_items)
   threads <- max(1L, n_cores %/% workers)
 
-  list(workers = as.integer(workers), threads = as.integer(threads))
+  list(
+    workers = as.integer(workers),
+    threads = as.integer(threads),
+    n_cores = as.integer(n_cores),
+    requested = requested
+  )
+}
+
+
+#' Describe the cores a training run will use
+#'
+#' Reports what the machine offers versus what we actually engage, so a run's
+#' logs are enough to tell whether a container's CPU limit is being detected
+#' and whether the whole allocation is being used.
+#'
+#' `parallel::detectCores()` reports the host's CPUs and ignores cgroup
+#' limits, whereas `future::availableCores()` honours them. On a container
+#' platform the two differing is expected and correct; them being equal to a
+#' large number is the signal that the limit is *not* being seen, and that we
+#' would be oversubscribing.
+#'
+#' @param n_items Number of models to be trained.
+#' @param cores The list returned by [dw_split_cores()].
+#'
+#' @return A single-line description, invisibly also usable as a string.
+#'
+#' @keywords internal
+dw_describe_cores <- function(n_items, cores) {
+  detected <- tryCatch(as.integer(parallel::detectCores()), error = function(e) NA_integer_)
+  available <- tryCatch(as.integer(future::availableCores()), error = function(e) NA_integer_)
+
+  sprintf(
+    paste0(
+      "Training %d model(s) using %d of %d core(s): %d worker(s) x %d gbm thread(s) ",
+      "[detectCores=%s, availableCores=%s, n_cores=%s]"
+    ),
+    n_items,
+    cores$workers * cores$threads,
+    cores$n_cores,
+    cores$workers,
+    cores$threads,
+    ifelse(is.na(detected), "unknown", detected),
+    ifelse(is.na(available), "unknown", available),
+    if (is.null(cores$requested)) "auto" else cores$requested
+  )
 }
 
 
