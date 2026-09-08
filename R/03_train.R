@@ -84,6 +84,11 @@ train_configs <- function(data, configs) {
 #' @param training_end Date or string. Cutoff date separating training from prediction period.
 #' @param ntrainings Integer. Number of training runs for bootstrap uncertainty. Default is 1.
 #' @param original_seed Integer. Random seed for reproducibility. Default is 42.
+#' @param n_cores Integer. Total cores to use for training. Rows are trained in
+#'   parallel worker processes, with any leftover cores given to gbm3's own
+#'   threading. `NULL` (default) uses [future::availableCores()], which respects
+#'   container CPU limits. Use 1 to train serially.
+#'   Results are unaffected: the seed is set per model inside each worker.
 #' @param ... Additional arguments passed to the training engine.
 #'
 #' @return A tibble with one row per location containing:
@@ -121,6 +126,7 @@ train_models <- function(data,
                          training_end,
                          ntrainings = 1,
                          original_seed = 42,
+                         n_cores = NULL,
                          ...) {
 
  # Validate input data
@@ -166,25 +172,44 @@ train_models <- function(data,
   # Add index for tracking
   data$index <- zoo::index(data)
 
+  # Each row is an independent model, so spread the rows across worker
+  # processes and give gbm3 whatever cores are left over (see dw_split_cores).
+  cores <- dw_split_cores(n_items = nrow(data), n_cores = n_cores)
+  backend <- dw_parallel_backend(cores$workers)
+  on.exit(backend$close(), add = TRUE)
+
+  if (cores$workers > 1L) {
+    message(sprintf(
+      "Training %d model(s) on %d worker(s) x %d gbm thread(s)",
+      nrow(data), cores$workers, cores$threads
+    ))
+  }
+
+  extra_args <- list(...)
+
+  train_one <- function(i) {
+    do.call(train_model_safe_ntimes, c(
+      list(
+        index = data$index[[i]],
+        location_id = data$location_id[[i]],
+        data = data$meas_weather[[i]],
+        normalise = normalise,
+        training_end = training_end,
+        weather_vars = weather_vars_wlag,
+        time_vars = time_vars,
+        trees = trees,
+        detect_breaks = detect_breaks,
+        samples = samples,
+        training.fraction = training.fraction,
+        training_excluded_dates = training_excluded_dates,
+        num_threads = cores$threads
+      ),
+      extra_args
+    ))
+  }
+
   # Run training across all locations
-  result <- pbapply::pbmapply(
-    train_model_safe_ntimes,
-    index = data$index,
-    location_id = data$location_id,
-    data = data$meas_weather,
-    normalise = normalise,
-    training_end = training_end,
-    weather_vars = list(weather_vars_wlag),
-    time_vars = list(time_vars),
-    trees = trees,
-    detect_breaks = detect_breaks,
-    samples = samples,
-    training.fraction = training.fraction,
-    training_excluded_dates = list(training_excluded_dates),
-    USE.NAMES = FALSE,
-    SIMPLIFY = FALSE,
-    ...
-  )
+  result <- pbapply::pblapply(seq_len(nrow(data)), train_one, cl = backend$cl)
 
   # Aggregate results
   aggregate_training_results(result, data)
@@ -256,8 +281,16 @@ add_derived_time_vars <- function(data, time_vars) {
 #' @keywords internal
 aggregate_training_results <- function(result, data) {
 
-  # Remove failed trainings
-  result <- result[!sapply(result, function(x) all(is.na(x)))]
+  # Remove failed trainings. train_model_safe() turns a modelling error into
+  # NA, but a worker process that dies outright surfaces as a try-error, which
+  # is only reachable now that rows are trained in parallel.
+  failed <- vapply(result, function(x) {
+    inherits(x, "try-error") ||
+      inherits(x, "error") ||
+      is.null(x) ||
+      all(is.na(x))
+  }, logical(1))
+  result <- result[!failed]
 
   if (length(result) == 0) {
     return(NA)

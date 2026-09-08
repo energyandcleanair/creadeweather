@@ -40,6 +40,9 @@
 #' @param cv_folds Integer. Number of cross-validation folds for determining
 #'   optimal tree count. Use 1 for OOB estimation. Default is 3.
 #' @param parallel Logical. Whether to use parallel processing. Default is TRUE.
+#' @param num_threads Integer. gbm3 threads for this single fit. `NULL` probes
+#'   the machine; [train_models()] passes an explicit value so that worker
+#'   processes and gbm threads together stay within the core budget.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A tibble with one row containing:
@@ -76,6 +79,7 @@ train_gbm <- function(data,
                       training.fraction = 0.9,
                       cv_folds = 3,
                       parallel = TRUE,
+                      num_threads = NULL,
                       ...) {
 
   prepared <- train_gbm_prepare_data(
@@ -95,7 +99,8 @@ train_gbm <- function(data,
     interaction.depth = interaction.depth,
     learning.rate = learning.rate,
     cv_folds = cv_folds,
-    parallel = parallel
+    parallel = parallel,
+    num_threads = num_threads
   )
 }
 
@@ -269,6 +274,7 @@ train_gbm_prepare_data <- function(data,
 #' @param learning.rate Shrinkage parameter.
 #' @param cv_folds Number of CV folds (use 1 for OOB).
 #' @param parallel Whether to use parallel processing.
+#' @param num_threads Integer. gbm3 threads to use, or NULL to probe the machine.
 #'
 #' @return A tibble with columns: `model`, `data`, `performance`.
 #'
@@ -279,7 +285,8 @@ train_gbm_fit_model <- function(data_prepared,
                                 interaction.depth = 1,
                                 learning.rate = 0.1,
                                 cv_folds = 3,
-                                parallel = TRUE) {
+                                parallel = TRUE,
+                                num_threads = NULL) {
 
   if (!"set" %in% names(data_prepared)) {
     stop("Prepared data must include a 'set' column")
@@ -295,8 +302,18 @@ train_gbm_fit_model <- function(data_prepared,
     stop("No valid training data available")
   }
 
-  # Configure parallelization
-  n_cores <- if (parallel) as.integer(future::availableCores() - 1) else 1L
+  # Configure parallelization.
+  # `num_threads` is set by train_models(), which has already reserved cores
+  # for its worker processes; honour it so we don't oversubscribe the box by
+  # running (workers x threads) far above the actual core count. Only fall
+  # back to probing the machine when called directly.
+  n_cores <- if (!is.null(num_threads)) {
+    max(1L, as.integer(num_threads))
+  } else if (parallel) {
+    max(1L, as.integer(future::availableCores() - 1))
+  } else {
+    1L
+  }
 
   # Train GBM model
   message("Training GBM model...")
