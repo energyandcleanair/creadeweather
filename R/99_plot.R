@@ -61,8 +61,11 @@ plot.infos <- function(output_data_row){
     'mpe validation'=round(output_data_row$mpe_test,2)
   )
   infos_tbl <- tibble('Parameter / Result'=names(infos_list), 'Value'=as.character(infos_list))
-  ggtexttable(infos_tbl, rows = NULL, 
-                          theme = ttheme("lCyan"))
+  ggpubr::ggtexttable(
+    infos_tbl,
+    rows = NULL,
+    theme = ggpubr::ttheme("lCyan")
+  )
 }
 
 plot.output_data_row <- function(output_data_row, rolling_days){
@@ -112,7 +115,7 @@ plot.output_data <- function(output_data, rolling_days, filepath){
   }
   
   figure_alls <- ggpubr::ggarrange(plotlist=figures, ncol = 1, nrow = 3)
-  ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
+  ggpubr::ggexport(figure_alls, filename=filepath,  width = 20, height = 20)
 }
 
 plot.map_count <- function(data, folder, title, meas_col){
@@ -571,4 +574,3 @@ plot.rmweather.qc_plot <- function(result, result_folder=NULL){
   }
   return(plt)
 }
-

@@ -42,9 +42,7 @@ Imports:
     pbmcapply,
     parallel,
     cowplot,
-    ggpubr,
     forcats,
-    deweather,
     ranger,
     caTools,
     dotenv,
@@ -65,14 +63,15 @@ Depends:
     worldmet
 Remotes:
     hubert-thieriot/worldmet,
-    davidcarslaw/deweather,
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
     gbm-developers/gbm3
 Suggests: 
-	devtools,
-	testthat
+    deweather,
+    devtools,
+    ggpubr,
+    testthat
 VignetteBuilder:
 RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
