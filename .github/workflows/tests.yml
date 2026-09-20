@@ -20,7 +20,10 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          needs: check
+          dependencies: '"hard"'
+          extra-packages: |
+            any::devtools
+            any::testthat
 
       - name: Run tests
         run: |
