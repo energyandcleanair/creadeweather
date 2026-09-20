@@ -23,7 +23,7 @@ Imports:
     ggnewscale,
     lubridate,
     gbm3,
-    rjson,
+    rjson (>= 0.2.23),
     e1071,
     standardize,
     Metrics,
@@ -69,8 +69,6 @@ Remotes:
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
-    dgrtwo/fuzzyjoin,
-    cran/rjson@0.2.21,
     gbm-developers/gbm3
 Suggests: 
 	devtools,

@@ -1,4 +1,4 @@
 library(testthat)
-library(crea_deweather)
+library(creadeweather)
 
-test_check("crea_deweather")
+test_check("creadeweather")
