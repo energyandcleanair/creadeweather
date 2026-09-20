@@ -37,11 +37,6 @@ train_caret <- function(data,
                         learning.rate=0.1,
                         link="linear",
                         ...){
-  if (!requireNamespace("deweather", quietly = TRUE)) {
-    stop("Package `deweather` is required to use `train_caret()`.", call. = FALSE)
-  }
-  
-  
   if(is.null(training_end)){
     training_end <- "2099-01-01"
   }

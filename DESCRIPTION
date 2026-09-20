@@ -16,6 +16,7 @@ Imports:
     sf,
     sp,
     data.table,
+    Deriv (<= 4.1.6),
     raster,
     pbapply,
     bit64,
@@ -42,7 +43,9 @@ Imports:
     pbmcapply,
     parallel,
     cowplot,
+    ggpubr,
     forcats,
+    deweather,
     ranger,
     caTools,
     dotenv,
@@ -63,14 +66,14 @@ Depends:
     worldmet
 Remotes:
     hubert-thieriot/worldmet,
+    deweather=openair-project/deweather-archive@170caa4455c61669c6a27de691e4803a36bd9d70,
     rich-iannone/splitr,
     energyandcleanair/rcrea,
     energyandcleanair/creatrajs,
+    cran::Deriv@4.1.6,
     gbm-developers/gbm3
 Suggests: 
-    deweather,
     devtools,
-    ggpubr,
     testthat
 VignetteBuilder:
 RoxygenNote: 7.3.2
