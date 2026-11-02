@@ -412,12 +412,14 @@ fire.get_attach_to_trajs_fn <- function(source) {
   NULL
 }
 
-fire.split_archive <- function(file_archive, region = "Global") {
+# satellite: FIRMS folder of the satellite the archive comes from. creatrajs reads
+# Suomi NPP ("suomi-npp-viirs-c2") before 1 Apr 2018 and NOAA-20 ("noaa-20-viirs-c2") afterwards.
+fire.split_archive <- function(file_archive, region = "Global", satellite = "suomi-npp-viirs-c2") {
   
   f <- readr::read_csv(file_archive)
   fs <- split(f, f$acq_date)
   
-  folder <- file.path(creatrajs::utils.get_firms_folder(), "suomi-npp-viirs-c2", region)
+  folder <- file.path(creatrajs::utils.get_firms_folder(), satellite, region)
   
   lapply(fs, function(f) {
     date <- unique(f$acq_date)
